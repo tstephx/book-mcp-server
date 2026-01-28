@@ -1,0 +1,26 @@
+{
+  "name": "technical_tutorial_v1",
+  "book_type": "technical_tutorial",
+  "version": 1,
+  "chapter_detection": {
+    "method": "toc_with_explicit_fallback",
+    "min_words_per_chapter": 1000,
+    "max_words_per_chapter": 25000,
+    "preserve_code_blocks": true
+  },
+  "text_cleaning": {
+    "remove_headers_footers": true,
+    "normalize_whitespace": true,
+    "preserve_formatting": ["code", "lists", "tables"]
+  },
+  "section_splitting": {
+    "enabled": true,
+    "max_tokens_per_section": 15000
+  },
+  "quality_thresholds": {
+    "min_chapters": 3,
+    "max_chapters": 50,
+    "min_avg_chapter_words": 500,
+    "code_block_detection_required": true
+  }
+}

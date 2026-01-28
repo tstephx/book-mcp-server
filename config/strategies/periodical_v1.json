@@ -1,0 +1,25 @@
+{
+  "name": "periodical_v1",
+  "book_type": "periodical",
+  "version": 1,
+  "chapter_detection": {
+    "method": "article_boundaries",
+    "min_words_per_chapter": 200,
+    "max_words_per_chapter": 10000,
+    "detect_bylines": true,
+    "detect_datelines": true
+  },
+  "text_cleaning": {
+    "remove_headers_footers": true,
+    "remove_advertisements": true,
+    "normalize_whitespace": true
+  },
+  "section_splitting": {
+    "enabled": false
+  },
+  "quality_thresholds": {
+    "min_chapters": 1,
+    "max_chapters": 100,
+    "min_avg_chapter_words": 100
+  }
+}

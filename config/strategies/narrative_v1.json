@@ -1,0 +1,24 @@
+{
+  "name": "narrative_v1",
+  "book_type": "narrative_nonfiction",
+  "version": 1,
+  "chapter_detection": {
+    "method": "explicit_with_semantic_fallback",
+    "min_words_per_chapter": 2000,
+    "max_words_per_chapter": 50000
+  },
+  "text_cleaning": {
+    "remove_headers_footers": true,
+    "normalize_whitespace": true,
+    "preserve_formatting": ["quotes"]
+  },
+  "section_splitting": {
+    "enabled": true,
+    "max_tokens_per_section": 15000
+  },
+  "quality_thresholds": {
+    "min_chapters": 3,
+    "max_chapters": 40,
+    "min_avg_chapter_words": 1000
+  }
+}
