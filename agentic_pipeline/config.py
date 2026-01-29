@@ -5,15 +5,15 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agentic_pipeline.db.config import get_db_path
+
 
 @dataclass
 class OrchestratorConfig:
     """Configuration for the orchestrator."""
 
     # Paths
-    db_path: Path = field(default_factory=lambda: Path(
-        os.environ.get("AGENTIC_PIPELINE_DB", "data/library.db")
-    ))
+    db_path: Path = field(default_factory=get_db_path)
     book_ingestion_path: Path = field(default_factory=lambda: Path(
         os.environ.get(
             "BOOK_INGESTION_PATH",
@@ -36,7 +36,7 @@ class OrchestratorConfig:
     def from_env(cls) -> "OrchestratorConfig":
         """Create configuration from environment variables."""
         return cls(
-            db_path=Path(os.environ.get("AGENTIC_PIPELINE_DB", "data/library.db")),
+            db_path=get_db_path(),
             book_ingestion_path=Path(os.environ.get(
                 "BOOK_INGESTION_PATH",
                 "/Users/taylorstephens/_Projects/book-ingestion-python"

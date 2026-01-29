@@ -64,14 +64,58 @@ class Orchestrator:
 
     def _extract_sample(self, book_path: str, max_chars: int = 40000) -> str:
         """Extract text sample from book for classification."""
-        # For now, just read the file if it's text
-        # In production, this would use the book-ingestion converters
         path = Path(book_path)
+        suffix = path.suffix.lower()
+
+        # Handle epub files
+        if suffix == ".epub":
+            return self._extract_epub_text(path, max_chars)
+
+        # Handle PDF files (basic - would need PyMuPDF for full support)
+        if suffix == ".pdf":
+            return f"[PDF file: {path.name} - requires processing pipeline]"
+
+        # Try reading as text
         try:
-            return path.read_text()[:max_chars]
+            return path.read_text(encoding="utf-8")[:max_chars]
         except UnicodeDecodeError:
-            # Binary file - would need conversion
             return f"[Binary file: {path.name}]"
+
+    def _extract_epub_text(self, path: Path, max_chars: int = 40000) -> str:
+        """Extract text from epub file."""
+        try:
+            import ebooklib
+            from ebooklib import epub
+            from html.parser import HTMLParser
+
+            class HTMLTextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.text = []
+                def handle_data(self, data):
+                    self.text.append(data)
+                def get_text(self):
+                    return " ".join(self.text)
+
+            book = epub.read_epub(str(path), options={"ignore_ncx": True})
+            text_parts = []
+
+            for item in book.get_items():
+                if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                    parser = HTMLTextExtractor()
+                    content = item.get_content().decode("utf-8", errors="ignore")
+                    parser.feed(content)
+                    text_parts.append(parser.get_text())
+
+                    # Stop if we have enough text
+                    if sum(len(p) for p in text_parts) > max_chars:
+                        break
+
+            result = "\n\n".join(text_parts)[:max_chars]
+            return result if result.strip() else f"[Empty epub: {path.name}]"
+
+        except Exception as e:
+            return f"[Epub extraction failed: {path.name} - {e}]"
 
     def _transition(self, pipeline_id: str, to_state: PipelineState):
         """Transition pipeline to new state with logging."""
