@@ -260,3 +260,100 @@ def get_audit_log(
         last_days=last_days,
         limit=limit,
     )
+
+
+# Phase 5: Autonomy Tools
+
+def get_autonomy_status() -> dict:
+    """
+    Get current autonomy mode, thresholds, and metrics summary.
+    """
+    from agentic_pipeline.autonomy import AutonomyConfig, MetricsCollector
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    collector = MetricsCollector(db_path)
+
+    mode = config.get_mode()
+    metrics = collector.get_metrics(days=30)
+
+    return {
+        "mode": mode,
+        "escape_hatch_active": config.is_escape_hatch_active(),
+        "metrics_30d": metrics,
+    }
+
+
+def set_autonomy_mode(mode: str) -> dict:
+    """
+    Change autonomy mode.
+
+    Args:
+        mode: One of "supervised", "partial", "confident"
+    """
+    from agentic_pipeline.autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+
+    if config.is_escape_hatch_active():
+        return {"error": "Cannot change mode while escape hatch is active"}
+
+    config.set_mode(mode)
+    return {"mode": mode, "success": True}
+
+
+def activate_escape_hatch_tool(reason: str) -> dict:
+    """
+    Immediately revert to supervised mode.
+
+    Args:
+        reason: Why the escape hatch is being activated
+    """
+    from agentic_pipeline.autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    config.activate_escape_hatch(reason)
+
+    return {
+        "success": True,
+        "message": "Escape hatch activated. All books now require human review.",
+        "reason": reason,
+    }
+
+
+def get_autonomy_readiness() -> dict:
+    """
+    Check if the system is ready to advance to the next autonomy mode.
+    """
+    from agentic_pipeline.autonomy import AutonomyConfig, MetricsCollector, CalibrationEngine
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    collector = MetricsCollector(db_path)
+    engine = CalibrationEngine(db_path)
+
+    mode = config.get_mode()
+    metrics = collector.get_metrics(days=90)
+
+    # Calculate override rate
+    total = metrics["total_processed"]
+    overrides = metrics["human_rejected"] + metrics["human_adjusted"]
+    override_rate = overrides / total if total > 0 else None
+
+    # Get thresholds
+    thresholds = engine.update_thresholds()
+
+    ready_for_partial = total >= 100 and (override_rate or 1) < 0.15
+    ready_for_confident = total >= 500 and (override_rate or 1) < 0.05
+
+    return {
+        "current_mode": mode,
+        "total_processed": total,
+        "override_rate": override_rate,
+        "thresholds": thresholds,
+        "ready_for_partial": ready_for_partial,
+        "ready_for_confident": ready_for_confident,
+        "recommendation": "confident" if ready_for_confident else ("partial" if ready_for_partial else "supervised"),
+    }
