@@ -73,3 +73,64 @@ def rollback_book_tool(
     """
     path = Path(db_path) if db_path else get_db_path()
     return rollback_book(path, pipeline_id, reason, actor)
+
+
+def process_book(path: str) -> dict:
+    """
+    Process a book through the pipeline.
+
+    Args:
+        path: Path to the book file (epub, pdf, etc.)
+
+    Returns:
+        Processing result with pipeline_id, state, book_type, and confidence
+    """
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    config = OrchestratorConfig.from_env()
+    orchestrator = Orchestrator(config)
+
+    result = orchestrator.process_one(path)
+    return result
+
+
+def get_pipeline_status(pipeline_id: str) -> dict:
+    """
+    Get the status of a pipeline run.
+
+    Args:
+        pipeline_id: The pipeline ID to check
+
+    Returns:
+        Pipeline details including state, book_type, confidence, retries
+    """
+    import json
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    db_path = get_db_path()
+    repo = PipelineRepository(db_path)
+
+    pipeline = repo.get(pipeline_id)
+
+    if not pipeline:
+        return {"error": f"Pipeline not found: {pipeline_id}"}
+
+    result = {
+        "pipeline_id": pipeline_id,
+        "state": pipeline["state"],
+        "source_path": pipeline["source_path"],
+        "retry_count": pipeline.get("retry_count", 0),
+        "created_at": pipeline.get("created_at"),
+    }
+
+    if pipeline.get("book_profile"):
+        profile = json.loads(pipeline["book_profile"]) if isinstance(pipeline["book_profile"], str) else pipeline["book_profile"]
+        result["book_type"] = profile.get("book_type")
+        result["confidence"] = profile.get("confidence")
+        result["suggested_tags"] = profile.get("suggested_tags")
+
+    if pipeline.get("approved_by"):
+        result["approved_by"] = pipeline["approved_by"]
+
+    return result
