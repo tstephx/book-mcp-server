@@ -162,3 +162,53 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     repo = PipelineRepository(db_path)
     pipeline = repo.get(result["pipeline_id"])
     assert pipeline["approved_by"] == "auto:high_confidence"
+
+
+def test_orchestrator_worker_processes_queue(db_path, config):
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+    import threading
+    import time
+
+    repo = PipelineRepository(db_path)
+
+    # Create a book in DETECTED state
+    pid = repo.create("/book.epub", "hash123")
+
+    orchestrator = Orchestrator(config)
+
+    # Mock processing to just mark complete
+    def mock_process(pipeline_id, book_path, content_hash):
+        repo.update_state(pipeline_id, PipelineState.COMPLETE)
+        return {"pipeline_id": pipeline_id, "state": "complete"}
+
+    orchestrator._process_book = mock_process
+
+    # Run worker in thread, stop after one iteration
+    def run_and_stop():
+        time.sleep(0.1)
+        orchestrator.shutdown_requested = True
+
+    stopper = threading.Thread(target=run_and_stop)
+    stopper.start()
+
+    orchestrator.run_worker()
+
+    stopper.join()
+
+    # Book should be processed
+    pipeline = repo.get(pid)
+    assert pipeline["state"] == PipelineState.COMPLETE.value
+
+
+def test_orchestrator_graceful_shutdown(db_path, config):
+    from agentic_pipeline.orchestrator import Orchestrator
+    import signal
+
+    orchestrator = Orchestrator(config)
+
+    # Simulate SIGINT
+    orchestrator._handle_shutdown(signal.SIGINT, None)
+
+    assert orchestrator.shutdown_requested == True
