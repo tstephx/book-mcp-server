@@ -159,6 +159,28 @@ agentic-pipeline approve <pipeline-id>
 agentic-pipeline reject <pipeline-id> --reason "Poor quality"
 ```
 
+### Production Monitoring (Phase 4)
+
+**Check pipeline health:**
+```bash
+agentic-pipeline health
+```
+
+**Find stuck pipelines:**
+```bash
+agentic-pipeline stuck
+```
+
+**Batch approve high-confidence books:**
+```bash
+agentic-pipeline batch-approve --min-confidence 0.9 --execute
+```
+
+**Query audit trail:**
+```bash
+agentic-pipeline audit --last 20
+```
+
 ### With Claude (MCP Tools)
 
 ```
@@ -258,5 +280,8 @@ A: ~$0.03-0.05 per book (two LLM calls: classification + validation). At 100 boo
 ## Related Documentation
 
 - [DESIGN.md](./DESIGN.md) - Technical architecture & decision rationale
-- [Phase 1 Plan](./docs/plans/2025-01-28-phase1-foundation.md) - Implementation details
+- [Phase 1 Plan](./docs/plans/2025-01-28-phase1-foundation.md) - Foundation implementation
+- [Phase 2 Classifier](./docs/plans/2025-01-28-phase2-classifier-agent-design.md) - AI classifier design
+- [Phase 3 Orchestrator](./docs/plans/2025-01-28-phase3-orchestrator-design.md) - Pipeline orchestration
+- [Phase 4 Production Hardening](./docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md) - Health, batch ops, audit
 - [Design Document](./docs/plans/2025-01-28-agentic-processing-pipeline-design.md) - Full specification
