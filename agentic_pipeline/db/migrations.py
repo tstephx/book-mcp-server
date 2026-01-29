@@ -78,6 +78,7 @@ MIGRATIONS = [
         before_state JSON,
         after_state JSON,
         adjustments JSON,
+        filter_used JSON,
         confidence_at_decision REAL,
         autonomy_mode TEXT,
         session_id TEXT,
@@ -151,14 +152,46 @@ MIGRATIONS = [
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
+
+    # Health metrics cache (Phase 4)
+    """
+    CREATE TABLE IF NOT EXISTS health_metrics (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        active_count INTEGER NOT NULL DEFAULT 0,
+        queued_count INTEGER NOT NULL DEFAULT 0,
+        stuck_count INTEGER NOT NULL DEFAULT 0,
+        completed_24h INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        avg_processing_seconds REAL,
+        queue_by_priority JSON,
+        stuck_pipelines JSON,
+        alerts JSON,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+
+    # State duration stats for stuck detection (Phase 4)
+    """
+    CREATE TABLE IF NOT EXISTS state_duration_stats (
+        state TEXT PRIMARY KEY,
+        sample_count INTEGER NOT NULL DEFAULT 0,
+        median_seconds REAL NOT NULL DEFAULT 0,
+        p95_seconds REAL NOT NULL DEFAULT 0,
+        max_seconds REAL NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
 ]
 
 INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_pipelines_state ON processing_pipelines(state)",
     "CREATE INDEX IF NOT EXISTS idx_pipelines_hash ON processing_pipelines(content_hash)",
     "CREATE INDEX IF NOT EXISTS idx_pipelines_priority ON processing_pipelines(priority, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_pipelines_priority_queue ON processing_pipelines(state, priority, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_audit_book ON approval_audit(book_id)",
     "CREATE INDEX IF NOT EXISTS idx_audit_action ON approval_audit(action, performed_at)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_actor ON approval_audit(actor)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_session ON approval_audit(session_id)",
     "CREATE INDEX IF NOT EXISTS idx_feedback_category ON autonomy_feedback(feedback_category)",
 ]
 
