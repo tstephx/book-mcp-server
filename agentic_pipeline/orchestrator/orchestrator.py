@@ -134,8 +134,12 @@ class Orchestrator:
     def _run_processing(self, book_path: str) -> None:
         """Run book-ingestion processing via subprocess."""
         try:
+            # Use the venv python from book-ingestion-python
+            venv_python = self.config.book_ingestion_path / "venv" / "bin" / "python"
+            python_cmd = str(venv_python) if venv_python.exists() else "python"
+
             result = subprocess.run(
-                ["python", "-m", "src.cli", "process", book_path],
+                [python_cmd, "-m", "src.cli", "process", book_path],
                 cwd=str(self.config.book_ingestion_path),
                 timeout=self.config.processing_timeout,
                 capture_output=True,
@@ -156,8 +160,13 @@ class Orchestrator:
     def _run_embedding(self, content_hash: str) -> None:
         """Run embedding generation via subprocess."""
         try:
+            # Use the venv python from book-ingestion-python
+            venv_python = self.config.book_ingestion_path / "venv" / "bin" / "python"
+            python_cmd = str(venv_python) if venv_python.exists() else "python"
+
+            # The generate_embeddings script processes all chapters without embeddings
             result = subprocess.run(
-                ["python", "-m", "scripts.generate_embeddings", "--book-hash", content_hash],
+                [python_cmd, "scripts/generate_embeddings.py"],
                 cwd=str(self.config.book_ingestion_path),
                 timeout=self.config.embedding_timeout,
                 capture_output=True,
