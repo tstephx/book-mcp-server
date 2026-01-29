@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "book-library": {
+      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "args": [
+        "/Users/taylorstephens/_Projects/book-mcp-server/server.py"
+      ]
+    }
+  }
+}

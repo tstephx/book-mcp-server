@@ -1,0 +1,6 @@
+click>=8.0
+rich>=13.0
+watchdog>=3.0
+mcp>=1.0
+pytest>=7.0
+pytest-asyncio>=0.21
