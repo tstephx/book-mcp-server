@@ -125,5 +125,51 @@ def strategies():
         console.print()
 
 
+@main.command()
+@click.option("--text", "-t", required=True, help="Text to classify (or path to file)")
+@click.option("--provider", "-p", default="openai", help="Provider to use (openai, anthropic)")
+def classify(text: str, provider: str):
+    """Classify book text and show the result."""
+    import hashlib
+    from .db.config import get_db_path
+    from .agents.classifier import ClassifierAgent
+    from .agents.providers.openai_provider import OpenAIProvider
+    from .agents.providers.anthropic_provider import AnthropicProvider
+
+    # Check if text is a file path
+    text_path = Path(text)
+    if text_path.exists():
+        text = text_path.read_text()
+        console.print(f"[dim]Read {len(text)} chars from {text_path}[/dim]")
+
+    # Generate hash from text
+    content_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
+
+    # Select provider
+    if provider == "anthropic":
+        primary = AnthropicProvider()
+    else:
+        primary = OpenAIProvider()
+
+    db_path = get_db_path()
+    agent = ClassifierAgent(db_path, primary=primary)
+
+    console.print(f"[blue]Classifying with {provider}...[/blue]")
+
+    result = agent.classify(text, content_hash=content_hash)
+
+    console.print(f"\n[bold]Classification Result:[/bold]")
+    console.print(f"  Type: [cyan]{result.book_type.value}[/cyan]")
+
+    conf = result.confidence
+    conf_style = "green" if conf >= 0.8 else "yellow" if conf >= 0.5 else "red"
+    console.print(f"  Confidence: [{conf_style}]{conf:.0%}[/{conf_style}]")
+
+    if result.suggested_tags:
+        console.print(f"  Tags: {', '.join(result.suggested_tags)}")
+
+    console.print(f"  Reasoning: [dim]{result.reasoning}[/dim]")
+
+
 if __name__ == "__main__":
     main()
