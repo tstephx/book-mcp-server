@@ -171,5 +171,120 @@ def classify(text: str, provider: str):
     console.print(f"  Reasoning: [dim]{result.reasoning}[/dim]")
 
 
+@main.command()
+@click.argument("book_path", type=click.Path(exists=True))
+def process(book_path: str):
+    """Process a single book through the pipeline."""
+    from .config import OrchestratorConfig
+    from .orchestrator import Orchestrator
+
+    config = OrchestratorConfig.from_env()
+    orchestrator = Orchestrator(config)
+
+    console.print(f"[blue]Processing: {book_path}[/blue]")
+
+    result = orchestrator.process_one(book_path)
+
+    if result.get("skipped"):
+        console.print(f"[yellow]Skipped: {result['reason']}[/yellow]")
+        return
+
+    state = result.get("state", "unknown")
+    if state == "complete":
+        console.print(f"[green]Complete![/green]")
+        console.print(f"  Type: {result.get('book_type')}")
+        console.print(f"  Confidence: {result.get('confidence', 0):.0%}")
+    elif state == "pending_approval":
+        console.print(f"[yellow]Pending approval[/yellow]")
+        console.print(f"  Type: {result.get('book_type')}")
+        console.print(f"  Confidence: {result.get('confidence', 0):.0%}")
+    elif state == "needs_retry":
+        console.print(f"[red]Failed - queued for retry[/red]")
+        console.print(f"  Error: {result.get('error')}")
+    else:
+        console.print(f"[dim]State: {state}[/dim]")
+
+    console.print(f"  Pipeline ID: {result.get('pipeline_id')}")
+
+
+@main.command()
+def worker():
+    """Run the queue worker (processes books continuously)."""
+    from .config import OrchestratorConfig
+    from .orchestrator import Orchestrator
+
+    config = OrchestratorConfig.from_env()
+    orchestrator = Orchestrator(config)
+
+    console.print("[blue]Starting worker... Press Ctrl+C to stop gracefully.[/blue]")
+    orchestrator.run_worker()
+    console.print("[green]Worker stopped.[/green]")
+
+
+@main.command()
+@click.option("--max-attempts", "-m", default=3, help="Max retry attempts before rejection")
+def retry(max_attempts: int):
+    """Retry books in NEEDS_RETRY state."""
+    from .config import OrchestratorConfig
+    from .orchestrator import Orchestrator
+
+    config = OrchestratorConfig.from_env()
+    config.max_retry_attempts = max_attempts
+    orchestrator = Orchestrator(config)
+
+    console.print(f"[blue]Retrying failed books (max {max_attempts} attempts)...[/blue]")
+
+    results = orchestrator.retry_failed()
+
+    if not results:
+        console.print("[yellow]No books to retry[/yellow]")
+        return
+
+    for result in results:
+        pid = result.get("pipeline_id", "?")[:8]
+        state = result.get("state")
+        if state == "complete":
+            console.print(f"  [green]{pid}...: Complete[/green]")
+        elif state == "rejected":
+            console.print(f"  [red]{pid}...: Rejected ({result.get('reason')})[/red]")
+        else:
+            console.print(f"  [yellow]{pid}...: {state}[/yellow]")
+
+
+@main.command()
+@click.argument("pipeline_id")
+def status(pipeline_id: str):
+    """Show status of a pipeline."""
+    from .db.config import get_db_path
+    from .db.pipelines import PipelineRepository
+    import json
+
+    db_path = get_db_path()
+    repo = PipelineRepository(db_path)
+
+    pipeline = repo.get(pipeline_id)
+
+    if not pipeline:
+        console.print(f"[red]Pipeline not found: {pipeline_id}[/red]")
+        return
+
+    console.print(f"\n[bold]Pipeline: {pipeline_id}[/bold]")
+    console.print(f"  State: [cyan]{pipeline['state']}[/cyan]")
+    console.print(f"  Source: {pipeline['source_path']}")
+
+    if pipeline.get("book_profile"):
+        profile = json.loads(pipeline["book_profile"]) if isinstance(pipeline["book_profile"], str) else pipeline["book_profile"]
+        console.print(f"  Type: {profile.get('book_type')}")
+        conf = profile.get("confidence", 0)
+        conf_style = "green" if conf >= 0.8 else "yellow" if conf >= 0.5 else "red"
+        console.print(f"  Confidence: [{conf_style}]{conf:.0%}[/{conf_style}]")
+
+    console.print(f"  Retries: {pipeline.get('retry_count', 0)}")
+    console.print(f"  Created: {pipeline.get('created_at')}")
+
+    if pipeline.get("approved_by"):
+        console.print(f"  Approved by: {pipeline['approved_by']}")
+
+
 if __name__ == "__main__":
     main()
