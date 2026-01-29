@@ -3,6 +3,7 @@
 
 import hashlib
 import signal
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -11,7 +12,14 @@ from agentic_pipeline.config import OrchestratorConfig
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
-from agentic_pipeline.orchestrator.errors import IdempotencyError
+from agentic_pipeline.orchestrator.errors import (
+    IdempotencyError,
+    ProcessingError,
+    EmbeddingError,
+    PipelineTimeoutError,
+)
+from agentic_pipeline.agents.classifier import ClassifierAgent
+from agentic_pipeline.pipeline.strategy import StrategySelector
 
 
 class Orchestrator:
@@ -21,6 +29,8 @@ class Orchestrator:
         self.config = config
         self.repo = PipelineRepository(config.db_path)
         self.logger = PipelineLogger()
+        self.classifier = ClassifierAgent(config.db_path)
+        self.strategy_selector = StrategySelector()
         self.shutdown_requested = False
 
     def _compute_hash(self, book_path: str) -> str:
@@ -51,6 +61,74 @@ class Orchestrator:
 
         # Terminal but not complete (rejected, archived) - allow reprocessing
         return None
+
+    def _extract_sample(self, book_path: str, max_chars: int = 40000) -> str:
+        """Extract text sample from book for classification."""
+        # For now, just read the file if it's text
+        # In production, this would use the book-ingestion converters
+        path = Path(book_path)
+        try:
+            return path.read_text()[:max_chars]
+        except UnicodeDecodeError:
+            # Binary file - would need conversion
+            return f"[Binary file: {path.name}]"
+
+    def _transition(self, pipeline_id: str, to_state: PipelineState):
+        """Transition pipeline to new state with logging."""
+        current = self.repo.get(pipeline_id)
+        from_state = current["state"] if current else "none"
+        self.repo.update_state(pipeline_id, to_state)
+        self.logger.state_transition(pipeline_id, from_state, to_state.value)
+
+    def _run_classifier(self, pipeline_id: str, text: str, content_hash: str) -> dict:
+        """Run classification and store result."""
+        profile = self.classifier.classify(text, content_hash)
+        profile_dict = profile.to_dict()
+        self.repo.update_book_profile(pipeline_id, profile_dict)
+        return profile_dict
+
+    def _run_processing(self, book_path: str) -> None:
+        """Run book-ingestion processing via subprocess."""
+        try:
+            result = subprocess.run(
+                ["python", "-m", "src.cli", "process", book_path],
+                cwd=str(self.config.book_ingestion_path),
+                timeout=self.config.processing_timeout,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                raise ProcessingError(
+                    f"Processing failed: {result.stderr}",
+                    exit_code=result.returncode,
+                    stderr=result.stderr
+                )
+        except subprocess.TimeoutExpired:
+            raise PipelineTimeoutError(
+                f"Processing exceeded {self.config.processing_timeout}s",
+                timeout=self.config.processing_timeout
+            )
+
+    def _run_embedding(self, content_hash: str) -> None:
+        """Run embedding generation via subprocess."""
+        try:
+            result = subprocess.run(
+                ["python", "-m", "scripts.generate_embeddings", "--book-hash", content_hash],
+                cwd=str(self.config.book_ingestion_path),
+                timeout=self.config.embedding_timeout,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode != 0:
+                raise EmbeddingError(
+                    f"Embedding failed: {result.stderr}",
+                    exit_code=result.returncode
+                )
+        except subprocess.TimeoutExpired:
+            raise PipelineTimeoutError(
+                f"Embedding exceeded {self.config.embedding_timeout}s",
+                timeout=self.config.embedding_timeout
+            )
 
     def process_one(self, book_path: str) -> dict:
         """Process a single book through the pipeline."""
@@ -83,10 +161,69 @@ class Orchestrator:
             }
 
     def _process_book(self, pipeline_id: str, book_path: str, content_hash: str) -> dict:
-        """Internal: process book through all states."""
-        # This will be implemented in Task 6
-        # For now, just return a placeholder
+        """Process book through all states."""
+
+        # HASHING (already done via _compute_hash)
+        self._transition(pipeline_id, PipelineState.HASHING)
+
+        # Check duplicate
+        # (For now, skip - hash uniqueness is enforced by DB)
+
+        # CLASSIFYING
+        self._transition(pipeline_id, PipelineState.CLASSIFYING)
+        text_sample = self._extract_sample(book_path)
+        profile = self._run_classifier(pipeline_id, text_sample, content_hash)
+
+        # SELECTING_STRATEGY
+        self._transition(pipeline_id, PipelineState.SELECTING_STRATEGY)
+        strategy = self.strategy_selector.select(profile)
+        self.repo.update_strategy_config(pipeline_id, strategy)
+
+        # PROCESSING
+        self._transition(pipeline_id, PipelineState.PROCESSING)
+        try:
+            self._run_processing(book_path)
+        except (ProcessingError, PipelineTimeoutError) as e:
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
+            return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
+
+        # VALIDATING
+        self._transition(pipeline_id, PipelineState.VALIDATING)
+        # TODO: Add actual validation logic
+
+        # APPROVAL ROUTING
+        confidence = profile.get("confidence", 0)
+        if confidence >= self.config.confidence_threshold:
+            # Auto-approve
+            self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
+            self._transition(pipeline_id, PipelineState.APPROVED)
+        else:
+            # Needs human review
+            self._transition(pipeline_id, PipelineState.PENDING_APPROVAL)
+            return {
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.PENDING_APPROVAL.value,
+                "book_type": profile.get("book_type"),
+                "confidence": confidence,
+                "needs_review": True
+            }
+
+        # EMBEDDING
+        self._transition(pipeline_id, PipelineState.EMBEDDING)
+        try:
+            self._run_embedding(content_hash)
+        except (EmbeddingError, PipelineTimeoutError) as e:
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
+            return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
+
+        # COMPLETE
+        self._transition(pipeline_id, PipelineState.COMPLETE)
+
         return {
             "pipeline_id": pipeline_id,
-            "state": "pending_implementation",
+            "state": PipelineState.COMPLETE.value,
+            "book_type": profile.get("book_type"),
+            "confidence": confidence
         }
