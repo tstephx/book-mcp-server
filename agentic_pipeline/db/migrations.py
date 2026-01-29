@@ -181,6 +181,37 @@ MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
+
+    # Per-type thresholds - Phase 5
+    """
+    CREATE TABLE IF NOT EXISTS autonomy_thresholds (
+        book_type TEXT PRIMARY KEY,
+        auto_approve_threshold REAL,
+        sample_count INTEGER NOT NULL DEFAULT 0,
+        measured_accuracy REAL,
+        last_calculated TIMESTAMP,
+        calibration_data JSON,
+        manual_override REAL,
+        override_reason TEXT
+    )
+    """,
+
+    # Spot-check tracking - Phase 5
+    """
+    CREATE TABLE IF NOT EXISTS spot_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        book_id TEXT NOT NULL,
+        pipeline_id TEXT,
+        original_classification TEXT,
+        original_confidence REAL,
+        auto_approved_at TIMESTAMP,
+        classification_correct BOOLEAN,
+        quality_acceptable BOOLEAN,
+        reviewer TEXT,
+        notes TEXT,
+        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
 ]
 
 INDEXES = [
