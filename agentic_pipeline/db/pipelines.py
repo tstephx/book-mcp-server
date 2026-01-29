@@ -213,3 +213,47 @@ class PipelineRepository:
         )
         conn.commit()
         conn.close()
+
+    def find_by_state(
+        self,
+        state: PipelineState,
+        limit: int = None
+    ) -> list[dict]:
+        """Find pipelines in a specific state."""
+        conn = self._connect()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT * FROM processing_pipelines
+            WHERE state = ?
+            ORDER BY priority ASC, created_at ASC
+        """
+        if limit:
+            query += f" LIMIT {limit}"
+
+        cursor.execute(query, (state.value,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def increment_retry_count(self, pipeline_id: str) -> int:
+        """Increment retry count and return new value."""
+        conn = self._connect()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE processing_pipelines
+            SET retry_count = retry_count + 1, updated_at = ?
+            WHERE id = ?
+        """, (datetime.utcnow().isoformat(), pipeline_id))
+
+        cursor.execute(
+            "SELECT retry_count FROM processing_pipelines WHERE id = ?",
+            (pipeline_id,)
+        )
+        new_count = cursor.fetchone()[0]
+
+        conn.commit()
+        conn.close()
+        return new_count
