@@ -286,5 +286,170 @@ def status(pipeline_id: str):
         console.print(f"  Approved by: {pipeline['approved_by']}")
 
 
+# Phase 4: Production Hardening Commands
+
+@main.command()
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def health(as_json: bool):
+    """Show pipeline health status."""
+    from .db.config import get_db_path
+    from .health import HealthMonitor, StuckDetector
+    import json as json_module
+
+    db_path = get_db_path()
+    monitor = HealthMonitor(db_path)
+    detector = StuckDetector(db_path)
+
+    report = monitor.get_health()
+    report["stuck"] = detector.detect()
+
+    if as_json:
+        console.print(json_module.dumps(report, indent=2))
+        return
+
+    console.print("\n[bold]Pipeline Health[/bold]")
+    console.print("-" * 35)
+    console.print(f"  Active:     {report['active']} (processing now)")
+
+    stuck_count = len(report['stuck'])
+    if stuck_count > 0:
+        console.print(f"  Stuck:      [red]{stuck_count} [!][/red]")
+    else:
+        console.print(f"  Stuck:      {stuck_count}")
+
+    console.print(f"  Queued:     {report['queued']} (waiting)")
+    console.print(f"  Completed:  {report['completed_24h']} (last 24h)")
+    console.print(f"  Failed:     {report['failed']} (needs_retry)")
+    console.print("-" * 35)
+
+    if report['alerts']:
+        console.print("\n[yellow]Alerts:[/yellow]")
+        for alert in report['alerts']:
+            console.print(f"  [{alert['severity']}] {alert['message']}")
+
+
+@main.command()
+@click.option("--recover", is_flag=True, help="Auto-recover stuck pipelines")
+def stuck(recover: bool):
+    """List stuck pipelines."""
+    from .db.config import get_db_path
+    from .health import StuckDetector
+
+    db_path = get_db_path()
+    detector = StuckDetector(db_path)
+    stuck_list = detector.detect()
+
+    if not stuck_list:
+        console.print("[green]No stuck pipelines[/green]")
+        return
+
+    console.print(f"\n[yellow]Found {len(stuck_list)} stuck pipeline(s):[/yellow]\n")
+
+    for item in stuck_list:
+        console.print(f"  {item['id'][:8]}... [{item['state']}]")
+        console.print(f"    Stuck for {item['stuck_minutes']} min (expected: {item['expected_minutes']} min)")
+        console.print(f"    Source: {Path(item['source_path']).name}")
+
+
+@main.command("batch-approve")
+@click.option("--min-confidence", type=float, help="Minimum confidence threshold")
+@click.option("--book-type", help="Filter by book type")
+@click.option("--max-count", default=50, help="Maximum books to approve")
+@click.option("--execute", is_flag=True, help="Actually execute (otherwise dry-run)")
+def batch_approve(min_confidence: float, book_type: str, max_count: int, execute: bool):
+    """Approve books matching filters."""
+    from .db.config import get_db_path
+    from .batch import BatchOperations, BatchFilter
+
+    db_path = get_db_path()
+    ops = BatchOperations(db_path)
+    filter = BatchFilter(
+        min_confidence=min_confidence,
+        book_type=book_type,
+        max_count=max_count,
+    )
+
+    result = ops.approve(filter, actor="human:cli", execute=execute)
+
+    if execute:
+        console.print(f"[green]Approved {result['approved']} books[/green]")
+    else:
+        console.print(f"[yellow]Would approve {result['would_approve']} books (dry-run)[/yellow]")
+        for book in result['books'][:10]:
+            console.print(f"  {book['id'][:8]}... {Path(book['source_path']).name}")
+        if len(result['books']) > 10:
+            console.print(f"  ... and {len(result['books']) - 10} more")
+
+
+@main.command("batch-reject")
+@click.option("--book-type", help="Filter by book type")
+@click.option("--max-confidence", type=float, help="Maximum confidence threshold")
+@click.option("--reason", required=True, help="Rejection reason")
+@click.option("--max-count", default=50, help="Maximum books to reject")
+@click.option("--execute", is_flag=True, help="Actually execute (otherwise dry-run)")
+def batch_reject(book_type: str, max_confidence: float, reason: str, max_count: int, execute: bool):
+    """Reject books matching filters."""
+    from .db.config import get_db_path
+    from .batch import BatchOperations, BatchFilter
+
+    db_path = get_db_path()
+    ops = BatchOperations(db_path)
+    filter = BatchFilter(
+        book_type=book_type,
+        max_confidence=max_confidence,
+        max_count=max_count,
+    )
+
+    result = ops.reject(filter, reason=reason, actor="human:cli", execute=execute)
+
+    if execute:
+        console.print(f"[yellow]Rejected {result['rejected']} books[/yellow]")
+    else:
+        console.print(f"[yellow]Would reject {result['would_reject']} books (dry-run)[/yellow]")
+
+
+@main.command()
+@click.option("--last", default=50, help="Number of recent entries")
+@click.option("--actor", help="Filter by actor")
+@click.option("--action", help="Filter by action type")
+@click.option("--book-id", help="Filter by book ID")
+def audit(last: int, actor: str, action: str, book_id: str):
+    """Query the audit trail."""
+    from .db.config import get_db_path
+    from .audit import AuditTrail
+
+    db_path = get_db_path()
+    trail = AuditTrail(db_path)
+
+    entries = trail.query(
+        book_id=book_id,
+        actor=actor,
+        action=action,
+        limit=last,
+    )
+
+    if not entries:
+        console.print("[yellow]No audit entries found[/yellow]")
+        return
+
+    console.print(f"\n[bold]Audit Trail ({len(entries)} entries)[/bold]\n")
+
+    table = Table()
+    table.add_column("Time", style="dim")
+    table.add_column("Action")
+    table.add_column("Actor")
+    table.add_column("Book")
+
+    for entry in entries:
+        table.add_row(
+            entry["performed_at"][:19] if entry.get("performed_at") else "?",
+            entry["action"],
+            entry["actor"],
+            entry["book_id"][:16] + "..." if len(entry["book_id"]) > 16 else entry["book_id"],
+        )
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     main()
