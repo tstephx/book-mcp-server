@@ -137,10 +137,52 @@ pytest tests/ --cov=agentic_pipeline
 4. **TDD** - Tests written before implementation
 5. **Immutable Audit** - All decisions logged permanently
 
+## Using the Book Library
+
+Once books are processed, they're available via MCP tools in Claude Desktop.
+
+### Key Capabilities
+
+| Category | Tools |
+|----------|-------|
+| **Search** | `semantic_search`, `text_search`, `search_all_books` |
+| **Discovery** | `topic_coverage`, `cross_book_comparison`, `find_related_content` |
+| **Reading** | `get_chapter`, `get_book_info`, `list_books` |
+| **Learning** | `teach_concept`, `learning_path`, `create_study_guide` |
+| **Planning** | `generate_project_learning_path`, `create_implementation_plan` |
+| **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress` |
+| **Export** | `export_chapter`, `export_book`, `generate_flashcards` |
+
+### Claude Desktop Config
+
+```json
+{
+  "mcpServers": {
+    "book-library": {
+      "command": "python",
+      "args": ["/Users/taylorstephens/_Projects/book-mcp-server/server.py"],
+      "env": {
+        "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db"
+      }
+    }
+  }
+}
+```
+
+### Example Queries to Claude
+
+- "Search my books for Kubernetes content"
+- "Create a learning path for DevOps"
+- "Compare how my books explain microservices"
+- "Generate flashcards from the Docker chapter"
+
+See `docs/USER-GUIDE.md` for comprehensive usage documentation.
+
 ## Documentation
 
 - `README.md` - User-facing overview
 - `DESIGN.md` - Technical architecture
+- `docs/USER-GUIDE.md` - **Comprehensive usage guide**
 - `docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md` - Phase 4 features
 - `docs/PHASE5-CONFIDENT-AUTONOMY-COMPLETE.md` - Phase 5 features
 - `docs/plans/` - Design documents and implementation plans
