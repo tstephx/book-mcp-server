@@ -20,6 +20,19 @@ Phase 4 transforms the pipeline from "works on my machine" to "runs reliably in 
 
 **The Solution:** Health monitoring, stuck detection, batch operations, priority queues, and a complete audit trail.
 
+**Example scenario:** It's Friday afternoon. You queued 200 books yesterday and went home. This morning you need to know: Did they all process? Are any stuck? Can you approve the high-confidence ones in bulk so they're ready for the weekend? Phase 4 answers these questions.
+
+---
+
+## Terminology
+
+| Term | Definition |
+|------|------------|
+| **MCP** | Model Context Protocol — the standard way Claude connects to external tools and data sources |
+| **FIFO** | First In, First Out — a queue where items are processed in the order they arrived |
+| **Subprocess** | Running a separate program (like the book-ingestion CLI) as a child process |
+| **WAL mode** | Write-Ahead Logging — a SQLite mode that improves reliability and concurrent access |
+
 ---
 
 ## What Is This?
@@ -64,8 +77,8 @@ Phase 4 adds four production capabilities:
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │                     HEALTH MONITOR                             │  │
 │  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐          │  │
-│  │  │ Active  │  │  Stuck  │  │ Queued  │  │  Alerts │          │  │
-│  │  │    3    │  │    1    │  │   47    │  │    ⚠️   │          │  │
+│  │  │ Active  │  │  Stuck  │  │ Queued  │  │ Alerts  │          │  │
+│  │  │    3    │  │  1 (!)  │  │   47    │  │  1 warn │          │  │
 │  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘          │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                                                                      │
@@ -128,7 +141,7 @@ $ agentic-pipeline health
 Pipeline Health
 ─────────────────────────────────
   Active:     3 (processing now)
-  Stuck:      1 ⚠️ (pipeline abc123, stuck 45 min)
+  Stuck:      1 [!] (pipeline abc123, stuck 45 min)
   Queued:     47 (waiting)
   Completed:  892 (last 24h)
   Failed:     3 (needs_retry)
@@ -156,6 +169,13 @@ get_pipeline_health()
 ### Decision 2: How Do We Define "Stuck"?
 
 **What we chose:** A book is stuck if it's been in a non-terminal state longer than 2x the expected duration for that state.
+
+**Why 2x?** This multiplier balances catching stuck books quickly against avoiding false positives:
+- **1.5x** would flag too many legitimate slow operations (large books, API latency)
+- **2x** catches genuinely stuck items while tolerating normal variance
+- **3x** would take too long to detect real problems
+
+The multiplier is configurable (`STUCK_MULTIPLIER`) and can be tuned based on real-world experience.
 
 **The Options We Considered:**
 
@@ -234,11 +254,16 @@ $ agentic-pipeline batch-queue /path/to/old-archives --priority 10
 
 ```python
 # Every hour, boost priority of old items
-def age_priorities():
-    """Increase priority of items waiting too long."""
+def age_priorities() -> int:
+    """Increase priority of items waiting too long. Returns count of aged items."""
     # Items waiting > 24 hours: priority = max(1, priority - 3)
     # Items waiting > 48 hours: priority = 1
 ```
+
+**Why 24h and 48h thresholds?**
+- **24 hours:** A book queued yesterday should start getting priority today — this aligns with daily work rhythms
+- **48 hours:** No book should ever wait more than 2 days, even at lowest priority — ensures eventual processing
+- These intervals are configurable (`PRIORITY_AGING_HOURS_BOOST=24`, `PRIORITY_AGING_HOURS_URGENT=48`)
 
 **Alternatives we rejected:**
 
@@ -320,9 +345,11 @@ batch_approve(
 **Why we chose a database table:**
 
 1. **Queryable:** "Show me all books approved by the auto-approve system in the last week"
-2. **Tamper-resistant:** SQLite in WAL mode with proper permissions is sufficient for personal use
+2. **Tamper-resistant:** SQLite with proper file permissions is sufficient for personal use
 3. **Retention policies:** Can auto-clean old entries while preserving recent history
 4. **MCP integration:** Claude can query audit history to understand decisions
+
+**Security note:** The audit trail is only as secure as the database file. For a single-user system, standard Unix file permissions (readable/writable only by owner) provide adequate protection. The system does not defend against a malicious user with file system access — that's outside our threat model.
 
 **What we capture:**
 
@@ -346,6 +373,15 @@ CREATE TABLE approval_audit (
 - File contents (too large, already in book table)
 - Embeddings (too large, already in chunks table)
 - Intermediate processing steps (covered by state_history table)
+
+**Audit trail vs. state history:**
+
+| Table | Purpose | Example |
+|-------|---------|---------|
+| `pipeline_state_history` | Technical flow tracking | DETECTED → HASHING → CLASSIFYING → ... |
+| `approval_audit` | Business decision tracking | "taylor approved book X because Y" |
+
+The state history shows *what happened* technically. The audit trail shows *who decided what* for accountability.
 
 **Retention policy:**
 
@@ -418,6 +454,20 @@ class HealthMonitor:
 | `queue_backup` | >100 books queued | Info |
 | `worker_idle` | Worker running but no processing for 1 hour | Info |
 | `disk_space_low` | <1GB free in database directory | Critical |
+
+**Worker-Health Monitor Integration:**
+
+The worker and health monitor are loosely coupled:
+
+1. **Worker updates `updated_at`** on each state transition — this is the "heartbeat"
+2. **Health monitor reads the database** to detect stuck pipelines — no direct communication
+3. **Worker optionally logs health** at configurable intervals (`--health-interval 60`)
+
+This design keeps the worker simple (it just processes books) while the health monitor observes from outside. If the worker crashes, the health monitor will detect stuck pipelines from stale `updated_at` timestamps.
+
+**Health metrics cache refresh:**
+
+The `health_metrics` table is refreshed every `HEALTH_CACHE_REFRESH_SECONDS` (default: 30). This provides fast reads for the CLI/MCP while keeping database load low.
 
 ---
 
@@ -534,11 +584,33 @@ $ agentic-pipeline batch-reject \
 $ agentic-pipeline batch-retry --max-attempts 3
 ```
 
+**Batch operation rollback:**
+
+Batch operations cannot be automatically undone because:
+- Approvals may have triggered downstream processing (embeddings)
+- Rejections may have moved files to archive folders
+- The audit trail preserves what happened for accountability
+
+**To reverse a batch operation:**
+1. Query the audit trail: `agentic-pipeline audit --actor "batch:*" --last 1`
+2. Identify affected books from the `filter_used` field
+3. Use `batch_approve` or `batch_reject` with the inverse filter
+4. For approved books that need rollback: use `rollback_book` individually
+
+**Concurrency:**
+
+This is a single-user system. Batch operations are not designed for concurrent access:
+- Running two `batch_approve` commands simultaneously may process the same book twice
+- The worker processes one book at a time
+- If multi-user support is needed in the future, we'd add database-level locking
+
 ---
 
 ### 4. Priority Queues
 
 **Purpose:** Control processing order.
+
+**How priority works:** Priority numbers are like an "importance score" — lower numbers get processed first. Think of it like a to-do list where "1" is "do immediately" and "10" is "whenever you get around to it."
 
 **Priority scale:**
 
@@ -664,23 +736,28 @@ CREATE TABLE state_duration_stats (
 );
 
 -- Audit trail (append-only)
+-- Note: Schema aligned with master design in agentic-processing-pipeline-design.md
 CREATE TABLE approval_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     book_id TEXT NOT NULL,
     pipeline_id TEXT,
-    action TEXT NOT NULL,
-    actor TEXT NOT NULL,
+    action TEXT NOT NULL,              -- APPROVED, REJECTED, ROLLED_BACK, etc.
+    actor TEXT NOT NULL,               -- "auto:high_confidence", "human:taylor", "batch:filter_xyz"
     reason TEXT,
     before_state JSON,
     after_state JSON,
-    filter_used JSON,  -- For batch operations
+    adjustments JSON,                  -- Any modifications made during approval
+    filter_used JSON,                  -- For batch operations: the filter criteria used
     confidence_at_decision REAL,
+    autonomy_mode TEXT,                -- "supervised", "partial", "confident" (for Phase 5)
+    session_id TEXT,                   -- Groups related actions in a session
     performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_audit_book_id ON approval_audit(book_id);
 CREATE INDEX idx_audit_actor ON approval_audit(actor);
 CREATE INDEX idx_audit_performed_at ON approval_audit(performed_at);
+CREATE INDEX idx_audit_session ON approval_audit(session_id);
 ```
 
 ### Column Additions
@@ -735,7 +812,7 @@ agentic-pipeline process /path/to/book.epub --priority 1
 agentic-pipeline worker --health-interval 60  # Report health every 60s
 
 # Status with stuck warning
-agentic-pipeline status <id>  # Shows "⚠️ STUCK" if applicable
+agentic-pipeline status <id>  # Shows "[!] STUCK" if applicable
 ```
 
 ---
@@ -798,6 +875,20 @@ def get_audit_log(
 ) -> list[dict]:
     """Query the audit trail."""
 ```
+
+---
+
+## Edge Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| **Empty queue health report** | Returns `{"active": 0, "queued": 0, ...}` with `status: "idle"` — this is healthy |
+| **Stuck detection with no history** | Uses `DEFAULT_STATE_TIMEOUTS` until 100+ books provide statistical data |
+| **Batch operation matches zero books** | Returns `{"matched": 0, "affected": 0}` — success, not an error |
+| **Priority 1 book added while priority 10 is mid-process** | Current book completes first; new book is next. We don't interrupt processing. |
+| **Worker crashes mid-book** | Book stays in current state; health monitor detects as stuck after threshold |
+| **Batch approve during active processing** | Safe — only affects `pending_approval` books, not `processing` ones |
+| **Audit table query on empty table** | Returns empty array `[]`, not an error |
 
 ---
 
@@ -866,6 +957,34 @@ With Phase 4, you can:
 
 ---
 
+## Configuration Defaults
+
+All Phase 4 settings can be configured via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HEALTH_CACHE_REFRESH_SECONDS` | 30 | How often to refresh health metrics cache |
+| `STUCK_MULTIPLIER` | 2.0 | Multiplier for expected duration to flag as stuck |
+| `PRIORITY_AGING_HOURS_BOOST` | 24 | Hours before priority gets boosted |
+| `PRIORITY_AGING_HOURS_URGENT` | 48 | Hours before priority becomes 1 (urgent) |
+| `BATCH_MAX_COUNT_DEFAULT` | 50 | Default max items per batch operation |
+| `AUDIT_RETENTION_DAYS_DEFAULT` | 365 | Default retention for audit entries |
+| `HEALTH_ALERT_QUEUE_THRESHOLD` | 100 | Queue size that triggers `queue_backup` alert |
+| `HEALTH_ALERT_FAILURE_RATE` | 0.20 | Failure rate that triggers `high_failure_rate` alert |
+
+**Per-state timeout defaults (seconds):**
+
+| State | Default Timeout | Notes |
+|-------|-----------------|-------|
+| HASHING | 60 | File I/O only |
+| CLASSIFYING | 120 | Single LLM call |
+| SELECTING_STRATEGY | 30 | Local rules only |
+| PROCESSING | 900 | Subprocess, varies by book size |
+| VALIDATING | 60 | Database queries |
+| EMBEDDING | 600 | Subprocess, varies by chapter count |
+
+---
+
 ## File Structure
 
 ```
@@ -927,13 +1046,52 @@ These are the features that separate a prototype from a production system. They'
 
 ---
 
+## Implementation Order
+
+The components have dependencies that determine build order:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     IMPLEMENTATION ORDER                         │
+│                                                                  │
+│  1. Database migrations ──────────────────────────────────────┐ │
+│     (priority column, audit table, health table)              │ │
+│                           │                                    │ │
+│                           ▼                                    │ │
+│  2. Priority queues ─────────────────────────────────────────┐│ │
+│     (enables ordering, needed by batch operations)           ││ │
+│                           │                                   ││ │
+│                           ▼                                   ││ │
+│  3. Audit trail ─────────────────────────────────────────────┼┤ │
+│     (standalone, but batch ops depend on it for logging)     ││ │
+│                           │                                   ││ │
+│                           ▼                                   ││ │
+│  4. Batch operations ────────────────────────────────────────┘│ │
+│     (uses priority queues + audit trail)                      │ │
+│                           │                                    │ │
+│                           ▼                                    │ │
+│  5. Health monitoring ───────────────────────────────────────┐│ │
+│     (standalone, provides foundation for stuck detection)    ││ │
+│                           │                                   ││ │
+│                           ▼                                   ││ │
+│  6. Stuck detection ─────────────────────────────────────────┘│ │
+│     (uses health monitor infrastructure)                      │ │
+│                                                                │ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Why this order:**
+1. **Database first:** All other components need the schema
+2. **Priority queues early:** Simple to implement, immediately useful, batch ops depend on it
+3. **Audit trail before batch ops:** Batch operations must log to audit trail
+4. **Batch operations:** Most immediate user value
+5. **Health monitoring:** Visibility before automation
+6. **Stuck detection last:** Builds on health monitor, least urgent
+
+---
+
 ## Next Steps
 
 1. **Review this design** — Does it address your operational needs?
 2. **Create implementation plan** — Break into tasks with test-first approach
-3. **Implement in priority order:**
-   - Priority queues (enables batch queue)
-   - Batch operations (most immediate value)
-   - Health monitoring (visibility)
-   - Audit trail (compliance)
-   - Stuck detection (automation)
+3. **Implement in dependency order** (see diagram above)
