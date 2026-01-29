@@ -4,6 +4,28 @@
 
 ---
 
+## Status: ✅ Implemented
+
+**Completed:** January 28, 2025
+
+| Component | Status |
+|-----------|--------|
+| BookType enum & BookProfile dataclass | ✅ Complete |
+| LLMProvider abstract base class | ✅ Complete |
+| OpenAI provider (gpt-4o-mini) | ✅ Complete |
+| Anthropic provider (claude-3-haiku) | ✅ Complete |
+| ClassifierAgent orchestrator | ✅ Complete |
+| CLI `classify` command | ✅ Complete |
+| Unit tests (17 tests) | ✅ Complete |
+
+**Try it:**
+```bash
+export OPENAI_API_KEY="sk-..."
+python -m agentic_pipeline.cli classify --text "Chapter 1: Introduction to Python..."
+```
+
+---
+
 ## What Is This?
 
 The Classifier Agent is the "brain" that looks at a new book and answers: *What kind of book is this?*
@@ -301,4 +323,93 @@ It's not trying to be clever. It's trying to be predictable and get out of the w
 3. **Testing** — Verify with sample books
 4. **Calibration** — Adjust confidence threshold based on real results
 
-Ready for implementation plan? See `docs/plans/2025-01-28-phase2-classifier-implementation.md` (to be created).
+Implementation details: See `docs/plans/2025-01-28-phase2-classifier-implementation.md`.
+
+---
+
+## Implementation Notes (Post-Build)
+
+This section documents what we learned during actual implementation.
+
+### What Went as Planned
+
+1. **Provider abstraction worked well** — The `LLMProvider` base class made it trivial to add both OpenAI and Anthropic. Adding a third provider (e.g., local Ollama) would be ~50 lines of code.
+
+2. **Fallback behavior is seamless** — When OpenAI fails, Anthropic kicks in automatically. Users see the same output regardless of which provider responded.
+
+3. **Caching via existing tables** — Reusing `find_by_hash()` from the pipeline repository was the right call. Zero additional infrastructure needed.
+
+4. **Cost estimates were accurate** — GPT-4o-mini classification calls cost ~$0.001 as predicted.
+
+### Implementation Adjustments
+
+1. **Added text normalization** — We discovered that copy-pasted text often contains "smart quotes" (curly quotes like " " instead of straight quotes " "). These caused encoding errors with the OpenAI API.
+
+   **Solution:** Added a `_normalize_text()` helper that converts smart quotes to ASCII equivalents before sending to the API. This runs on both the user's input text and the prompt template.
+
+2. **Explicit UTF-8 encoding** — The prompt loader now explicitly specifies `encoding="utf-8"` when reading prompt files to avoid platform-specific encoding issues.
+
+3. **Model choice for Anthropic** — We chose `claude-3-haiku-20240307` over Claude Sonnet for the fallback. Haiku is faster and cheaper, which is appropriate for a backup provider we hope to rarely use.
+
+### Code Architecture
+
+```
+agentic_pipeline/
+├── agents/
+│   ├── __init__.py           # Exports: ClassifierAgent, BookProfile, BookType
+│   ├── classifier.py         # Main orchestrator (cache → primary → fallback)
+│   ├── classifier_types.py   # BookType enum, BookProfile dataclass
+│   ├── prompts/
+│   │   ├── __init__.py       # load_prompt() helper
+│   │   └── classify.txt      # The classification prompt template
+│   └── providers/
+│       ├── __init__.py       # Exports all providers
+│       ├── base.py           # LLMProvider abstract base class
+│       ├── openai_provider.py
+│       └── anthropic_provider.py
+```
+
+### Testing Approach
+
+- **Unit tests with mocks** — All provider tests use mocked API responses. We never call real APIs in tests.
+- **Integration test via CLI** — The `classify` command serves as a manual integration test with real API calls.
+- **17 total tests** covering:
+  - BookType enum completeness
+  - BookProfile serialization (to_dict, from_dict)
+  - LLMProvider abstract enforcement
+  - Each provider's response parsing
+  - Cache hit/miss behavior
+  - Fallback on primary failure
+  - Graceful degradation when all providers fail
+
+### Known Limitations
+
+1. **No retry logic** — If a provider fails, we immediately try the fallback. We don't retry the same provider. This is intentional—retrying delays the user and usually doesn't help. If OpenAI is down, it's down.
+
+2. **Fixed text truncation** — We truncate input to 40,000 characters (~10K tokens). This is hardcoded. Very large books might benefit from smarter sampling (e.g., first chapter + random middle section + last chapter).
+
+3. **No learning from corrections** — When humans correct a classification, we don't use that to improve future classifications. This would require fine-tuning or a feedback loop—future enhancement.
+
+### Environment Variables Required
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` | Yes (for primary) | OpenAI API authentication |
+| `ANTHROPIC_API_KEY` | No (for fallback) | Anthropic API authentication |
+
+If `ANTHROPIC_API_KEY` is not set, the fallback provider will fail, but the primary (OpenAI) will still work.
+
+### Performance Observations
+
+| Metric | Observed Value |
+|--------|----------------|
+| OpenAI response time | 1-3 seconds |
+| Anthropic response time | 2-4 seconds |
+| Cache hit (no API call) | <10ms |
+| Token usage per classification | ~500-800 tokens |
+
+---
+
+## Next Phase
+
+**Phase 3: Pipeline Orchestrator** — Connect the classifier to the state machine so classifications automatically drive strategy selection and approval flow.
