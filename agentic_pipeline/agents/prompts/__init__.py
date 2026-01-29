@@ -11,4 +11,4 @@ def load_prompt(name: str) -> str:
     path = PROMPTS_DIR / f"{name}.txt"
     if not path.exists():
         raise ValueError(f"Prompt not found: {name}")
-    return path.read_text()
+    return path.read_text(encoding="utf-8")
