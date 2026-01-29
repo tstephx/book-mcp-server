@@ -290,5 +290,5 @@ A: ~$0.03-0.05 per book (two LLM calls: classification + validation). At 100 boo
 - [Phase 2 Classifier](./docs/plans/2025-01-28-phase2-classifier-agent-design.md) - AI classifier design
 - [Phase 3 Orchestrator](./docs/plans/2025-01-28-phase3-orchestrator-design.md) - Pipeline orchestration
 - [Phase 4 Production Hardening](./docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md) - Health, batch ops, audit
-- [Phase 5 Confident Autonomy](./docs/plans/2025-01-28-phase5-confident-autonomy-design.md) - Graduated autonomy system
+- [Phase 5 Confident Autonomy](./docs/PHASE5-CONFIDENT-AUTONOMY-COMPLETE.md) - Graduated autonomy system
 - [Design Document](./docs/plans/2025-01-28-agentic-processing-pipeline-design.md) - Full specification
