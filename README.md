@@ -117,26 +117,32 @@ Before books enter the library:
 
 ---
 
-## Autonomy Levels
+## Autonomy Levels (Phase 5)
 
-The system starts cautious and earns trust over time:
+The system starts cautious and earns trust over time. This is implemented in [Phase 5: Confident Autonomy](./docs/plans/2025-01-28-phase5-confident-autonomy-design.md).
 
-### Phase 1: Supervised (Current)
+### Supervised Mode (Current)
 - All books require human approval
-- System collects data on accuracy
-- You build confidence in its decisions
+- System collects accuracy metrics
+- Building baseline for calibration
 
-### Phase 2: Partial Autonomy
-- Auto-approve when confidence ≥ 92% AND zero issues
+### Partial Autonomy Mode
+- Auto-approve: confidence ≥ threshold AND known book type AND zero issues
 - Human review for everything else
-- Weekly spot-checks of auto-approved books
+- Weekly spot-checks of 10% of auto-approved books
+- **Requirements:** 100+ books processed, <15% override rate
 
-### Phase 3: Confident Autonomy
-- Auto-approve based on calibrated thresholds
-- Human review only for edge cases
-- Monthly audits
+### Confident Autonomy Mode
+- Auto-approve based on per-book-type calibrated thresholds
+- Human review only for edge cases (~10% of books)
+- Monthly spot-checks of 5% of auto-approved books
+- **Requirements:** 500+ books processed, <5% override rate, calibration ±5%
 
 **Escape hatch**: One command reverts to fully supervised mode instantly.
+
+```bash
+agentic-pipeline escape-hatch "Something seems off"
+```
 
 ---
 
@@ -284,4 +290,5 @@ A: ~$0.03-0.05 per book (two LLM calls: classification + validation). At 100 boo
 - [Phase 2 Classifier](./docs/plans/2025-01-28-phase2-classifier-agent-design.md) - AI classifier design
 - [Phase 3 Orchestrator](./docs/plans/2025-01-28-phase3-orchestrator-design.md) - Pipeline orchestration
 - [Phase 4 Production Hardening](./docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md) - Health, batch ops, audit
+- [Phase 5 Confident Autonomy](./docs/plans/2025-01-28-phase5-confident-autonomy-design.md) - Graduated autonomy system
 - [Design Document](./docs/plans/2025-01-28-agentic-processing-pipeline-design.md) - Full specification
