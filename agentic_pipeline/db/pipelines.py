@@ -257,3 +257,29 @@ class PipelineRepository:
         conn.commit()
         conn.close()
         return new_count
+
+    def update_priority(self, pipeline_id: str, priority: int) -> None:
+        """Update the priority of a pipeline."""
+        conn = self._connect()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE processing_pipelines SET priority = ?, updated_at = ? WHERE id = ?",
+            (priority, datetime.utcnow().isoformat(), pipeline_id)
+        )
+        conn.commit()
+        conn.close()
+
+    def get_queue_by_priority(self) -> dict[int, int]:
+        """Get count of queued items by priority."""
+        conn = self._connect()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT priority, COUNT(*) as count
+            FROM processing_pipelines
+            WHERE state = ?
+            GROUP BY priority
+            ORDER BY priority
+        """, (PipelineState.DETECTED.value,))
+        rows = cursor.fetchall()
+        conn.close()
+        return {row[0]: row[1] for row in rows}
