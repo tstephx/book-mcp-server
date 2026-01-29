@@ -451,5 +451,131 @@ def audit(last: int, actor: str, action: str, book_id: str):
     console.print(table)
 
 
+# Phase 5: Autonomy Commands
+
+@main.group()
+def autonomy():
+    """Manage autonomy settings."""
+    pass
+
+
+@autonomy.command("status")
+def autonomy_status():
+    """Show current autonomy mode and thresholds."""
+    from .db.config import get_db_path
+    from .autonomy import AutonomyConfig, MetricsCollector
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    collector = MetricsCollector(db_path)
+
+    mode = config.get_mode()
+    escape_active = config.is_escape_hatch_active()
+    metrics = collector.get_metrics(days=30)
+
+    console.print(f"\n[bold]Autonomy Status[/bold]")
+    console.print("-" * 35)
+
+    if escape_active:
+        console.print(f"  Mode: [red]ESCAPE HATCH ACTIVE[/red]")
+    else:
+        console.print(f"  Mode: [cyan]{mode}[/cyan]")
+
+    console.print(f"\n[bold]Last 30 Days:[/bold]")
+    console.print(f"  Total processed: {metrics['total_processed']}")
+    console.print(f"  Auto-approved:   {metrics['auto_approved']}")
+    console.print(f"  Human approved:  {metrics['human_approved']}")
+    console.print(f"  Human rejected:  {metrics['human_rejected']}")
+
+
+@autonomy.command("enable")
+@click.argument("mode", type=click.Choice(["partial", "confident"]))
+def autonomy_enable(mode: str):
+    """Enable an autonomy mode."""
+    from .db.config import get_db_path
+    from .autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+
+    if config.is_escape_hatch_active():
+        console.print("[red]Cannot enable autonomy while escape hatch is active.[/red]")
+        console.print("Run: agentic-pipeline autonomy resume")
+        return
+
+    config.set_mode(mode)
+    console.print(f"[green]Autonomy mode set to: {mode}[/green]")
+
+
+@autonomy.command("disable")
+def autonomy_disable():
+    """Disable autonomy (revert to supervised)."""
+    from .db.config import get_db_path
+    from .autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    config.set_mode("supervised")
+    console.print("[yellow]Autonomy disabled. All books require human review.[/yellow]")
+
+
+@autonomy.command("resume")
+def autonomy_resume():
+    """Resume autonomy after escape hatch."""
+    from .db.config import get_db_path
+    from .autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+
+    if not config.is_escape_hatch_active():
+        console.print("[yellow]Escape hatch is not active.[/yellow]")
+        return
+
+    config.deactivate_escape_hatch()
+    console.print("[green]Escape hatch deactivated. Autonomy resumed.[/green]")
+
+
+@main.command("escape-hatch")
+@click.argument("reason")
+def escape_hatch(reason: str):
+    """Activate escape hatch - immediately revert to supervised mode."""
+    from .db.config import get_db_path
+    from .autonomy import AutonomyConfig
+
+    db_path = get_db_path()
+    config = AutonomyConfig(db_path)
+    config.activate_escape_hatch(reason)
+
+    console.print("\n[red bold]⚠️  ESCAPE HATCH ACTIVATED[/red bold]")
+    console.print("\nAll autonomy disabled. Reverting to supervised mode.")
+    console.print(f"Reason: {reason}")
+    console.print("\nTo resume: agentic-pipeline autonomy resume")
+
+
+@main.command("spot-check")
+@click.option("--list", "list_pending", is_flag=True, help="List pending spot-checks")
+def spot_check(list_pending: bool):
+    """Start or manage spot-check reviews."""
+    from .db.config import get_db_path
+    from .autonomy import SpotCheckManager
+
+    db_path = get_db_path()
+    manager = SpotCheckManager(db_path)
+
+    if list_pending:
+        pending = manager.select_for_review()
+        if not pending:
+            console.print("[green]No spot-checks pending.[/green]")
+            return
+
+        console.print(f"\n[bold]Pending Spot-Checks ({len(pending)} books)[/bold]\n")
+        for book in pending[:10]:
+            console.print(f"  {book['book_id'][:8]}... [{book['original_book_type']}] {book['original_confidence']:.0%}")
+    else:
+        console.print("Use --list to see pending spot-checks")
+        console.print("Interactive spot-check not yet implemented")
+
+
 if __name__ == "__main__":
     main()
