@@ -134,3 +134,129 @@ def get_pipeline_status(pipeline_id: str) -> dict:
         result["approved_by"] = pipeline["approved_by"]
 
     return result
+
+
+# Phase 4: Production Hardening Tools
+
+def get_pipeline_health() -> dict:
+    """
+    Get current pipeline health status.
+
+    Returns health metrics including active, queued, stuck counts and alerts.
+    """
+    from agentic_pipeline.health import HealthMonitor, StuckDetector
+
+    db_path = get_db_path()
+    monitor = HealthMonitor(db_path)
+    detector = StuckDetector(db_path)
+
+    report = monitor.get_health()
+    report["stuck"] = detector.detect()
+
+    return report
+
+
+def get_stuck_pipelines() -> list[dict]:
+    """
+    Get list of pipelines that appear to be stuck.
+
+    Returns pipelines that have been in the same state longer than expected.
+    """
+    from agentic_pipeline.health import StuckDetector
+
+    db_path = get_db_path()
+    detector = StuckDetector(db_path)
+
+    return detector.detect()
+
+
+def batch_approve_tool(
+    min_confidence: float = None,
+    book_type: str = None,
+    max_count: int = 50,
+    execute: bool = False,
+) -> dict:
+    """
+    Approve books matching filters.
+
+    Args:
+        min_confidence: Minimum confidence threshold
+        book_type: Filter by book type
+        max_count: Maximum books to approve
+        execute: Set True to actually approve (otherwise preview)
+
+    Returns:
+        Count of approved/would_approve books and list of affected books.
+    """
+    from agentic_pipeline.batch import BatchOperations, BatchFilter
+
+    db_path = get_db_path()
+    ops = BatchOperations(db_path)
+    filter = BatchFilter(
+        min_confidence=min_confidence,
+        book_type=book_type,
+        max_count=max_count,
+    )
+
+    return ops.approve(filter, actor="mcp:batch", execute=execute)
+
+
+def batch_reject_tool(
+    book_type: str = None,
+    max_confidence: float = None,
+    reason: str = "",
+    max_count: int = 50,
+    execute: bool = False,
+) -> dict:
+    """
+    Reject books matching filters.
+
+    Args:
+        book_type: Filter by book type
+        max_confidence: Maximum confidence threshold
+        reason: Rejection reason (required for execute)
+        max_count: Maximum books to reject
+        execute: Set True to actually reject (otherwise preview)
+    """
+    from agentic_pipeline.batch import BatchOperations, BatchFilter
+
+    db_path = get_db_path()
+    ops = BatchOperations(db_path)
+    filter = BatchFilter(
+        book_type=book_type,
+        max_confidence=max_confidence,
+        max_count=max_count,
+    )
+
+    return ops.reject(filter, reason=reason, actor="mcp:batch", execute=execute)
+
+
+def get_audit_log(
+    book_id: str = None,
+    actor: str = None,
+    action: str = None,
+    last_days: int = 7,
+    limit: int = 100,
+) -> list[dict]:
+    """
+    Query the audit trail.
+
+    Args:
+        book_id: Filter by book ID
+        actor: Filter by actor
+        action: Filter by action type
+        last_days: Only return entries from last N days
+        limit: Maximum entries to return
+    """
+    from agentic_pipeline.audit import AuditTrail
+
+    db_path = get_db_path()
+    trail = AuditTrail(db_path)
+
+    return trail.query(
+        book_id=book_id,
+        actor=actor,
+        action=action,
+        last_days=last_days,
+        limit=limit,
+    )
