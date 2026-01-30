@@ -3,7 +3,6 @@
 
 import hashlib
 import signal
-import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -20,6 +19,7 @@ from agentic_pipeline.orchestrator.errors import (
 )
 from agentic_pipeline.agents.classifier import ClassifierAgent
 from agentic_pipeline.pipeline.strategy import StrategySelector
+from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
 
 
 class Orchestrator:
@@ -32,6 +32,13 @@ class Orchestrator:
         self.classifier = ClassifierAgent(config.db_path)
         self.strategy_selector = StrategySelector()
         self.shutdown_requested = False
+
+        # Initialize processing adapter for direct library calls
+        self.processing_adapter = ProcessingAdapter(
+            db_path=config.db_path,
+            enable_llm_fallback=True,
+            llm_fallback_threshold=config.confidence_threshold,
+        )
 
     def _compute_hash(self, book_path: str) -> str:
         """Compute SHA-256 hash of file contents."""
@@ -131,57 +138,56 @@ class Orchestrator:
         self.repo.update_book_profile(pipeline_id, profile_dict)
         return profile_dict
 
-    def _run_processing(self, book_path: str) -> None:
-        """Run book-ingestion processing via subprocess."""
-        try:
-            # Use the venv python from book-ingestion-python
-            venv_python = self.config.book_ingestion_path / "venv" / "bin" / "python"
-            python_cmd = str(venv_python) if venv_python.exists() else "python"
+    def _run_processing(self, book_path: str, book_id: Optional[str] = None) -> dict:
+        """Run book-ingestion processing via direct library call.
 
-            result = subprocess.run(
-                [python_cmd, "-m", "src.cli", "process", book_path],
-                cwd=str(self.config.book_ingestion_path),
-                timeout=self.config.processing_timeout,
-                capture_output=True,
-                text=True
-            )
-            if result.returncode != 0:
-                raise ProcessingError(
-                    f"Processing failed: {result.stderr}",
-                    exit_code=result.returncode,
-                    stderr=result.stderr
-                )
-        except subprocess.TimeoutExpired:
-            raise PipelineTimeoutError(
-                f"Processing exceeded {self.config.processing_timeout}s",
-                timeout=self.config.processing_timeout
+        Returns:
+            Dict with processing results including quality_score, confidence, etc.
+        """
+        result = self.processing_adapter.process_book(
+            book_path=book_path,
+            book_id=book_id,
+        )
+
+        if not result.success:
+            raise ProcessingError(
+                f"Processing failed: {result.error}",
+                exit_code=1,
+                stderr=result.error or "Unknown error",
             )
 
-    def _run_embedding(self, content_hash: str) -> None:
-        """Run embedding generation via subprocess."""
-        try:
-            # Use the venv python from book-ingestion-python
-            venv_python = self.config.book_ingestion_path / "venv" / "bin" / "python"
-            python_cmd = str(venv_python) if venv_python.exists() else "python"
+        return {
+            "book_id": result.book_id,
+            "quality_score": result.quality_score,
+            "detection_confidence": result.detection_confidence,
+            "detection_method": result.detection_method,
+            "needs_review": result.needs_review,
+            "warnings": result.warnings,
+            "chapter_count": result.chapter_count,
+            "word_count": result.word_count,
+            "llm_fallback_used": result.llm_fallback_used,
+        }
 
-            # The generate_embeddings script processes all chapters without embeddings
-            result = subprocess.run(
-                [python_cmd, "scripts/generate_embeddings.py"],
-                cwd=str(self.config.book_ingestion_path),
-                timeout=self.config.embedding_timeout,
-                capture_output=True,
-                text=True
+    def _run_embedding(self, book_id: Optional[str] = None) -> dict:
+        """Run embedding generation via direct library call.
+
+        Args:
+            book_id: Optional book ID to limit embedding to specific book
+
+        Returns:
+            Dict with embedding results
+        """
+        result = self.processing_adapter.generate_embeddings(book_id=book_id)
+
+        if not result.success:
+            raise EmbeddingError(
+                f"Embedding failed: {result.error}",
+                exit_code=1,
             )
-            if result.returncode != 0:
-                raise EmbeddingError(
-                    f"Embedding failed: {result.stderr}",
-                    exit_code=result.returncode
-                )
-        except subprocess.TimeoutExpired:
-            raise PipelineTimeoutError(
-                f"Embedding exceeded {self.config.embedding_timeout}s",
-                timeout=self.config.embedding_timeout
-            )
+
+        return {
+            "chapters_processed": result.chapters_processed,
+        }
 
     def process_one(self, book_path: str) -> dict:
         """Process a single book through the pipeline."""
@@ -235,19 +241,32 @@ class Orchestrator:
         # PROCESSING
         self._transition(pipeline_id, PipelineState.PROCESSING)
         try:
-            self._run_processing(book_path)
+            processing_result = self._run_processing(book_path, book_id=pipeline_id)
         except (ProcessingError, PipelineTimeoutError) as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
             self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
             return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
+        # Store processing results in pipeline record
+        self.repo.update_processing_result(pipeline_id, {
+            "quality_score": processing_result.get("quality_score"),
+            "detection_confidence": processing_result.get("detection_confidence"),
+            "detection_method": processing_result.get("detection_method"),
+            "chapter_count": processing_result.get("chapter_count"),
+            "word_count": processing_result.get("word_count"),
+            "warnings": processing_result.get("warnings", []),
+            "llm_fallback_used": processing_result.get("llm_fallback_used", False),
+        })
+
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
-        # TODO: Add actual validation logic
+        # Validation now uses processing result quality metrics
 
-        # APPROVAL ROUTING
-        confidence = profile.get("confidence", 0)
-        if confidence >= self.config.confidence_threshold:
+        # APPROVAL ROUTING - use processing result confidence
+        confidence = processing_result.get("detection_confidence", 0)
+        needs_review = processing_result.get("needs_review", False)
+
+        if confidence >= self.config.confidence_threshold and not needs_review:
             # Auto-approve
             self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
             self._transition(pipeline_id, PipelineState.APPROVED)
@@ -265,7 +284,8 @@ class Orchestrator:
         # EMBEDDING
         self._transition(pipeline_id, PipelineState.EMBEDDING)
         try:
-            self._run_embedding(content_hash)
+            book_id = processing_result.get("book_id", pipeline_id)
+            self._run_embedding(book_id=book_id)
         except (EmbeddingError, PipelineTimeoutError) as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
             self._transition(pipeline_id, PipelineState.NEEDS_RETRY)

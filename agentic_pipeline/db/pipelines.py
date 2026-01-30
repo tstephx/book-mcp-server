@@ -198,6 +198,25 @@ class PipelineRepository:
         conn.commit()
         conn.close()
 
+    def update_processing_result(self, pipeline_id: str, processing_result: dict) -> None:
+        """Update the processing result from book-ingestion.
+
+        Stores quality metrics, detection confidence, and warnings from
+        the book-ingestion pipeline result.
+        """
+        conn = self._connect()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE processing_pipelines
+            SET processing_result = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (json.dumps(processing_result), datetime.utcnow().isoformat(), pipeline_id)
+        )
+        conn.commit()
+        conn.close()
+
     def mark_approved(self, pipeline_id: str, approved_by: str, confidence: float = None) -> None:
         """Mark a pipeline as approved."""
         conn = self._connect()
