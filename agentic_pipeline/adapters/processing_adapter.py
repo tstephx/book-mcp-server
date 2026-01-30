@@ -102,6 +102,7 @@ class ProcessingAdapter:
         title: Optional[str] = None,
         author: Optional[str] = None,
         book_id: Optional[str] = None,
+        save_to_storage: bool = True,
     ) -> ProcessingResult:
         """
         Process a book file and return structured results.
@@ -123,7 +124,7 @@ class ProcessingAdapter:
                 title=title,
                 author=author,
                 book_id=book_id,
-                save_to_storage=True,
+                save_to_storage=save_to_storage,
             )
 
             if not result.success:
