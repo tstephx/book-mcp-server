@@ -68,6 +68,47 @@ def _read_file_content(file_path: Path, check_size: bool = True) -> str:
     return content
 
 
+def _estimate_tokens(text: str) -> int:
+    """Estimate token count using ~4 characters per token heuristic."""
+    return len(text) // 4
+
+
+def _truncate_to_tokens(content: str, max_tokens: int) -> Tuple[str, bool, int]:
+    """
+    Truncate content to approximately max_tokens.
+
+    Returns:
+        Tuple of (truncated_content, was_truncated, total_estimated_tokens)
+    """
+    total_tokens = _estimate_tokens(content)
+
+    if total_tokens <= max_tokens:
+        return content, False, total_tokens
+
+    # Truncate to approximate character count (4 chars per token)
+    max_chars = max_tokens * 4
+
+    # Find a good break point (end of paragraph or sentence)
+    truncated = content[:max_chars]
+
+    # Try to break at paragraph
+    last_para = truncated.rfind('\n\n')
+    if last_para > max_chars * 0.7:  # Only if we keep at least 70%
+        truncated = truncated[:last_para]
+    else:
+        # Try to break at sentence
+        last_sentence = max(
+            truncated.rfind('. '),
+            truncated.rfind('.\n'),
+            truncated.rfind('? '),
+            truncated.rfind('! ')
+        )
+        if last_sentence > max_chars * 0.8:  # Only if we keep at least 80%
+            truncated = truncated[:last_sentence + 1]
+
+    return truncated, True, total_tokens
+
+
 def register_chapter_tools(mcp: "FastMCP") -> None:
     """
     Register all chapter-related tools
@@ -77,7 +118,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
     """
 
     @mcp.tool()
-    def get_chapter(book_id: str, chapter_number: int) -> str:
+    def get_chapter(book_id: str, chapter_number: int, max_tokens: Optional[int] = None) -> str:
         """
         Get the content of a specific chapter. For large chapters that have been
         split into sections, this returns an index listing all sections. Use
@@ -86,6 +127,8 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
         Args:
             book_id: The unique ID of the book
             chapter_number: The chapter number to retrieve (1-indexed)
+            max_tokens: Optional maximum tokens to return. If content exceeds this,
+                       it will be truncated with a note. Uses ~4 chars/token estimate.
         """
         try:
             # Validate inputs
@@ -118,6 +161,18 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                 index_file = chapter_path / "_index.md"
                 if index_file.exists():
                     content = _read_file_content(index_file, check_size=False)
+
+                    # Apply token truncation if requested
+                    if max_tokens is not None:
+                        content, was_truncated, total_tokens = _truncate_to_tokens(content, max_tokens)
+                        if was_truncated:
+                            content += (
+                                f"\n\n---\n"
+                                f"⚠️ **Content truncated** to ~{max_tokens:,} tokens "
+                                f"(of ~{total_tokens:,} total). "
+                                f"Use `get_section()` to read individual sections."
+                            )
+
                     return content
 
                 # Otherwise, list the sections
@@ -147,6 +202,23 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             # Handle single-file chapters
             try:
                 content = _read_file_content(chapter_path)
+
+                # Apply token truncation if requested
+                if max_tokens is not None:
+                    content, was_truncated, total_tokens = _truncate_to_tokens(content, max_tokens)
+                    if was_truncated:
+                        truncation_note = (
+                            f"\n\n---\n"
+                            f"⚠️ **Content truncated** to ~{max_tokens:,} tokens "
+                            f"(of ~{total_tokens:,} total). "
+                            f"Use `get_section()` for large chapters or increase `max_tokens`."
+                        )
+                        content += truncation_note
+                        logger.info(
+                            f"Truncated chapter {chapter_number} from {book_id}: "
+                            f"{total_tokens} -> {max_tokens} tokens"
+                        )
+
                 logger.info(f"Retrieved chapter {chapter_number} from {book_id}")
                 return content
 
@@ -172,7 +244,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             return f"Unexpected error: {str(e)}"
 
     @mcp.tool()
-    def get_section(book_id: str, chapter_number: int, section_number: int) -> str:
+    def get_section(book_id: str, chapter_number: int, section_number: int, max_tokens: Optional[int] = None) -> str:
         """
         Get a specific section from a chapter that has been split into multiple parts.
         Use get_chapter() first to see the list of available sections.
@@ -181,6 +253,8 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             book_id: The unique ID of the book
             chapter_number: The chapter number (1-indexed)
             section_number: The section number within the chapter (1-indexed)
+            max_tokens: Optional maximum tokens to return. If content exceeds this,
+                       it will be truncated with a note.
         """
         try:
             # Validate inputs
@@ -226,6 +300,21 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
             try:
                 content = _read_file_content(section_file)
+
+                # Apply token truncation if requested
+                if max_tokens is not None:
+                    content, was_truncated, total_tokens = _truncate_to_tokens(content, max_tokens)
+                    if was_truncated:
+                        content += (
+                            f"\n\n---\n"
+                            f"⚠️ **Content truncated** to ~{max_tokens:,} tokens "
+                            f"(of ~{total_tokens:,} total). Increase `max_tokens` for more."
+                        )
+                        logger.info(
+                            f"Truncated section {section_number} of chapter {chapter_number}: "
+                            f"{total_tokens} -> {max_tokens} tokens"
+                        )
+
                 logger.info(f"Retrieved section {section_number} of chapter {chapter_number} from {book_id}")
                 return content
 
