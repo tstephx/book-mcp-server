@@ -164,6 +164,36 @@ def create_server() -> FastMCP:
             "stats": cache.stats()
         }
 
+    # Register library status tool
+    @mcp.tool()
+    def library_status() -> dict:
+        """Get unified library status dashboard
+
+        Shows which books are fully ready (content + embeddings for semantic
+        search), which are partially ready, and which are still in the pipeline.
+
+        Returns:
+            Dictionary with:
+            - overview: total books, chapters, words, embedding coverage
+            - books: per-book status with embedding percentage and pipeline state
+            - pipeline_summary: pipeline state counts
+
+        Examples:
+            library_status()
+        """
+        try:
+            from agentic_pipeline.library import LibraryStatus
+            from agentic_pipeline.db.config import get_db_path
+
+            monitor = LibraryStatus(get_db_path())
+            result = monitor.get_status()
+            logger.info(f"Library status: {result['overview']['total_books']} books, "
+                       f"{result['overview']['embedding_coverage_pct']}% embedded")
+            return result
+        except Exception as e:
+            logger.error(f"Library status error: {e}", exc_info=True)
+            return {"error": str(e)}
+
     # =========================================================================
     # Full-Text Search Tools
     # =========================================================================

@@ -76,7 +76,7 @@ def pending():
 @main.command()
 @click.argument("pipeline_id")
 def approve(pipeline_id: str):
-    """Approve a pending book."""
+    """Approve a pending book and generate embeddings."""
     from .db.config import get_db_path
     from .approval.actions import approve_book
 
@@ -84,7 +84,15 @@ def approve(pipeline_id: str):
     result = approve_book(db_path, pipeline_id, actor="human:cli")
 
     if result["success"]:
-        console.print(f"[green]Approved: {pipeline_id}[/green]")
+        state = result.get("state", "approved")
+        if state == "complete":
+            chapters = result.get("chapters_embedded", 0)
+            console.print(f"[green]Approved & embedded: {pipeline_id} ({chapters} chapters)[/green]")
+        elif state == "needs_retry":
+            console.print(f"[yellow]Approved but embedding failed: {pipeline_id}[/yellow]")
+            console.print(f"  Error: {result.get('embedding_error')}")
+        else:
+            console.print(f"[green]Approved: {pipeline_id}[/green]")
     else:
         console.print(f"[red]Failed: {result.get('error')}[/red]")
 
@@ -158,7 +166,7 @@ def classify(text: str, provider: str):
 
     result = agent.classify(text, content_hash=content_hash)
 
-    console.print(f"\n[bold]Classification Result:[/bold]")
+    console.print("\n[bold]Classification Result:[/bold]")
     console.print(f"  Type: [cyan]{result.book_type.value}[/cyan]")
 
     conf = result.confidence
@@ -191,15 +199,15 @@ def process(book_path: str):
 
     state = result.get("state", "unknown")
     if state == "complete":
-        console.print(f"[green]Complete![/green]")
+        console.print("[green]Complete![/green]")
         console.print(f"  Type: {result.get('book_type')}")
         console.print(f"  Confidence: {result.get('confidence', 0):.0%}")
     elif state == "pending_approval":
-        console.print(f"[yellow]Pending approval[/yellow]")
+        console.print("[yellow]Pending approval[/yellow]")
         console.print(f"  Type: {result.get('book_type')}")
         console.print(f"  Confidence: {result.get('confidence', 0):.0%}")
     elif state == "needs_retry":
-        console.print(f"[red]Failed - queued for retry[/red]")
+        console.print("[red]Failed - queued for retry[/red]")
         console.print(f"  Error: {result.get('error')}")
     else:
         console.print(f"[dim]State: {state}[/dim]")
@@ -372,7 +380,13 @@ def batch_approve(min_confidence: float, book_type: str, max_count: int, execute
     result = ops.approve(filter, actor="human:cli", execute=execute)
 
     if execute:
-        console.print(f"[green]Approved {result['approved']} books[/green]")
+        embedded = result.get('embedded', 0)
+        failures = result.get('embedding_failures', [])
+        console.print(f"[green]Approved {result['approved']} books, embedded {embedded}[/green]")
+        if failures:
+            console.print(f"[yellow]  {len(failures)} embedding failure(s):[/yellow]")
+            for f in failures[:5]:
+                console.print(f"    {f['id'][:8]}... {f.get('error', 'unknown')}")
     else:
         console.print(f"[yellow]Would approve {result['would_approve']} books (dry-run)[/yellow]")
         for book in result['books'][:10]:
@@ -451,6 +465,72 @@ def audit(last: int, actor: str, action: str, book_id: str):
     console.print(table)
 
 
+@main.command("library-status")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def library_status(as_json: bool):
+    """Show library status dashboard."""
+    from .db.config import get_db_path
+    from .library import LibraryStatus
+    import json as json_module
+
+    db_path = get_db_path()
+    monitor = LibraryStatus(db_path)
+    report = monitor.get_status()
+
+    if as_json:
+        console.print(json_module.dumps(report, indent=2))
+        return
+
+    overview = report["overview"]
+
+    console.print("\n[bold]Library Status[/bold]")
+    console.print("-" * 40)
+    console.print(f"  Books:          {overview['total_books']}")
+    console.print(f"  Chapters:       {overview['total_chapters']}")
+    console.print(f"  Total words:    {overview['total_words']:,}")
+    console.print(f"  Embedded:       {overview['embedded_chapters']}/{overview['total_chapters']} ({overview['embedding_coverage_pct']}%)")
+    console.print()
+    console.print(f"  [green]Ready:          {overview['books_fully_ready']}[/green]")
+    console.print(f"  [yellow]Partial:        {overview['books_partially_ready']}[/yellow]")
+    console.print(f"  [red]No embeddings:  {overview['books_not_embedded']}[/red]")
+
+    if report["books"]:
+        console.print()
+        table = Table()
+        table.add_column("Title", max_width=40)
+        table.add_column("Author", max_width=20)
+        table.add_column("Chapters", justify="right")
+        table.add_column("Embedded", justify="right")
+        table.add_column("Status")
+        table.add_column("Source", style="dim")
+
+        for book in report["books"]:
+            status = book["status"]
+            if status == "ready":
+                status_display = "[green]ready[/green]"
+            elif status == "partial":
+                status_display = f"[yellow]partial ({book['embedding_pct']}%)[/yellow]"
+            else:
+                status_display = "[red]no embeddings[/red]"
+
+            table.add_row(
+                book["title"][:40],
+                (book["author"] or "")[:20],
+                str(book["chapters"]),
+                str(book["embedded_chapters"]),
+                status_display,
+                book["source"],
+            )
+
+        console.print(table)
+
+    pipeline = report["pipeline_summary"]
+    if pipeline["total_pipelines"] > 0:
+        console.print(f"\n[bold]Pipeline[/bold]: {pipeline['total_pipelines']} total")
+        for state, count in sorted(pipeline["by_state"].items()):
+            console.print(f"  {state}: {count}")
+
+
 # Phase 5: Autonomy Commands
 
 @main.group()
@@ -473,15 +553,15 @@ def autonomy_status():
     escape_active = config.is_escape_hatch_active()
     metrics = collector.get_metrics(days=30)
 
-    console.print(f"\n[bold]Autonomy Status[/bold]")
+    console.print("\n[bold]Autonomy Status[/bold]")
     console.print("-" * 35)
 
     if escape_active:
-        console.print(f"  Mode: [red]ESCAPE HATCH ACTIVE[/red]")
+        console.print("  Mode: [red]ESCAPE HATCH ACTIVE[/red]")
     else:
         console.print(f"  Mode: [cyan]{mode}[/cyan]")
 
-    console.print(f"\n[bold]Last 30 Days:[/bold]")
+    console.print("\n[bold]Last 30 Days:[/bold]")
     console.print(f"  Total processed: {metrics['total_processed']}")
     console.print(f"  Auto-approved:   {metrics['auto_approved']}")
     console.print(f"  Human approved:  {metrics['human_approved']}")
