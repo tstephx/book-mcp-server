@@ -1,5 +1,16 @@
 # Claude Project Context
 
+## Session Initialization (READ FIRST)
+
+**DO NOT scan directories on startup.** This project is well-documented below.
+
+### Quick Start Protocol
+1. Run `get_context(project="book-mcp-server")` for project memory
+2. Check `git status` and `git log -3` for recent state
+3. Ask the user what they want to work on
+
+---
+
 This is the **Agentic Book Processing Pipeline** - an AI-powered system that automatically processes, classifies, and ingests books into a searchable knowledge library.
 
 ## Quick Start
@@ -186,3 +197,16 @@ See `docs/USER-GUIDE.md` for comprehensive usage documentation.
 - `docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md` - Phase 4 features
 - `docs/PHASE5-CONFIDENT-AUTONOMY-COMPLETE.md` - Phase 5 features
 - `docs/plans/` - Design documents and implementation plans
+
+---
+
+## Memory Integration
+
+This project uses claude-innit for persistent context:
+- `get_context(project="book-mcp-server")` - Load project memory
+- `remember(content, category="project", project="book-mcp-server")` - Save decisions
+- `save_session(summary, project="book-mcp-server")` - End-of-session summary
+
+---
+
+*Last updated: 2026-02-06*
