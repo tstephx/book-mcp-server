@@ -9,7 +9,7 @@
 ### Step 1: Install
 
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 ./setup.sh
 ```
 
@@ -52,12 +52,12 @@ open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.jso
 {
   "mcpServers": {
     "book-library": {
-      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "command": "/path/to/book-mcp-server/venv/bin/python",
       "args": [
         "-m",
         "src.server"
       ],
-      "cwd": "/Users/taylorstephens/_Projects/book-mcp-server"
+      "cwd": "/path/to/book-mcp-server"
     }
   }
 }
@@ -72,9 +72,9 @@ open -a TextEdit ~/Library/Application\ Support/Claude/claude_desktop_config.jso
       ...existing config...
     },
     "book-library": {
-      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "command": "/path/to/book-mcp-server/venv/bin/python",
       "args": ["-m", "src.server"],
-      "cwd": "/Users/taylorstephens/_Projects/book-mcp-server"
+      "cwd": "/path/to/book-mcp-server"
     }
   }
 }
@@ -177,8 +177,8 @@ ls -la ~/Library/Application\ Support/Claude/claude_desktop_config.json
 **Check 2:** Paths are absolute (not relative)?
 ```bash
 # Verify these exist:
-ls -la /Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python
-ls -la /Users/taylorstephens/_Projects/book-mcp-server/src/server.py
+ls -la /path/to/book-mcp-server/venv/bin/python
+ls -la /path/to/book-mcp-server/src/server.py
 ```
 
 **Check 3:** Restarted Claude Desktop completely?
@@ -200,13 +200,13 @@ open /Applications/Utilities/Console.app
 **Database not found:**
 ```bash
 # Check database exists
-ls -la /Users/taylorstephens/_Projects/book-ingestion-python/data/library.db
+ls -la /path/to/book-ingestion-python/data/library.db
 ```
 
 **Books directory not found:**
 ```bash
 # Check books directory exists
-ls -la /Users/taylorstephens/_Projects/book-ingestion-python/data/books/
+ls -la /path/to/book-ingestion-python/data/books/
 ```
 
 ---

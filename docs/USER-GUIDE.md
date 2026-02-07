@@ -15,9 +15,9 @@ Add to your Claude Desktop config:
   "mcpServers": {
     "book-library": {
       "command": "python",
-      "args": ["/Users/taylorstephens/_Projects/book-mcp-server/server.py"],
+      "args": ["/path/to/book-mcp-server/server.py"],
       "env": {
-        "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db"
+        "BOOK_DB_PATH": "/path/to/book-ingestion-python/data/library.db"
       }
     }
   }

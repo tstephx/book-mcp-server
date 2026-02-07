@@ -12,9 +12,9 @@
 
 ## Prerequisites
 
-- Working directory: `/Users/taylorstephens/_Projects/book-mcp-server/.worktrees/agentic-pipeline`
-- Existing ingestion pipeline: `/Users/taylorstephens/_Projects/book-ingestion-python`
-- Shared database: `/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db`
+- Working directory: `/path/to/book-mcp-server/.worktrees/agentic-pipeline`
+- Existing ingestion pipeline: `/path/to/book-ingestion-python`
+- Shared database: `/path/to/book-ingestion-python/data/library.db`
 
 ---
 
@@ -203,7 +203,7 @@ import os
 from pathlib import Path
 
 # Default path to shared library.db
-DEFAULT_DB_PATH = Path("/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db")
+DEFAULT_DB_PATH = Path("/path/to/book-ingestion-python/data/library.db")
 
 
 def get_db_path() -> Path:

@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-- Working directory: `/Users/taylorstephens/_Projects/book-mcp-server`
+- Working directory: `/path/to/book-mcp-server`
 - Phase 1 complete (pipeline states, repository, etc.)
 - API keys available: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
 
@@ -26,7 +26,7 @@
 
 **Step 1: Update requirements.txt**
 
-Add to the end of `/Users/taylorstephens/_Projects/book-mcp-server/requirements.txt`:
+Add to the end of `/path/to/book-mcp-server/requirements.txt`:
 
 ```text
 openai>=1.0
@@ -35,7 +35,7 @@ anthropic>=0.18
 
 **Step 2: Update pyproject.toml**
 
-Add to the dependencies list in `/Users/taylorstephens/_Projects/book-mcp-server/pyproject.toml`:
+Add to the dependencies list in `/path/to/book-mcp-server/pyproject.toml`:
 
 ```toml
 [project]

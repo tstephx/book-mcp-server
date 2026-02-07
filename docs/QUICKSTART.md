@@ -9,7 +9,7 @@ Your MCP server is ready! Follow these 4 simple steps to connect your books to C
 ### Step 1: Install the Server
 
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 
 # Run setup script
 ./setup.sh
@@ -73,10 +73,10 @@ touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
     "book-library": {
       "command": "python",
       "args": [
-        "/Users/taylorstephens/_Projects/book-mcp-server/server.py"
+        "/path/to/book-mcp-server/server.py"
       ],
       "env": {
-        "PYTHONPATH": "/Users/taylorstephens/_Projects/book-mcp-server/venv/lib/python3.13/site-packages"
+        "PYTHONPATH": "/path/to/book-mcp-server/venv/lib/python3.13/site-packages"
       }
     }
   }
@@ -96,10 +96,10 @@ Add the `book-library` section inside the existing `mcpServers` object:
     "book-library": {
       "command": "python",
       "args": [
-        "/Users/taylorstephens/_Projects/book-mcp-server/server.py"
+        "/path/to/book-mcp-server/server.py"
       ],
       "env": {
-        "PYTHONPATH": "/Users/taylorstephens/_Projects/book-mcp-server/venv/lib/python3.13/site-packages"
+        "PYTHONPATH": "/path/to/book-mcp-server/venv/lib/python3.13/site-packages"
       }
     }
   }
@@ -171,10 +171,10 @@ cat ~/Library/Application\ Support/Claude/claude_desktop_config.json
 **Check 2:** Are the paths absolute?
 ```bash
 # Verify server exists
-ls -la /Users/taylorstephens/_Projects/book-mcp-server/server.py
+ls -la /path/to/book-mcp-server/server.py
 
 # Verify Python in venv
-ls -la /Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python
+ls -la /path/to/book-mcp-server/venv/bin/python
 ```
 
 **Check 3:** Did you restart Claude Desktop completely?
@@ -185,7 +185,7 @@ ls -la /Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python
 ### "Module not found" error?
 
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 source venv/bin/activate
 pip install --upgrade fastmcp
 ```

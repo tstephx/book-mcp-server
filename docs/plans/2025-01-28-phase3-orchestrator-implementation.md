@@ -12,9 +12,9 @@
 
 ## Prerequisites
 
-- Working directory: `/Users/taylorstephens/_Projects/book-mcp-server`
+- Working directory: `/path/to/book-mcp-server`
 - Phase 2 complete (ClassifierAgent working)
-- book-ingestion-python at `/Users/taylorstephens/_Projects/book-ingestion-python`
+- book-ingestion-python at `/path/to/book-ingestion-python`
 - Virtual environment: `source venv/bin/activate`
 
 ---
@@ -96,7 +96,7 @@ class OrchestratorConfig:
     book_ingestion_path: Path = field(default_factory=lambda: Path(
         os.environ.get(
             "BOOK_INGESTION_PATH",
-            "/Users/taylorstephens/_Projects/book-ingestion-python"
+            "/path/to/book-ingestion-python"
         )
     ))
 
@@ -118,7 +118,7 @@ class OrchestratorConfig:
             db_path=Path(os.environ.get("AGENTIC_PIPELINE_DB", "data/library.db")),
             book_ingestion_path=Path(os.environ.get(
                 "BOOK_INGESTION_PATH",
-                "/Users/taylorstephens/_Projects/book-ingestion-python"
+                "/path/to/book-ingestion-python"
             )),
             processing_timeout=int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", 600)),
             embedding_timeout=int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300)),

@@ -3,8 +3,8 @@
 import os
 from pathlib import Path
 
-# Default path to shared library.db
-DEFAULT_DB_PATH = Path("/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db")
+# Default path to shared library.db (override with AGENTIC_PIPELINE_DB env var)
+DEFAULT_DB_PATH = Path("data/library.db")
 
 
 def get_db_path() -> Path:

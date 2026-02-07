@@ -4,7 +4,7 @@
 import sqlite3
 import sys
 
-db_path = "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db"
+db_path = "/path/to/book-ingestion-python/data/library.db"
 
 try:
     print("🧪 Testing Semantic Search Setup")

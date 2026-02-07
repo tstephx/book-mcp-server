@@ -198,7 +198,7 @@ def setup_logging(name: Optional[str] = None) -> logging.Logger:
 ### Step 1: Setup
 
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 ./setup.sh
 ```
 
@@ -230,9 +230,9 @@ Add:
 {
   "mcpServers": {
     "book-library": {
-      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "command": "/path/to/book-mcp-server/venv/bin/python",
       "args": ["-m", "src.server"],
-      "cwd": "/Users/taylorstephens/_Projects/book-mcp-server"
+      "cwd": "/path/to/book-mcp-server"
     }
   }
 }

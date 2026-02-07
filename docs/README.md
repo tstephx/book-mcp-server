@@ -52,7 +52,7 @@ semantic_search("docker containers", limit=5)
 
 **Add new books:**
 ```bash
-cd /Users/taylorstephens/_Projects/book-ingestion-python
+cd /path/to/book-ingestion-python
 ./batch_process.sh /path/to/new/books
 python scripts/generate_embeddings.py
 ```
@@ -179,7 +179,7 @@ Top-5 results:       <5ms total
 
 1. **Process books:**
    ```bash
-   cd /Users/taylorstephens/_Projects/book-ingestion-python
+   cd /path/to/book-ingestion-python
    ./batch_process.sh /path/to/new/books
    ```
 
@@ -190,7 +190,7 @@ Top-5 results:       <5ms total
 
 3. **Verify:**
    ```bash
-   cd /Users/taylorstephens/_Projects/book-mcp-server
+   cd /path/to/book-mcp-server
    python test_semantic_setup.py
    ```
 

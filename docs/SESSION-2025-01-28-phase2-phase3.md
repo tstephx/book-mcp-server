@@ -29,7 +29,7 @@ A model-agnostic classifier agent that uses LLMs to determine book types, with O
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."  # Optional fallback
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 source venv/bin/activate
 python -m agentic_pipeline.cli classify --text "Chapter 1: Introduction to Python..."
 ```
@@ -111,7 +111,7 @@ Book → Hash → Classify → Select Strategy → Process → Validate → Appr
 ### To Execute
 
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 claude
 # Then run:
 Use superpowers:executing-plans to implement docs/plans/2025-01-28-phase3-orchestrator-implementation.md

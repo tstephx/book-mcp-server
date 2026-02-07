@@ -28,7 +28,7 @@ An agentic AI layer for the book ingestion pipeline that enables adaptive proces
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        WATCH FOLDER                                 │
-│              /Users/taylorstephens/Documents/_ebooks/               │
+│              /path/to/ebooks/               │
 └─────────────────────────────────────────────────────────────────────┘
                                  │
                                  ▼
@@ -441,7 +441,7 @@ activate_escape_hatch(reason)
 ## Project Structure
 
 ```
-/Users/taylorstephens/_Projects/
+/path/to/projects/
 ├── book-ingestion-python/        # Existing (unchanged)
 ├── book-mcp-server/              # Extended with pipeline_tools.py
 └── agentic-pipeline/             # NEW

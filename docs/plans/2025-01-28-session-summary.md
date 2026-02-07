@@ -67,7 +67,7 @@ Built model-agnostic LLM classification:
 ## Files Created
 
 ```
-/Users/taylorstephens/_Projects/book-mcp-server/
+/path/to/book-mcp-server/
 ├── agentic_pipeline/
 │   ├── __init__.py
 │   ├── cli.py                    # CLI with classify command

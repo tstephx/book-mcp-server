@@ -142,7 +142,7 @@ Run these commands to verify the implementation:
 
 ```bash
 # In book-ingestion-python
-cd /Users/taylorstephens/_Projects/book-ingestion-python
+cd /path/to/book-ingestion-python
 ./venv/bin/pip install -e .
 
 # Verify import
@@ -170,8 +170,8 @@ cd /Users/taylorstephens/_Projects/book-ingestion-python
 
 ```bash
 # In book-mcp-server
-cd /Users/taylorstephens/_Projects/book-mcp-server
-.venv/bin/pip install -e /Users/taylorstephens/_Projects/book-ingestion-python
+cd /path/to/book-mcp-server
+.venv/bin/pip install -e /path/to/book-ingestion-python
 
 .venv/bin/python -c "
 from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter

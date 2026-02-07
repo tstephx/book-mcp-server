@@ -93,7 +93,7 @@ ALTER TABLE chapters ADD COLUMN embedding_model TEXT;
 
 **Usage:**
 ```bash
-cd /Users/taylorstephens/_Projects/book-ingestion-python
+cd /path/to/book-ingestion-python
 source venv/bin/activate
 
 # Generate embeddings for new chapters
@@ -220,7 +220,7 @@ Give me context about container orchestration
 **Add New Books:**
 ```bash
 # 1. Process books
-cd /Users/taylorstephens/_Projects/book-ingestion-python
+cd /path/to/book-ingestion-python
 ./batch_process.sh /path/to/new/books
 
 # 2. Generate embeddings

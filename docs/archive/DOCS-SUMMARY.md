@@ -9,7 +9,7 @@ All semantic search documentation has been moved to a dedicated `docs/` folder w
 ## 📁 New Documentation Structure
 
 ```
-/Users/taylorstephens/_Projects/book-mcp-server/
+/path/to/book-mcp-server/
 ├── README.md                          # ✏️ Updated with docs links
 ├── docs/                              # 📂 NEW - Documentation folder
 │   ├── README.md                      # 📖 Documentation index
@@ -106,7 +106,7 @@ All semantic search documentation has been moved to a dedicated `docs/` folder w
 
 ### From Root Directory:
 ```bash
-cd /Users/taylorstephens/_Projects/book-mcp-server
+cd /path/to/book-mcp-server
 
 # View documentation index
 cat docs/README.md
@@ -232,7 +232,7 @@ docs/README.md → Support section
 
 All documentation is now at:
 ```
-/Users/taylorstephens/_Projects/book-mcp-server/docs/
+/path/to/book-mcp-server/docs/
 ```
 
 **Files:**
