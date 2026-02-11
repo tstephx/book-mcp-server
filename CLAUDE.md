@@ -13,8 +13,8 @@ This is the **Agentic Book Processing Pipeline** - an AI-powered system that aut
 # Activate environment
 source .venv/bin/activate
 
-# Run tests
-pytest tests/ -v
+# Run tests (use python -m pytest, not bare pytest)
+python -m pytest tests/ -v
 
 # Initialize database
 agentic-pipeline init
@@ -34,13 +34,16 @@ agentic_pipeline/
 │   ├── classifier.py       # Book type classification
 │   ├── validator.py        # Quality validation
 │   └── providers/          # LLM providers (OpenAI, Anthropic)
+├── adapters/               # External system adapters
+│   ├── processing_adapter.py  # Wraps book-ingestion library
+│   └── llm_fallback_adapter.py # LLM fallback for low confidence
 ├── pipeline/               # State machine & orchestration
 │   ├── states.py           # Pipeline states enum
 │   ├── strategy.py         # Strategy selection
 │   └── transitions.py      # State transitions
 ├── approval/               # Approval queue & actions
 │   ├── queue.py            # ApprovalQueue
-│   └── actions.py          # approve/reject/rollback
+│   └── actions.py          # approve/reject/rollback + inline embedding
 ├── autonomy/               # Phase 5: Graduated trust
 │   ├── config.py           # AutonomyConfig (modes, escape hatch)
 │   ├── metrics.py          # MetricsCollector
@@ -54,20 +57,25 @@ agentic_pipeline/
 │   └── operations.py       # BatchOperations
 ├── audit/                  # Phase 4: Audit trail
 │   └── trail.py            # AuditTrail
+├── library/                # Library status dashboard
+│   └── status.py           # LibraryStatus
 ├── db/                     # Database layer
-│   ├── migrations.py       # Schema definitions
+│   ├── migrations.py       # Schema definitions (WAL mode enabled)
 │   ├── pipelines.py        # PipelineRepository
 │   └── config.py           # DB path configuration
+├── orchestrator/           # Main orchestrator (package)
+│   └── orchestrator.py     # Orchestrator class
 ├── cli.py                  # Click CLI commands
 ├── mcp_server.py           # MCP tools for Claude
-├── orchestrator.py         # Main orchestrator
 └── config.py               # OrchestratorConfig
 ```
 
 ## Key Concepts
 
 ### Pipeline States
-Books flow through: `QUEUED` → `HASHING` → `CLASSIFYING` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `COMPLETE`
+Books flow through: `DETECTED` → `HASHING` → `CLASSIFYING` → `SELECTING_STRATEGY` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `APPROVED` → `EMBEDDING` → `COMPLETE`
+
+High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and auto-approve. Approval (single or batch) runs embedding inline — no separate worker needed.
 
 ### Autonomy Modes
 - **supervised** - All books require human approval (default)
@@ -115,32 +123,35 @@ def my_tool(arg: str) -> dict:
 ## Testing
 
 ```bash
-# All tests
-pytest tests/ -v
+# All tests (use python -m pytest, not bare pytest)
+python -m pytest tests/ -v
 
 # Specific phase
-pytest tests/test_phase5*.py -v
+python -m pytest tests/test_phase5*.py -v
 
 # Single file
-pytest tests/test_autonomy_config.py -v
+python -m pytest tests/test_autonomy_config.py -v
 
 # With coverage
-pytest tests/ --cov=agentic_pipeline
+python -m pytest tests/ --cov=agentic_pipeline
 ```
 
 ## Environment
 
 - Python 3.12+
 - Virtual env at `.venv/`
-- Database at `~/.agentic-pipeline/pipeline.db` (or `AGENTIC_PIPELINE_DB` env var)
+- Database at `~/_Projects/book-ingestion-python/data/library.db` (shared by pipeline + MCP server)
+- Override with `AGENTIC_PIPELINE_DB` env var
 
 ## Architecture Decisions
 
-1. **SQLite** - Single-file database, no server needed
-2. **Click CLI** - Standard Python CLI framework
-3. **Rich** - Terminal formatting and tables
-4. **TDD** - Tests written before implementation
-5. **Immutable Audit** - All decisions logged permanently
+1. **SQLite + WAL mode** - Single-file database with concurrent read/write support; all connections use `timeout=10`
+2. **Inline embedding** - `approve_book()` runs the full APPROVED → EMBEDDING → COMPLETE flow; no separate worker needed
+3. **ProcessingAdapter** - Wraps `book-ingestion` as a library (not subprocess); lazy-imported in approval to avoid hard dependency
+4. **Click CLI** - Standard Python CLI framework
+5. **Rich** - Terminal formatting and tables
+6. **TDD** - Tests written before implementation
+7. **Immutable Audit** - All decisions logged permanently
 
 ## Using the Book Library
 
@@ -212,4 +223,4 @@ This project uses claude-innit for persistent context:
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-02-11*
