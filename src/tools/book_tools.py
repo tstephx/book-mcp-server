@@ -25,7 +25,7 @@ def register_book_tools(mcp: "FastMCP") -> None:
         """List all books in the library with their metadata"""
         try:
             books = execute_query("""
-                SELECT id, title, author, word_count, 
+                SELECT id, title, author, word_count, book_type,
                        (SELECT COUNT(*) FROM chapters WHERE book_id = books.id) as chapter_count
                 FROM books
                 ORDER BY title
@@ -40,6 +40,8 @@ def register_book_tools(mcp: "FastMCP") -> None:
                 result += f"📖 {book['title']}\n"
                 if book['author']:
                     result += f"   Author: {book['author']}\n"
+                if book['book_type']:
+                    result += f"   Type: {book['book_type']}\n"
                 result += f"   Words: {book['word_count']:,}\n"
                 result += f"   Chapters: {book['chapter_count']}\n"
                 result += f"   ID: {book['id']}\n\n"
@@ -82,13 +84,35 @@ def register_book_tools(mcp: "FastMCP") -> None:
             
             result = f"📖 {book['title']}\n"
             result += "="*50 + "\n\n"
-            
+
             if book['author']:
                 result += f"Author: {book['author']}\n"
             result += f"Total Words: {book['word_count']:,}\n"
             result += f"Chapters: {len(chapters)}\n"
-            result += f"Status: {book['processing_status']}\n\n"
-            
+            result += f"Status: {book['processing_status']}\n"
+
+            # Classification info
+            book_type = book['book_type'] if 'book_type' in book.keys() else None
+            if book_type:
+                result += f"\nClassification:\n"
+                result += f"  Type: {book_type}\n"
+                confidence = book['classification_confidence'] if 'classification_confidence' in book.keys() else None
+                if confidence is not None:
+                    result += f"  Confidence: {confidence:.0%}\n"
+                tags_raw = book['suggested_tags'] if 'suggested_tags' in book.keys() else None
+                if tags_raw:
+                    try:
+                        import json
+                        tags = json.loads(tags_raw)
+                        if tags:
+                            result += f"  Tags: {', '.join(tags)}\n"
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                reasoning = book['classification_reasoning'] if 'classification_reasoning' in book.keys() else None
+                if reasoning:
+                    result += f"  Reasoning: {reasoning}\n"
+
+            result += "\n"
             result += "Table of Contents:\n" + "-"*50 + "\n"
             for chapter in chapters:
                 result += f"{chapter['chapter_number']:2d}. {chapter['title']} ({chapter['word_count']:,} words)\n"
