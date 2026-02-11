@@ -21,7 +21,7 @@ class BackfillManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT b.id, b.title, b.author, b.file_path, b.word_count,
+                SELECT b.id, b.title, b.author, b.source_file, b.word_count,
                        COUNT(c.id) as chapter_count,
                        SUM(CASE WHEN c.embedding IS NOT NULL THEN 1 ELSE 0 END) as embedded_count
                 FROM books b
@@ -62,7 +62,7 @@ class BackfillManager:
             content_hash = self._compute_hash(book)
             created = self.repo.create_backfill(
                 book_id=book["id"],
-                source_path=book["file_path"] or "",
+                source_path=book["source_file"] or "",
                 content_hash=content_hash,
             )
             summary = self._book_summary(book)

@@ -21,7 +21,7 @@ def db_path():
             id TEXT PRIMARY KEY,
             title TEXT,
             author TEXT,
-            file_path TEXT,
+            source_file TEXT,
             word_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -95,13 +95,13 @@ def test_create_backfill_uses_book_id_as_pipeline_id(db_path):
     assert record["id"] == "my-uuid-here"
 
 
-def _insert_library_book(db_path, book_id, title, file_path, chapters=3):
+def _insert_library_book(db_path, book_id, title, source_file, chapters=3):
     """Insert a fake library book with chapters."""
     import uuid
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
-        (book_id, title, "Test Author", file_path, 10000),
+        "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
+        (book_id, title, "Test Author", source_file, 10000),
     )
     for i in range(chapters):
         conn.execute(
@@ -284,7 +284,7 @@ def test_validator_finds_missing_embeddings(db_path):
     # Book with 3 chapters, only 1 has embedding
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
         ("book-partial", "Partial Book", "Author", "/book.epub", 10000),
     )
     for i in range(3):
@@ -311,7 +311,7 @@ def test_validator_flags_no_chapters(db_path):
     # Book with 0 chapters
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
         ("book-empty", "Empty Book", "Author", "/book.epub", 0),
     )
     conn.commit()

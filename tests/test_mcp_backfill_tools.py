@@ -21,7 +21,7 @@ def db_path():
             id TEXT PRIMARY KEY,
             title TEXT,
             author TEXT,
-            file_path TEXT,
+            source_file TEXT,
             word_count INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -43,11 +43,11 @@ def db_path():
     path.unlink(missing_ok=True)
 
 
-def _insert_library_book(db_path, book_id, title, file_path, chapters=3):
+def _insert_library_book(db_path, book_id, title, source_file, chapters=3):
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
-        (book_id, title, "Author", file_path, 10000),
+        "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
+        (book_id, title, "Author", source_file, 10000),
     )
     for i in range(chapters):
         conn.execute(
@@ -89,7 +89,7 @@ def test_validate_library_tool(db_path):
     # Book with no chapters = quality issue
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
         ("empty-book", "Empty", "Author", "/b.epub", 0),
     )
     conn.commit()
