@@ -194,6 +194,7 @@ class ProcessingAdapter:
         import hashlib
         import io
         import sqlite3
+        from datetime import datetime
 
         import numpy as np
 
@@ -250,21 +251,29 @@ class ProcessingAdapter:
                     texts, batch_size=batch_size
                 )
 
+                now = datetime.utcnow().isoformat()
+
                 for ch, content, emb in zip(valid, texts, embeddings):
                     emb_blob = io.BytesIO()
                     np.save(emb_blob, emb)
                     content_hash = hashlib.sha256(content.encode()).hexdigest()
+                    file_mtime = self._get_file_mtime(
+                        ch["file_path"], books_dir
+                    )
 
                     cursor.execute(
                         """
                         UPDATE chapters
-                        SET embedding = ?, embedding_model = ?, content_hash = ?
+                        SET embedding = ?, embedding_model = ?, content_hash = ?,
+                            file_mtime = ?, embedding_updated_at = ?
                         WHERE id = ?
                         """,
                         (
                             emb_blob.getvalue(),
                             "all-MiniLM-L6-v2",
                             content_hash,
+                            file_mtime,
+                            now,
                             ch["id"],
                         ),
                     )
@@ -322,6 +331,27 @@ class ProcessingAdapter:
                 return "\n\n".join(p.read_text(encoding="utf-8") for p in parts)
 
         raise FileNotFoundError(f"Chapter not found: {file_path}")
+
+    @staticmethod
+    def _get_file_mtime(file_path: str, books_dir: Path) -> float:
+        """Get chapter file modification time. Returns 0 on any error."""
+        try:
+            path = Path(file_path)
+            if not path.is_absolute():
+                try:
+                    rel = path.relative_to("data/books")
+                    path = books_dir / rel
+                except ValueError:
+                    path = books_dir / path
+
+            if path.is_dir():
+                mtimes = [p.stat().st_mtime for p in path.glob("*.md")]
+                return max(mtimes) if mtimes else 0
+            elif path.is_file():
+                return path.stat().st_mtime
+            return 0
+        except Exception:
+            return 0
 
     def get_processing_status(self, book_id: str) -> Optional[dict]:
         """
