@@ -237,8 +237,11 @@ DEFAULT_RETENTION = [
 
 def run_migrations(db_path: Path) -> None:
     """Run all migrations to set up agentic pipeline tables."""
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     cursor = conn.cursor()
+
+    # Enable WAL mode for concurrent read/write access
+    cursor.execute("PRAGMA journal_mode = WAL")
 
     # Run table creation
     for migration in MIGRATIONS:

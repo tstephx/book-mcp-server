@@ -34,7 +34,7 @@ class HealthMonitor:
 
     def get_health(self) -> dict:
         """Get current system health."""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 

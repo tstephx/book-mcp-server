@@ -23,7 +23,7 @@ class BatchFilter:
 
     def apply(self, db_path: Path) -> list[dict]:
         """Apply filter and return matching pipelines."""
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db_path, timeout=10)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 

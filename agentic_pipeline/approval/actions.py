@@ -26,7 +26,7 @@ def _record_audit(
     confidence: Optional[float] = None,
 ) -> None:
     """Record an action in the audit trail."""
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=10)
     cursor = conn.cursor()
     cursor.execute(
         """

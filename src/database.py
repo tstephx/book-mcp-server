@@ -32,7 +32,7 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
     """
     conn = None
     try:
-        conn = sqlite3.connect(str(Config.DB_PATH))
+        conn = sqlite3.connect(str(Config.DB_PATH), timeout=10)
         conn.row_factory = sqlite3.Row
         yield conn
     except sqlite3.Error as e:
