@@ -340,6 +340,32 @@ class Orchestrator:
                 "error": str(e),
             }
 
+    def _scan_watch_dir(self) -> int:
+        """Scan watch directory for new book files and queue them."""
+        if not self.config.watch_dir:
+            return 0
+
+        watch_path = Path(self.config.watch_dir)
+        if not watch_path.is_dir():
+            return 0
+
+        extensions = ("*.epub", "*.pdf")
+        detected = 0
+
+        for ext in extensions:
+            for book_path in watch_path.rglob(ext):
+                try:
+                    content_hash = self._compute_hash(str(book_path))
+                    if self._check_idempotency(content_hash):
+                        continue  # Already in pipeline
+                    self.repo.create(str(book_path), content_hash)
+                    self.logger.processing_started("detected", str(book_path))
+                    detected += 1
+                except Exception as e:
+                    self.logger.error("scan", type(e).__name__, str(e))
+
+        return detected
+
     def run_worker(self):
         """Run as queue worker, processing books continuously."""
         # Register signal handlers

@@ -222,3 +222,48 @@ def test_orchestrator_graceful_shutdown(db_path, config):
     orchestrator._handle_shutdown(signal.SIGINT, None)
 
     assert orchestrator.shutdown_requested == True
+
+
+def test_scan_directory_finds_new_books(db_path, config, tmp_path):
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    # Create fake book files
+    (tmp_path / "book1.epub").write_bytes(b"fake epub 1")
+    (tmp_path / "book2.pdf").write_bytes(b"fake pdf 2")
+    (tmp_path / "readme.txt").write_bytes(b"not a book")
+
+    config.watch_dir = tmp_path
+    orchestrator = Orchestrator(config)
+    detected = orchestrator._scan_watch_dir()
+
+    assert detected == 2
+
+
+def test_scan_directory_skips_already_queued(db_path, config, tmp_path):
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    (tmp_path / "book1.epub").write_bytes(b"fake epub 1")
+
+    config.watch_dir = tmp_path
+    orchestrator = Orchestrator(config)
+
+    # First scan detects the book
+    assert orchestrator._scan_watch_dir() == 1
+    # Second scan skips it (already in pipeline via hash)
+    assert orchestrator._scan_watch_dir() == 0
+
+
+def test_scan_directory_noop_when_no_watch_dir(db_path, config):
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    config.watch_dir = None
+    orchestrator = Orchestrator(config)
+    assert orchestrator._scan_watch_dir() == 0
+
+
+def test_scan_directory_noop_when_dir_missing(db_path, config, tmp_path):
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    config.watch_dir = tmp_path / "nonexistent"
+    orchestrator = Orchestrator(config)
+    assert orchestrator._scan_watch_dir() == 0
