@@ -238,38 +238,40 @@ DEFAULT_RETENTION = [
 def run_migrations(db_path: Path) -> None:
     """Run all migrations to set up agentic pipeline tables."""
     conn = sqlite3.connect(db_path, timeout=10)
-    cursor = conn.cursor()
-
-    # Enable WAL mode for concurrent read/write access
-    cursor.execute("PRAGMA journal_mode = WAL")
-
-    # Run table creation
-    for migration in MIGRATIONS:
-        cursor.execute(migration)
-
-    # Run index creation
-    for index in INDEXES:
-        cursor.execute(index)
-
-    # Add processing_result column to existing DBs (safe if already exists)
     try:
+        cursor = conn.cursor()
+
+        # Enable WAL mode for concurrent read/write access
+        cursor.execute("PRAGMA journal_mode = WAL")
+
+        # Run table creation
+        for migration in MIGRATIONS:
+            cursor.execute(migration)
+
+        # Run index creation
+        for index in INDEXES:
+            cursor.execute(index)
+
+        # Add processing_result column to existing DBs (safe if already exists)
+        try:
+            cursor.execute(
+                "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
+            )
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Insert default autonomy config if not exists
         cursor.execute(
-            "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
-        )
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-
-    # Insert default autonomy config if not exists
-    cursor.execute(
-        "INSERT OR IGNORE INTO autonomy_config (id) VALUES (1)"
-    )
-
-    # Insert default retention policies
-    for audit_type, retain_days in DEFAULT_RETENTION:
-        cursor.execute(
-            "INSERT OR IGNORE INTO audit_retention (audit_type, retain_days) VALUES (?, ?)",
-            (audit_type, retain_days)
+            "INSERT OR IGNORE INTO autonomy_config (id) VALUES (1)"
         )
 
-    conn.commit()
-    conn.close()
+        # Insert default retention policies
+        for audit_type, retain_days in DEFAULT_RETENTION:
+            cursor.execute(
+                "INSERT OR IGNORE INTO audit_retention (audit_type, retain_days) VALUES (?, ?)",
+                (audit_type, retain_days)
+            )
+
+        conn.commit()
+    finally:
+        conn.close()

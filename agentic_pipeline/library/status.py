@@ -13,18 +13,19 @@ class LibraryStatus:
     def get_status(self) -> dict:
         """Get unified library status."""
         conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
         try:
-            books = self._get_books(cursor)
-        except sqlite3.OperationalError:
-            # Tables don't exist yet (fresh init)
-            conn.close()
-            return self._empty_status()
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        pipeline_summary = self._get_pipeline_summary(cursor)
-        conn.close()
+            try:
+                books = self._get_books(cursor)
+            except sqlite3.OperationalError:
+                # Tables don't exist yet (fresh init)
+                return self._empty_status()
+
+            pipeline_summary = self._get_pipeline_summary(cursor)
+        finally:
+            conn.close()
 
         # Compute per-book status
         book_list = []

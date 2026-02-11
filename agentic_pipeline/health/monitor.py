@@ -35,44 +35,45 @@ class HealthMonitor:
     def get_health(self) -> dict:
         """Get current system health."""
         conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        # Count active (processing)
-        active_states = [s.value for s in ACTIVE_STATES]
-        placeholders = ",".join("?" * len(active_states))
-        cursor.execute(f"""
-            SELECT COUNT(*) FROM processing_pipelines
-            WHERE state IN ({placeholders})
-        """, active_states)
-        active = cursor.fetchone()[0]
+            # Count active (processing)
+            active_states = [s.value for s in ACTIVE_STATES]
+            placeholders = ",".join("?" * len(active_states))
+            cursor.execute(f"""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state IN ({placeholders})
+            """, active_states)
+            active = cursor.fetchone()[0]
 
-        # Count queued (detected)
-        cursor.execute("""
-            SELECT COUNT(*) FROM processing_pipelines
-            WHERE state = ?
-        """, (PipelineState.DETECTED.value,))
-        queued = cursor.fetchone()[0]
+            # Count queued (detected)
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+            """, (PipelineState.DETECTED.value,))
+            queued = cursor.fetchone()[0]
 
-        # Count failed (needs_retry)
-        cursor.execute("""
-            SELECT COUNT(*) FROM processing_pipelines
-            WHERE state = ?
-        """, (PipelineState.NEEDS_RETRY.value,))
-        failed = cursor.fetchone()[0]
+            # Count failed (needs_retry)
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+            """, (PipelineState.NEEDS_RETRY.value,))
+            failed = cursor.fetchone()[0]
 
-        # Count completed in last 24h
-        cursor.execute("""
-            SELECT COUNT(*) FROM processing_pipelines
-            WHERE state = ?
-            AND updated_at > datetime('now', '-24 hours')
-        """, (PipelineState.COMPLETE.value,))
-        completed_24h = cursor.fetchone()[0]
+            # Count completed in last 24h
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+                AND updated_at > datetime('now', '-24 hours')
+            """, (PipelineState.COMPLETE.value,))
+            completed_24h = cursor.fetchone()[0]
 
-        # Queue by priority
-        queue_by_priority = self.repo.get_queue_by_priority()
-
-        conn.close()
+            # Queue by priority
+            queue_by_priority = self.repo.get_queue_by_priority()
+        finally:
+            conn.close()
 
         # Generate alerts
         alerts = self._generate_alerts(queued, failed, completed_24h)

@@ -20,14 +20,16 @@ class AutonomyConfig:
     def get_mode(self) -> str:
         """Get current autonomy mode."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT current_mode, escape_hatch_active FROM autonomy_config WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT current_mode, escape_hatch_active FROM autonomy_config WHERE id = 1")
+            row = cursor.fetchone()
 
-        if row and row["escape_hatch_active"]:
-            return "supervised"
-        return row["current_mode"] if row else "supervised"
+            if row and row["escape_hatch_active"]:
+                return "supervised"
+            return row["current_mode"] if row else "supervised"
+        finally:
+            conn.close()
 
     def set_mode(self, mode: str) -> None:
         """Set autonomy mode."""
@@ -35,69 +37,76 @@ class AutonomyConfig:
             raise ValueError(f"Invalid mode: {mode}")
 
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE autonomy_config SET current_mode = ?, updated_at = ? WHERE id = 1",
-            (mode, datetime.now(timezone.utc).isoformat())
-        )
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE autonomy_config SET current_mode = ?, updated_at = ? WHERE id = 1",
+                (mode, datetime.now(timezone.utc).isoformat())
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     def activate_escape_hatch(self, reason: str) -> None:
         """Activate escape hatch - immediately revert to supervised."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE autonomy_config SET
-                escape_hatch_active = TRUE,
-                escape_hatch_activated_at = ?,
-                escape_hatch_reason = ?,
-                updated_at = ?
-            WHERE id = 1
-        """, (
-            datetime.now(timezone.utc).isoformat(),
-            reason,
-            datetime.now(timezone.utc).isoformat()
-        ))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            now = datetime.now(timezone.utc).isoformat()
+            cursor.execute("""
+                UPDATE autonomy_config SET
+                    escape_hatch_active = TRUE,
+                    escape_hatch_activated_at = ?,
+                    escape_hatch_reason = ?,
+                    updated_at = ?
+                WHERE id = 1
+            """, (now, reason, now))
+            conn.commit()
+        finally:
+            conn.close()
 
     def deactivate_escape_hatch(self) -> None:
         """Deactivate escape hatch."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE autonomy_config SET
-                escape_hatch_active = FALSE,
-                updated_at = ?
-            WHERE id = 1
-        """, (datetime.now(timezone.utc).isoformat(),))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE autonomy_config SET
+                    escape_hatch_active = FALSE,
+                    updated_at = ?
+                WHERE id = 1
+            """, (datetime.now(timezone.utc).isoformat(),))
+            conn.commit()
+        finally:
+            conn.close()
 
     def is_escape_hatch_active(self) -> bool:
         """Check if escape hatch is active."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute("SELECT escape_hatch_active FROM autonomy_config WHERE id = 1")
-        row = cursor.fetchone()
-        conn.close()
-        return bool(row and row["escape_hatch_active"])
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT escape_hatch_active FROM autonomy_config WHERE id = 1")
+            row = cursor.fetchone()
+            return bool(row and row["escape_hatch_active"])
+        finally:
+            conn.close()
 
     def get_threshold(self, book_type: str) -> Optional[float]:
         """Get auto-approve threshold for a book type."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT auto_approve_threshold, manual_override FROM autonomy_thresholds WHERE book_type = ?",
-            (book_type,)
-        )
-        row = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT auto_approve_threshold, manual_override FROM autonomy_thresholds WHERE book_type = ?",
+                (book_type,)
+            )
+            row = cursor.fetchone()
 
-        if not row:
-            return None
-        return row["manual_override"] if row["manual_override"] else row["auto_approve_threshold"]
+            if not row:
+                return None
+            return row["manual_override"] if row["manual_override"] else row["auto_approve_threshold"]
+        finally:
+            conn.close()
 
     def should_auto_approve(self, book_type: str, confidence: float) -> bool:
         """Determine if a book should be auto-approved."""

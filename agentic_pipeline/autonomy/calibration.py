@@ -27,109 +27,114 @@ class CalibrationEngine:
     def calculate_calibration(self, book_type: str, days: int = 90) -> Optional[dict]:
         """Calculate calibration metrics for a book type."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-        cursor.execute("""
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct,
-                AVG(original_confidence) as avg_confidence
-            FROM autonomy_feedback
-            WHERE original_book_type = ?
-            AND created_at > ?
-        """, (book_type, cutoff))
-
-        row = cursor.fetchone()
-        conn.close()
-
-        total = row["total"] or 0
-
-        if total < self.min_samples:
-            return None
-
-        correct = row["correct"] or 0
-        accuracy = correct / total
-
-        return {
-            "book_type": book_type,
-            "sample_count": total,
-            "accuracy": accuracy,
-            "avg_confidence": row["avg_confidence"],
-        }
-
-    def calculate_threshold(self, book_type: str) -> Optional[float]:
-        """Calculate the safe auto-approve threshold for a book type."""
-        conn = self._connect()
-        cursor = conn.cursor()
-
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
-
-        # Try progressively lower thresholds
-        for threshold in [0.95, 0.92, 0.90, 0.88, 0.85, 0.82, 0.80]:
             cursor.execute("""
                 SELECT
                     COUNT(*) as total,
-                    SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
+                    SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct,
+                    AVG(original_confidence) as avg_confidence
                 FROM autonomy_feedback
                 WHERE original_book_type = ?
-                AND original_confidence >= ?
                 AND created_at > ?
-            """, (book_type, threshold, cutoff))
+            """, (book_type, cutoff))
 
             row = cursor.fetchone()
+
             total = row["total"] or 0
 
-            if total < 10:  # Need at least 10 samples at this threshold
-                continue
+            if total < self.min_samples:
+                return None
 
             correct = row["correct"] or 0
             accuracy = correct / total
 
-            if accuracy >= self.target_accuracy:
-                conn.close()
-                return threshold
+            return {
+                "book_type": book_type,
+                "sample_count": total,
+                "accuracy": accuracy,
+                "avg_confidence": row["avg_confidence"],
+            }
+        finally:
+            conn.close()
 
-        conn.close()
-        return None
+    def calculate_threshold(self, book_type: str) -> Optional[float]:
+        """Calculate the safe auto-approve threshold for a book type."""
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+
+            # Try progressively lower thresholds
+            for threshold in [0.95, 0.92, 0.90, 0.88, 0.85, 0.82, 0.80]:
+                cursor.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
+                    FROM autonomy_feedback
+                    WHERE original_book_type = ?
+                    AND original_confidence >= ?
+                    AND created_at > ?
+                """, (book_type, threshold, cutoff))
+
+                row = cursor.fetchone()
+                total = row["total"] or 0
+
+                if total < 10:  # Need at least 10 samples at this threshold
+                    continue
+
+                correct = row["correct"] or 0
+                accuracy = correct / total
+
+                if accuracy >= self.target_accuracy:
+                    return threshold
+
+            return None
+        finally:
+            conn.close()
 
     def update_thresholds(self) -> dict:
         """Recalculate and update all thresholds."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        # Get all book types with data
-        cursor.execute("""
-            SELECT DISTINCT original_book_type FROM autonomy_feedback
-            WHERE original_book_type IS NOT NULL
-        """)
-        book_types = [row[0] for row in cursor.fetchall()]
+            # Get all book types with data
+            cursor.execute("""
+                SELECT DISTINCT original_book_type FROM autonomy_feedback
+                WHERE original_book_type IS NOT NULL
+            """)
+            book_types = [row[0] for row in cursor.fetchall()]
 
-        results = {}
-        for book_type in book_types:
-            calibration = self.calculate_calibration(book_type)
-            threshold = self.calculate_threshold(book_type)
+            results = {}
+            for book_type in book_types:
+                calibration = self.calculate_calibration(book_type)
+                threshold = self.calculate_threshold(book_type)
 
-            if calibration:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO autonomy_thresholds
-                    (book_type, auto_approve_threshold, sample_count, measured_accuracy, last_calculated)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (
-                    book_type,
-                    threshold,
-                    calibration["sample_count"],
-                    calibration["accuracy"],
-                    datetime.now(timezone.utc).isoformat()
-                ))
+                if calibration:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO autonomy_thresholds
+                        (book_type, auto_approve_threshold, sample_count, measured_accuracy, last_calculated)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        book_type,
+                        threshold,
+                        calibration["sample_count"],
+                        calibration["accuracy"],
+                        datetime.now(timezone.utc).isoformat()
+                    ))
 
-                results[book_type] = {
-                    "threshold": threshold,
-                    "sample_count": calibration["sample_count"],
-                    "accuracy": calibration["accuracy"],
-                }
+                    results[book_type] = {
+                        "threshold": threshold,
+                        "sample_count": calibration["sample_count"],
+                        "accuracy": calibration["accuracy"],
+                    }
 
-        conn.commit()
-        conn.close()
-        return results
+            conn.commit()
+            return results
+        finally:
+            conn.close()

@@ -24,43 +24,45 @@ class BatchFilter:
     def apply(self, db_path: Path) -> list[dict]:
         """Apply filter and return matching pipelines."""
         conn = sqlite3.connect(db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        conditions = []
-        params = []
+            conditions = []
+            params = []
 
-        # Default to pending_approval if no state specified
-        if self.state:
-            conditions.append("state = ?")
-            params.append(self.state)
-        else:
-            conditions.append("state = ?")
-            params.append("pending_approval")
+            # Default to pending_approval if no state specified
+            if self.state:
+                conditions.append("state = ?")
+                params.append(self.state)
+            else:
+                conditions.append("state = ?")
+                params.append("pending_approval")
 
-        if self.source_path_pattern:
-            conditions.append("source_path GLOB ?")
-            params.append(self.source_path_pattern)
+            if self.source_path_pattern:
+                conditions.append("source_path GLOB ?")
+                params.append(self.source_path_pattern)
 
-        if self.created_before:
-            conditions.append("created_at < ?")
-            params.append(self.created_before.isoformat())
+            if self.created_before:
+                conditions.append("created_at < ?")
+                params.append(self.created_before.isoformat())
 
-        if self.created_after:
-            conditions.append("created_at > ?")
-            params.append(self.created_after.isoformat())
+            if self.created_after:
+                conditions.append("created_at > ?")
+                params.append(self.created_after.isoformat())
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        cursor.execute(f"""
-            SELECT * FROM processing_pipelines
-            {where}
-            ORDER BY priority ASC, created_at ASC
-            LIMIT ?
-        """, params + [self.max_count * 2])  # Fetch extra for post-filtering
+            cursor.execute(f"""
+                SELECT * FROM processing_pipelines
+                {where}
+                ORDER BY priority ASC, created_at ASC
+                LIMIT ?
+            """, params + [self.max_count * 2])  # Fetch extra for post-filtering
 
-        rows = cursor.fetchall()
-        conn.close()
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
 
         results = []
         for row in rows:

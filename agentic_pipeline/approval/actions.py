@@ -27,29 +27,31 @@ def _record_audit(
 ) -> None:
     """Record an action in the audit trail."""
     conn = sqlite3.connect(db_path, timeout=10)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        INSERT INTO approval_audit
-        (book_id, pipeline_id, action, actor, reason, before_state, after_state,
-         adjustments, confidence_at_decision, autonomy_mode)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            book_id or "",
-            pipeline_id,
-            action,
-            actor,
-            reason,
-            json.dumps(before_state) if before_state else None,
-            json.dumps(after_state) if after_state else None,
-            json.dumps(adjustments) if adjustments else None,
-            confidence,
-            "supervised",  # TODO: get from autonomy_config
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO approval_audit
+            (book_id, pipeline_id, action, actor, reason, before_state, after_state,
+             adjustments, confidence_at_decision, autonomy_mode)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                book_id or "",
+                pipeline_id,
+                action,
+                actor,
+                reason,
+                json.dumps(before_state) if before_state else None,
+                json.dumps(after_state) if after_state else None,
+                json.dumps(adjustments) if adjustments else None,
+                confidence,
+                "supervised",  # TODO: get from autonomy_config
+            )
         )
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:

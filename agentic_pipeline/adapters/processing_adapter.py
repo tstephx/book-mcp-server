@@ -194,7 +194,7 @@ class ProcessingAdapter:
         import hashlib
         import io
         import sqlite3
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         import numpy as np
 
@@ -204,85 +204,86 @@ class ProcessingAdapter:
                 self._embedding_generator = EmbeddingGenerator()
 
             conn = sqlite3.connect(str(self.db_path), timeout=10)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            try:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
 
-            if book_id:
-                cursor.execute(
-                    "SELECT id, file_path FROM chapters "
-                    "WHERE book_id = ? AND embedding IS NULL",
-                    (book_id,),
-                )
-            else:
-                cursor.execute(
-                    "SELECT id, file_path FROM chapters WHERE embedding IS NULL"
-                )
+                if book_id:
+                    cursor.execute(
+                        "SELECT id, file_path FROM chapters "
+                        "WHERE book_id = ? AND embedding IS NULL",
+                        (book_id,),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT id, file_path FROM chapters WHERE embedding IS NULL"
+                    )
 
-            chapters = cursor.fetchall()
+                chapters = cursor.fetchall()
 
-            if not chapters:
-                conn.close()
-                return EmbeddingResult(success=True, chapters_processed=0)
+                if not chapters:
+                    return EmbeddingResult(success=True, chapters_processed=0)
 
-            logger.info(f"Generating embeddings for {len(chapters)} chapters")
-            books_dir = self.db_path.parent / "books"
-            processed = 0
+                logger.info(f"Generating embeddings for {len(chapters)} chapters")
+                books_dir = self.db_path.parent / "books"
+                processed = 0
 
-            for i in range(0, len(chapters), batch_size):
-                batch = chapters[i : i + batch_size]
-                texts = []
-                valid = []
+                for i in range(0, len(chapters), batch_size):
+                    batch = chapters[i : i + batch_size]
+                    texts = []
+                    valid = []
 
-                for ch in batch:
-                    try:
-                        content = self._read_chapter_content(
+                    for ch in batch:
+                        try:
+                            content = self._read_chapter_content(
+                                ch["file_path"], books_dir
+                            )
+                            if content.strip():
+                                texts.append(content)
+                                valid.append(ch)
+                        except Exception as e:
+                            logger.warning(f"Cannot read chapter {ch['id']}: {e}")
+
+                    if not texts:
+                        continue
+
+                    embeddings = self._embedding_generator.generate_batch(
+                        texts, batch_size=batch_size
+                    )
+
+                    now = datetime.now(timezone.utc).isoformat()
+
+                    for ch, content, emb in zip(valid, texts, embeddings):
+                        emb_blob = io.BytesIO()
+                        np.save(emb_blob, emb)
+                        content_hash = hashlib.sha256(content.encode()).hexdigest()
+                        file_mtime = self._get_file_mtime(
                             ch["file_path"], books_dir
                         )
-                        if content.strip():
-                            texts.append(content)
-                            valid.append(ch)
-                    except Exception as e:
-                        logger.warning(f"Cannot read chapter {ch['id']}: {e}")
 
-                if not texts:
-                    continue
+                        cursor.execute(
+                            """
+                            UPDATE chapters
+                            SET embedding = ?, embedding_model = ?, content_hash = ?,
+                                file_mtime = ?, embedding_updated_at = ?
+                            WHERE id = ?
+                            """,
+                            (
+                                emb_blob.getvalue(),
+                                "all-MiniLM-L6-v2",
+                                content_hash,
+                                file_mtime,
+                                now,
+                                ch["id"],
+                            ),
+                        )
+                        processed += 1
 
-                embeddings = self._embedding_generator.generate_batch(
-                    texts, batch_size=batch_size
-                )
+                    conn.commit()
 
-                now = datetime.utcnow().isoformat()
-
-                for ch, content, emb in zip(valid, texts, embeddings):
-                    emb_blob = io.BytesIO()
-                    np.save(emb_blob, emb)
-                    content_hash = hashlib.sha256(content.encode()).hexdigest()
-                    file_mtime = self._get_file_mtime(
-                        ch["file_path"], books_dir
-                    )
-
-                    cursor.execute(
-                        """
-                        UPDATE chapters
-                        SET embedding = ?, embedding_model = ?, content_hash = ?,
-                            file_mtime = ?, embedding_updated_at = ?
-                        WHERE id = ?
-                        """,
-                        (
-                            emb_blob.getvalue(),
-                            "all-MiniLM-L6-v2",
-                            content_hash,
-                            file_mtime,
-                            now,
-                            ch["id"],
-                        ),
-                    )
-                    processed += 1
-
-                conn.commit()
-
-            conn.close()
-            return EmbeddingResult(success=True, chapters_processed=processed)
+                return EmbeddingResult(success=True, chapters_processed=processed)
+            finally:
+                conn.close()
 
         except ImportError as e:
             logger.warning(f"Embedding dependencies not available: {e}")

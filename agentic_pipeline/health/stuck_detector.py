@@ -49,55 +49,57 @@ class StuckDetector:
     def detect(self) -> list[dict]:
         """Find pipelines that appear to be stuck."""
         conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        stuck = []
-        now = datetime.now(timezone.utc)
+            stuck = []
+            now = datetime.now(timezone.utc)
 
-        for state in NON_TERMINAL_STATES:
-            threshold_seconds = self.thresholds.get(state.value.upper())
-            if threshold_seconds is None:
-                continue  # No timeout for this state (e.g., PENDING_APPROVAL)
+            for state in NON_TERMINAL_STATES:
+                threshold_seconds = self.thresholds.get(state.value.upper())
+                if threshold_seconds is None:
+                    continue  # No timeout for this state (e.g., PENDING_APPROVAL)
 
-            # Calculate stuck threshold
-            stuck_threshold = threshold_seconds * self.stuck_multiplier
-            cutoff = (now - timedelta(seconds=stuck_threshold)).isoformat()
+                # Calculate stuck threshold
+                stuck_threshold = threshold_seconds * self.stuck_multiplier
+                cutoff = (now - timedelta(seconds=stuck_threshold)).isoformat()
 
-            cursor.execute("""
-                SELECT * FROM processing_pipelines
-                WHERE state = ?
-                AND updated_at < ?
-            """, (state.value, cutoff))
+                cursor.execute("""
+                    SELECT * FROM processing_pipelines
+                    WHERE state = ?
+                    AND updated_at < ?
+                """, (state.value, cutoff))
 
-            for row in cursor.fetchall():
-                pipeline = dict(row)
-                updated_at_str = pipeline["updated_at"]
+                for row in cursor.fetchall():
+                    pipeline = dict(row)
+                    updated_at_str = pipeline["updated_at"]
 
-                # Parse the datetime
-                try:
-                    if updated_at_str.endswith("Z"):
-                        updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
-                    elif "+" in updated_at_str or updated_at_str.count("-") > 2:
-                        updated_at = datetime.fromisoformat(updated_at_str)
-                    else:
-                        updated_at = datetime.fromisoformat(updated_at_str).replace(tzinfo=timezone.utc)
-                except (ValueError, AttributeError):
-                    updated_at = now  # Fallback
+                    # Parse the datetime
+                    try:
+                        if updated_at_str.endswith("Z"):
+                            updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                        elif "+" in updated_at_str or updated_at_str.count("-") > 2:
+                            updated_at = datetime.fromisoformat(updated_at_str)
+                        else:
+                            updated_at = datetime.fromisoformat(updated_at_str).replace(tzinfo=timezone.utc)
+                    except (ValueError, AttributeError):
+                        updated_at = now  # Fallback
 
-                if updated_at.tzinfo is None:
-                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
 
-                stuck_duration = now - updated_at
+                    stuck_duration = now - updated_at
 
-                stuck.append({
-                    "id": pipeline["id"],
-                    "state": pipeline["state"],
-                    "source_path": pipeline["source_path"],
-                    "stuck_since": pipeline["updated_at"],
-                    "stuck_minutes": int(stuck_duration.total_seconds() / 60),
-                    "expected_minutes": int(threshold_seconds / 60),
-                })
+                    stuck.append({
+                        "id": pipeline["id"],
+                        "state": pipeline["state"],
+                        "source_path": pipeline["source_path"],
+                        "stuck_since": pipeline["updated_at"],
+                        "stuck_minutes": int(stuck_duration.total_seconds() / 60),
+                        "expected_minutes": int(threshold_seconds / 60),
+                    })
 
-        conn.close()
-        return stuck
+            return stuck
+        finally:
+            conn.close()

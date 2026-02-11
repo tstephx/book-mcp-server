@@ -34,32 +34,34 @@ class AuditTrail:
     ) -> int:
         """Log an audit entry. Returns the entry ID."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            INSERT INTO approval_audit
-            (book_id, pipeline_id, action, actor, reason, before_state, after_state,
-             adjustments, filter_used, confidence_at_decision, autonomy_mode, session_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            book_id,
-            pipeline_id,
-            action,
-            actor,
-            reason,
-            json.dumps(before_state) if before_state else None,
-            json.dumps(after_state) if after_state else None,
-            json.dumps(adjustments) if adjustments else None,
-            json.dumps(filter_used) if filter_used else None,
-            confidence,
-            autonomy_mode,
-            session_id,
-        ))
+            cursor.execute("""
+                INSERT INTO approval_audit
+                (book_id, pipeline_id, action, actor, reason, before_state, after_state,
+                 adjustments, filter_used, confidence_at_decision, autonomy_mode, session_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                book_id,
+                pipeline_id,
+                action,
+                actor,
+                reason,
+                json.dumps(before_state) if before_state else None,
+                json.dumps(after_state) if after_state else None,
+                json.dumps(adjustments) if adjustments else None,
+                json.dumps(filter_used) if filter_used else None,
+                confidence,
+                autonomy_mode,
+                session_id,
+            ))
 
-        entry_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return entry_id
+            entry_id = cursor.lastrowid
+            conn.commit()
+            return entry_id
+        finally:
+            conn.close()
 
     def query(
         self,
@@ -71,46 +73,48 @@ class AuditTrail:
     ) -> list[dict]:
         """Query audit entries."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        conditions = []
-        params = []
+            conditions = []
+            params = []
 
-        if book_id:
-            conditions.append("book_id = ?")
-            params.append(book_id)
+            if book_id:
+                conditions.append("book_id = ?")
+                params.append(book_id)
 
-        if actor:
-            conditions.append("actor = ?")
-            params.append(actor)
+            if actor:
+                conditions.append("actor = ?")
+                params.append(actor)
 
-        if action:
-            conditions.append("action = ?")
-            params.append(action)
+            if action:
+                conditions.append("action = ?")
+                params.append(action)
 
-        if last_days:
-            conditions.append("performed_at > datetime('now', ?)")
-            params.append(f"-{last_days} days")
+            if last_days:
+                conditions.append("performed_at > datetime('now', ?)")
+                params.append(f"-{last_days} days")
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        cursor.execute(f"""
-            SELECT * FROM approval_audit
-            {where}
-            ORDER BY performed_at DESC
-            LIMIT ?
-        """, params + [limit])
+            cursor.execute(f"""
+                SELECT * FROM approval_audit
+                {where}
+                ORDER BY performed_at DESC
+                LIMIT ?
+            """, params + [limit])
 
-        rows = cursor.fetchall()
-        conn.close()
+            rows = cursor.fetchall()
 
-        results = []
-        for row in rows:
-            entry = dict(row)
-            # Parse JSON fields
-            for field in ["before_state", "after_state", "adjustments", "filter_used"]:
-                if entry.get(field):
-                    entry[field] = json.loads(entry[field])
-            results.append(entry)
+            results = []
+            for row in rows:
+                entry = dict(row)
+                # Parse JSON fields
+                for field in ["before_state", "after_state", "adjustments", "filter_used"]:
+                    if entry.get(field):
+                        entry[field] = json.loads(entry[field])
+                results.append(entry)
 
-        return results
+            return results
+        finally:
+            conn.close()
