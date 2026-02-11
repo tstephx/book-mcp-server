@@ -32,6 +32,22 @@ agentic-pipeline worker --watch-dir /path/to/books/
 ## Project Structure
 
 ```
+src/
+├── tools/
+│   ├── hybrid_search_tool.py  # Hybrid search MCP tool (RRF + MMR)
+│   └── semantic_search_tool.py # Semantic search MCP tool
+├── utils/
+│   ├── embedding_loader.py    # Shared embedding loading (used by search tools)
+│   ├── hybrid_search.py       # RRF fusion + MMR diversity algorithms
+│   ├── cache.py               # Two-tier cache (embeddings, summary embeddings, chapters)
+│   ├── summaries.py           # Chapter summaries + summary embedding generation
+│   └── ...
+├── server.py                  # MCP server + inline tools
+└── ...
+
+migrations/
+├── add_summary_embeddings.py  # Adds embedding column to chapter_summaries
+
 agentic_pipeline/
 ├── agents/                 # AI-powered components
 │   ├── classifier.py       # Book type classification
@@ -163,6 +179,7 @@ python -m pytest tests/ --cov=agentic_pipeline
 5. **Rich** - Terminal formatting and tables
 6. **TDD** - Tests written before implementation
 7. **Immutable Audit** - All decisions logged permanently
+8. **Hybrid Search** - Reciprocal Rank Fusion (RRF) combines FTS5 keyword + semantic vector search; optional Maximal Marginal Relevance (MMR) for diversity. Shared embedding loading via `src/utils/embedding_loader.py`
 
 ## Using the Book Library
 
@@ -172,7 +189,7 @@ Once books are processed, they're available via MCP tools in Claude Desktop.
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `semantic_search`, `text_search`, `search_all_books` |
+| **Search** | `semantic_search`, `text_search`, `hybrid_search`, `search_all_books` |
 | **Discovery** | `topic_coverage`, `cross_book_comparison`, `find_related_content` |
 | **Reading** | `get_chapter`, `get_book_info`, `list_books` |
 | **Learning** | `teach_concept`, `learning_path`, `create_study_guide` |
@@ -234,4 +251,4 @@ This project uses claude-innit for persistent context:
 
 ---
 
-*Last updated: 2026-02-11*
+*Last updated: 2026-02-11 (hybrid search, summary embeddings)*
