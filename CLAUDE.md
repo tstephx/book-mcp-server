@@ -79,6 +79,7 @@ agentic_pipeline/
 ├── library/                # Library status dashboard
 │   └── status.py           # LibraryStatus
 ├── db/                     # Database layer
+│   ├── connection.py       # get_pipeline_db() shared context manager
 │   ├── migrations.py       # Schema definitions (WAL mode enabled)
 │   ├── pipelines.py        # PipelineRepository
 │   └── config.py           # DB path configuration
@@ -172,7 +173,7 @@ python -m pytest tests/ --cov=agentic_pipeline
 
 ## Architecture Decisions
 
-1. **SQLite + WAL mode** - Single-file database with concurrent read/write support; all connections use `timeout=10`
+1. **SQLite + WAL mode** - Single-file database with concurrent read/write support; all `agentic_pipeline/` connections go through `get_pipeline_db()` context manager (`timeout=10`, `row_factory=sqlite3.Row`)
 2. **Inline embedding** - `approve_book()` runs the full APPROVED → EMBEDDING → COMPLETE flow; no separate worker needed
 3. **ProcessingAdapter** - Wraps `book-ingestion` as a library (not subprocess); lazy-imported in approval to avoid hard dependency
 4. **Click CLI** - Standard Python CLI framework
@@ -251,4 +252,4 @@ This project uses claude-innit for persistent context:
 
 ---
 
-*Last updated: 2026-02-11 (hybrid search, summary embeddings)*
+*Last updated: 2026-02-11 (DB context manager refactor)*
