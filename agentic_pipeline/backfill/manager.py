@@ -69,6 +69,7 @@ class BackfillManager:
             if created:
                 backfilled += 1
                 summary["action"] = "backfilled"
+                self._write_audit(book["id"])
             else:
                 skipped += 1
                 summary["action"] = "skipped"
@@ -101,6 +102,23 @@ class BackfillManager:
             "word_count": book["word_count"] or 0,
             "quality": quality,
         }
+
+    def _write_audit(self, book_id: str) -> None:
+        """Record backfill in audit trail."""
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        try:
+            conn.execute(
+                """
+                INSERT INTO approval_audit
+                (book_id, pipeline_id, action, actor, reason)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (book_id, book_id, "backfill", "backfill:automated",
+                 "Legacy book registered in pipeline"),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
     @staticmethod
     def _compute_hash(book: dict) -> str:
