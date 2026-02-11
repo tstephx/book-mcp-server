@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 # Default path to shared library.db (override with AGENTIC_PIPELINE_DB env var)
-DEFAULT_DB_PATH = Path("data/library.db")
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "library.db"
 
 
 def get_db_path() -> Path:
