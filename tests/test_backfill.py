@@ -275,3 +275,62 @@ def test_backfill_creates_audit_entries(db_path):
 
     assert row is not None
     assert row["actor"] == "backfill:automated"
+
+
+def test_validator_finds_missing_embeddings(db_path):
+    from agentic_pipeline.backfill import LibraryValidator
+    import uuid
+
+    # Book with 3 chapters, only 1 has embedding
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
+        ("book-partial", "Partial Book", "Author", "/book.epub", 10000),
+    )
+    for i in range(3):
+        emb = b"fake" if i == 0 else None
+        conn.execute(
+            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), "book-partial", f"Ch {i+1}", f"ch{i}.md", 3000, emb),
+        )
+    conn.commit()
+    conn.close()
+
+    validator = LibraryValidator(db_path)
+    issues = validator.validate()
+
+    book_issues = [i for i in issues if i["book_id"] == "book-partial"]
+    assert len(book_issues) > 0
+    assert any(i["issue"] == "missing_embeddings" for i in book_issues)
+
+
+def test_validator_flags_no_chapters(db_path):
+    from agentic_pipeline.backfill import LibraryValidator
+
+    # Book with 0 chapters
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO books (id, title, author, file_path, word_count) VALUES (?, ?, ?, ?, ?)",
+        ("book-empty", "Empty Book", "Author", "/book.epub", 0),
+    )
+    conn.commit()
+    conn.close()
+
+    validator = LibraryValidator(db_path)
+    issues = validator.validate()
+
+    book_issues = [i for i in issues if i["book_id"] == "book-empty"]
+    assert any(i["issue"] == "no_chapters" for i in book_issues)
+
+
+def test_validator_clean_book_has_no_issues(db_path):
+    from agentic_pipeline.backfill import LibraryValidator
+
+    _insert_library_book(db_path, "book-good", "Good Book", "/book.epub", chapters=5)
+
+    validator = LibraryValidator(db_path)
+    issues = validator.validate()
+
+    book_issues = [i for i in issues if i["book_id"] == "book-good"]
+    assert len(book_issues) == 0

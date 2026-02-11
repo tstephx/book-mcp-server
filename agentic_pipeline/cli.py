@@ -778,5 +778,50 @@ def spot_check(list_pending: bool):
         console.print("Interactive spot-check not yet implemented")
 
 
+@main.command()
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def validate(as_json: bool):
+    """Check library books for quality issues."""
+    from .db.config import get_db_path
+    from .backfill import LibraryValidator
+    import json as json_module
+
+    db_path = get_db_path()
+    validator = LibraryValidator(db_path)
+    issues = validator.validate()
+
+    if as_json:
+        console.print(json_module.dumps(issues, indent=2))
+        return
+
+    if not issues:
+        console.print("[green]All books pass quality checks.[/green]")
+        return
+
+    console.print(f"\n[yellow]Found {len(issues)} issue(s):[/yellow]\n")
+
+    table = Table()
+    table.add_column("Title", max_width=35)
+    table.add_column("Issue")
+    table.add_column("Detail")
+
+    for issue in issues:
+        issue_type = issue["issue"]
+        if issue_type == "no_chapters":
+            style = "red"
+        elif issue_type == "missing_embeddings":
+            style = "yellow"
+        else:
+            style = "dim"
+
+        table.add_row(
+            (issue["title"] or "?")[:35],
+            f"[{style}]{issue_type}[/{style}]",
+            issue["detail"],
+        )
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     main()
