@@ -6,7 +6,6 @@ ranked result set. MMR provides diversity to reduce redundant results.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 
