@@ -246,7 +246,11 @@ class PipelineRepository:
             conn.close()
 
     def mark_approved(self, pipeline_id: str, approved_by: str, confidence: float = None) -> None:
-        """Mark a pipeline as approved."""
+        """Set approval metadata on a pipeline record.
+
+        Only writes approved_by and approval_confidence — does NOT touch the
+        state column.  All state changes must go through update_state().
+        """
         conn = self._connect()
         try:
             cursor = conn.cursor()
@@ -254,10 +258,10 @@ class PipelineRepository:
             cursor.execute(
                 """
                 UPDATE processing_pipelines
-                SET state = ?, approved_by = ?, approval_confidence = ?, updated_at = ?
+                SET approved_by = ?, approval_confidence = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (PipelineState.APPROVED.value, approved_by, confidence, now, pipeline_id)
+                (approved_by, confidence, now, pipeline_id)
             )
             conn.commit()
         finally:

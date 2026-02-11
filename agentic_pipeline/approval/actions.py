@@ -143,7 +143,8 @@ def approve_book(
 
     before_state = {"state": pipeline["state"]}
 
-    # Mark as approved
+    # Transition state, then set approval metadata
+    repo.update_state(pipeline_id, PipelineState.APPROVED)
     repo.mark_approved(pipeline_id, approved_by=actor, confidence=confidence)
 
     # Run embedding inline (APPROVED → EMBEDDING → COMPLETE)

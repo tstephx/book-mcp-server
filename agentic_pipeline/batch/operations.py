@@ -40,6 +40,7 @@ class BatchOperations:
         embedding_failures = []
 
         for pipeline in matches:
+            self.repo.update_state(pipeline["id"], PipelineState.APPROVED)
             self.repo.mark_approved(
                 pipeline["id"],
                 approved_by=f"batch:{actor}",

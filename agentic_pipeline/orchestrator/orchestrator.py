@@ -283,25 +283,11 @@ class Orchestrator:
                 "needs_review": True
             }
 
-        # EMBEDDING
-        self._transition(pipeline_id, PipelineState.EMBEDDING)
-        try:
-            book_id = processing_result.get("book_id", pipeline_id)
-            self._run_embedding(book_id=book_id)
-        except (EmbeddingError, PipelineTimeoutError) as e:
-            self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
-            return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
-
-        # COMPLETE
-        self._transition(pipeline_id, PipelineState.COMPLETE)
-
-        return {
-            "pipeline_id": pipeline_id,
-            "state": PipelineState.COMPLETE.value,
-            "book_type": profile.get("book_type"),
-            "confidence": confidence
-        }
+        # EMBEDDING → COMPLETE (delegate to shared helper)
+        result = self._complete_approved(pipeline_id)
+        result["book_type"] = profile.get("book_type")
+        result["confidence"] = confidence
+        return result
 
     def _complete_approved(self, pipeline_id: str) -> dict:
         """Complete an approved book by running embedding and marking complete.

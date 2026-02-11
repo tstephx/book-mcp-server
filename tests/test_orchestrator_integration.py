@@ -76,9 +76,16 @@ def test_full_pipeline_mocked(config, sample_book):
         "llm_fallback_used": False,
     }
 
+    # _complete_approved delegates to approval.actions which lazy-imports
+    # ProcessingAdapter, so we patch at the source module.
+    mock_adapter_cls = MagicMock()
+    mock_adapter_instance = mock_adapter_cls.return_value
+    mock_embed_result = MagicMock(success=True, chapters_processed=10, error=None)
+    mock_adapter_instance.generate_embeddings.return_value = mock_embed_result
+
     with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
         with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
-            with patch.object(orchestrator, '_run_embedding', return_value={"chapters_processed": 10}):
+            with patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", mock_adapter_cls):
                 result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "complete"
