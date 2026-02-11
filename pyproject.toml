@@ -18,6 +18,9 @@ dependencies = [
     # "book-ingestion",  # Install separately: pip install -e /path/to/book-ingestion-python
 ]
 
+[tool.setuptools.packages.find]
+include = ["agentic_pipeline*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
