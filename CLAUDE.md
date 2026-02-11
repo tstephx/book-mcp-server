@@ -164,21 +164,30 @@ Once books are processed, they're available via MCP tools in Claude Desktop.
 | **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress` |
 | **Export** | `export_chapter`, `export_book`, `generate_flashcards` |
 
-### Claude Desktop Config
+### MCP Client Config
+
+Add to `.mcp.json` in any project that needs the book library:
 
 ```json
 {
   "mcpServers": {
     "book-library": {
-      "command": "python",
-      "args": ["/path/to/book-mcp-server/server.py"],
+      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "args": ["/Users/taylorstephens/_Projects/book-mcp-server/server.py"],
       "env": {
-        "BOOK_DB_PATH": "/path/to/book-ingestion-python/data/library.db"
+        "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db",
+        "BOOKS_DIR": "/Users/taylorstephens/_Projects/book-ingestion-python/data/books",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
       }
     }
   }
 }
 ```
+
+**Critical notes:**
+- Command must use the **venv python** (has mcp, fastmcp, openai deps)
+- Env vars are `BOOK_DB_PATH` and `BOOKS_DIR` (see `src/config.py`)
+- Do NOT use `uv` (not installed) or `BOOK_LIBRARY_DB`/`LIBRARY_PATH` (wrong names)
 
 ### Example Queries to Claude
 
