@@ -1,21 +1,16 @@
 """Audit trail for tracking all approval decisions."""
 
 import json
-import sqlite3
 from pathlib import Path
-from typing import Optional
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 class AuditTrail:
     """Immutable append-only log of approval decisions."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
+        self.db_path = str(db_path)
 
     def log(
         self,
@@ -33,8 +28,7 @@ class AuditTrail:
         session_id: str = None,
     ) -> int:
         """Log an audit entry. Returns the entry ID."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -60,8 +54,6 @@ class AuditTrail:
             entry_id = cursor.lastrowid
             conn.commit()
             return entry_id
-        finally:
-            conn.close()
 
     def query(
         self,
@@ -72,8 +64,7 @@ class AuditTrail:
         limit: int = 100,
     ) -> list[dict]:
         """Query audit entries."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             conditions = []
@@ -116,5 +107,3 @@ class AuditTrail:
                 results.append(entry)
 
             return results
-        finally:
-            conn.close()

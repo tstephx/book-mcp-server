@@ -1,23 +1,22 @@
 """Library validator - checks books for quality issues."""
 
-import sqlite3
 from pathlib import Path
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 class LibraryValidator:
     """Validates library books for common quality issues."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
+        self.db_path = str(db_path)
 
     def validate(self) -> list[dict]:
         """Check all books for quality issues.
 
         Returns a list of issue dicts with book_id, title, and issue type.
         """
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -59,5 +58,3 @@ class LibraryValidator:
                     })
 
             return issues
-        finally:
-            conn.close()

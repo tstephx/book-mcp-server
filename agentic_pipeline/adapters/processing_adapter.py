@@ -18,6 +18,7 @@ from book_ingestion import (
 from book_ingestion.embeddings import EmbeddingGenerator
 
 from agentic_pipeline.adapters.llm_fallback_adapter import LLMFallbackAdapter
+from agentic_pipeline.db.connection import get_pipeline_db
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,6 @@ class ProcessingAdapter:
         """
         import hashlib
         import io
-        import sqlite3
         from datetime import datetime, timezone
 
         import numpy as np
@@ -203,9 +203,7 @@ class ProcessingAdapter:
             if self._embedding_generator is None:
                 self._embedding_generator = EmbeddingGenerator()
 
-            conn = sqlite3.connect(str(self.db_path), timeout=10)
-            try:
-                conn.row_factory = sqlite3.Row
+            with get_pipeline_db(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
                 if book_id:
@@ -282,8 +280,6 @@ class ProcessingAdapter:
                     conn.commit()
 
                 return EmbeddingResult(success=True, chapters_processed=processed)
-            finally:
-                conn.close()
 
         except ImportError as e:
             logger.warning(f"Embedding dependencies not available: {e}")

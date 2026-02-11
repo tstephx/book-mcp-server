@@ -1,8 +1,8 @@
 """Health monitoring for the pipeline."""
 
-import sqlite3
 from pathlib import Path
 
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
 
@@ -27,16 +27,14 @@ class HealthMonitor:
         alert_queue_threshold: int = 100,
         alert_failure_rate: float = 0.20,
     ):
-        self.db_path = db_path
+        self.db_path = str(db_path)
         self.repo = PipelineRepository(db_path)
         self.alert_queue_threshold = alert_queue_threshold
         self.alert_failure_rate = alert_failure_rate
 
     def get_health(self) -> dict:
         """Get current system health."""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Count active (processing)
@@ -72,8 +70,6 @@ class HealthMonitor:
 
             # Queue by priority
             queue_by_priority = self.repo.get_queue_by_priority()
-        finally:
-            conn.close()
 
         # Generate alerts
         alerts = self._generate_alerts(queued, failed, completed_24h)

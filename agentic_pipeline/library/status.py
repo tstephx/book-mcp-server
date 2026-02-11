@@ -3,18 +3,18 @@
 import sqlite3
 from pathlib import Path
 
+from agentic_pipeline.db.connection import get_pipeline_db
+
 
 class LibraryStatus:
     """Aggregates library status across books, chapters, and pipeline."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
+        self.db_path = str(db_path)
 
     def get_status(self) -> dict:
         """Get unified library status."""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             try:
@@ -24,8 +24,6 @@ class LibraryStatus:
                 return self._empty_status()
 
             pipeline_summary = self._get_pipeline_summary(cursor)
-        finally:
-            conn.close()
 
         # Compute per-book status
         book_list = []
@@ -84,7 +82,7 @@ class LibraryStatus:
             "pipeline_summary": pipeline_summary,
         }
 
-    def _get_books(self, cursor: sqlite3.Cursor) -> list:
+    def _get_books(self, cursor) -> list:
         """Query books joined with chapters and pipeline state."""
         cursor.execute("""
             SELECT b.id, b.title, b.author, b.word_count,
@@ -99,7 +97,7 @@ class LibraryStatus:
         """)
         return cursor.fetchall()
 
-    def _get_pipeline_summary(self, cursor: sqlite3.Cursor) -> dict:
+    def _get_pipeline_summary(self, cursor) -> dict:
         """Get pipeline state counts."""
         try:
             cursor.execute("""

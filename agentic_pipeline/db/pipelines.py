@@ -1,12 +1,12 @@
 """Pipeline repository for CRUD operations."""
 
-import sqlite3
 import uuid
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.pipeline.states import PipelineState, can_transition
 
 
@@ -14,12 +14,7 @@ class PipelineRepository:
     """Repository for pipeline records."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
-
-    def _connect(self):
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
+        self.db_path = str(db_path)
 
     def create(
         self,
@@ -31,8 +26,7 @@ class PipelineRepository:
         pipeline_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -43,15 +37,12 @@ class PipelineRepository:
                 (pipeline_id, source_path, content_hash, PipelineState.DETECTED.value, priority, now, now)
             )
             conn.commit()
-        finally:
-            conn.close()
 
         return pipeline_id
 
     def get(self, pipeline_id: str) -> Optional[dict]:
         """Get a pipeline by ID."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT * FROM processing_pipelines WHERE id = ?",
@@ -59,13 +50,10 @@ class PipelineRepository:
             )
             row = cursor.fetchone()
             return dict(row) if row else None
-        finally:
-            conn.close()
 
     def find_by_hash(self, content_hash: str) -> Optional[dict]:
         """Find a pipeline by content hash."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT * FROM processing_pipelines WHERE content_hash = ?",
@@ -73,8 +61,6 @@ class PipelineRepository:
             )
             row = cursor.fetchone()
             return dict(row) if row else None
-        finally:
-            conn.close()
 
     def update_state(
         self,
@@ -84,8 +70,7 @@ class PipelineRepository:
         error_details: Optional[dict] = None
     ) -> None:
         """Update pipeline state and record history."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Get current state
@@ -152,13 +137,10 @@ class PipelineRepository:
             )
 
             conn.commit()
-        finally:
-            conn.close()
 
     def list_pending_approval(self) -> list[dict]:
         """Get all pipelines pending approval."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -170,13 +152,10 @@ class PipelineRepository:
             )
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-        finally:
-            conn.close()
 
     def update_book_profile(self, pipeline_id: str, book_profile: dict) -> None:
         """Update the book profile from classifier."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -187,13 +166,10 @@ class PipelineRepository:
                 (json.dumps(book_profile), datetime.now(timezone.utc).isoformat(), pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def update_strategy_config(self, pipeline_id: str, strategy_config: dict) -> None:
         """Update the strategy config."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -204,13 +180,10 @@ class PipelineRepository:
                 (json.dumps(strategy_config), datetime.now(timezone.utc).isoformat(), pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def update_validation_result(self, pipeline_id: str, validation_result: dict) -> None:
         """Update the validation result."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -221,8 +194,6 @@ class PipelineRepository:
                 (json.dumps(validation_result), datetime.now(timezone.utc).isoformat(), pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def update_processing_result(self, pipeline_id: str, processing_result: dict) -> None:
         """Update the processing result from book-ingestion.
@@ -230,8 +201,7 @@ class PipelineRepository:
         Stores quality metrics, detection confidence, and warnings from
         the book-ingestion pipeline result.
         """
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -242,8 +212,6 @@ class PipelineRepository:
                 (json.dumps(processing_result), datetime.now(timezone.utc).isoformat(), pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def mark_approved(self, pipeline_id: str, approved_by: str, confidence: float = None) -> None:
         """Set approval metadata on a pipeline record.
@@ -251,8 +219,7 @@ class PipelineRepository:
         Only writes approved_by and approval_confidence — does NOT touch the
         state column.  All state changes must go through update_state().
         """
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             now = datetime.now(timezone.utc).isoformat()
             cursor.execute(
@@ -264,8 +231,6 @@ class PipelineRepository:
                 (approved_by, confidence, now, pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def find_by_state(
         self,
@@ -273,8 +238,7 @@ class PipelineRepository:
         limit: int = None
     ) -> list[dict]:
         """Find pipelines in a specific state."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             query = """
@@ -290,13 +254,10 @@ class PipelineRepository:
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-        finally:
-            conn.close()
 
     def increment_retry_count(self, pipeline_id: str) -> int:
         """Increment retry count and return new value."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -313,21 +274,16 @@ class PipelineRepository:
 
             conn.commit()
             return new_count
-        finally:
-            conn.close()
 
     def update_priority(self, pipeline_id: str, priority: int) -> None:
         """Update the priority of a pipeline."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE processing_pipelines SET priority = ?, updated_at = ? WHERE id = ?",
                 (priority, datetime.now(timezone.utc).isoformat(), pipeline_id)
             )
             conn.commit()
-        finally:
-            conn.close()
 
     def create_backfill(
         self,
@@ -343,8 +299,7 @@ class PipelineRepository:
         Returns True if created, False if skipped (hash already exists).
         """
         now = datetime.now(timezone.utc).isoformat()
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Skip if content_hash already tracked
@@ -375,16 +330,13 @@ class PipelineRepository:
             )
             conn.commit()
             return True
-        finally:
-            conn.close()
 
     def prepare_reingest(self, pipeline_id: str) -> str:
         """Archive an existing pipeline record and create a new one for reingestion.
 
         Returns the new pipeline_id.
         """
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             now = datetime.now(timezone.utc).isoformat()
 
@@ -437,13 +389,10 @@ class PipelineRepository:
 
             conn.commit()
             return new_id
-        finally:
-            conn.close()
 
     def get_queue_by_priority(self) -> dict[int, int]:
         """Get count of queued items by priority."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT priority, COUNT(*) as count
@@ -454,5 +403,3 @@ class PipelineRepository:
             """, (PipelineState.DETECTED.value,))
             rows = cursor.fetchall()
             return {row[0]: row[1] for row in rows}
-        finally:
-            conn.close()

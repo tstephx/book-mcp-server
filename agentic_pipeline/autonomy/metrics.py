@@ -1,22 +1,17 @@
 """Autonomy metrics collection."""
 
 import json
-import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 class MetricsCollector:
     """Collects and aggregates autonomy metrics."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
+        self.db_path = str(db_path)
 
     def record_decision(
         self,
@@ -29,8 +24,7 @@ class MetricsCollector:
         adjustments: dict = None,
     ) -> None:
         """Record a decision for metrics tracking."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Determine original decision type
@@ -53,13 +47,10 @@ class MetricsCollector:
             ))
 
             conn.commit()
-        finally:
-            conn.close()
 
     def get_metrics(self, days: int = 30) -> dict:
         """Get aggregated metrics for the specified period."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -88,13 +79,10 @@ class MetricsCollector:
                 "avg_confidence_auto": row["avg_conf_auto"],
                 "avg_confidence_human": row["avg_conf_human"],
             }
-        finally:
-            conn.close()
 
     def get_accuracy_by_type(self, book_type: str, days: int = 90) -> dict:
         """Get accuracy metrics for a specific book type."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -118,5 +106,3 @@ class MetricsCollector:
                 "sample_count": total,
                 "accuracy": correct / total if total > 0 else None,
             }
-        finally:
-            conn.close()

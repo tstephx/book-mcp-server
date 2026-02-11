@@ -1,12 +1,12 @@
 """Approval actions - approve, reject, rollback."""
 
 import logging
-import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
 
@@ -39,8 +39,7 @@ def _record_audit(
     confidence: Optional[float] = None,
 ) -> None:
     """Record an action in the audit trail."""
-    conn = sqlite3.connect(db_path, timeout=10)
-    try:
+    with get_pipeline_db(str(db_path)) as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -63,8 +62,6 @@ def _record_audit(
             )
         )
         conn.commit()
-    finally:
-        conn.close()
 
 
 def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:

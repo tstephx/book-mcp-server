@@ -1,28 +1,23 @@
 """Spot-check system for ongoing verification."""
 
 import random
-import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 class SpotCheckManager:
     """Manages spot-check selection and results."""
 
     def __init__(self, db_path: Path, sample_rate: float = 0.10):
-        self.db_path = db_path
+        self.db_path = str(db_path)
         self.sample_rate = sample_rate
-
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
 
     def select_for_review(self, days: int = 7) -> list[dict]:
         """Select auto-approved books for spot-check review."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -48,8 +43,6 @@ class SpotCheckManager:
 
             # Random sample
             return random.sample(candidates, min(sample_size, len(candidates)))
-        finally:
-            conn.close()
 
     def submit_result(
         self,
@@ -61,8 +54,7 @@ class SpotCheckManager:
         pipeline_id: str = None,
     ) -> None:
         """Submit a spot-check review result."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Get original info
@@ -93,13 +85,10 @@ class SpotCheckManager:
             ))
 
             conn.commit()
-        finally:
-            conn.close()
 
     def get_results(self, days: int = 30) -> list[dict]:
         """Get spot-check results for the specified period."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -111,13 +100,10 @@ class SpotCheckManager:
             """, (cutoff,))
 
             return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
 
     def get_accuracy_rate(self, days: int = 30) -> Optional[float]:
         """Get the accuracy rate from spot-checks."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -137,5 +123,3 @@ class SpotCheckManager:
                 return None
 
             return row["correct"] / total
-        finally:
-            conn.close()

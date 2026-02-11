@@ -1,9 +1,9 @@
 """Backfill manager - registers legacy library books in the pipeline."""
 
 import hashlib
-import sqlite3
 from pathlib import Path
 
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 
 
@@ -11,14 +11,12 @@ class BackfillManager:
     """Finds and backfills library books that have no pipeline record."""
 
     def __init__(self, db_path: Path):
-        self.db_path = db_path
+        self.db_path = str(db_path)
         self.repo = PipelineRepository(db_path)
 
     def find_untracked(self) -> list[dict]:
         """Find library books without a pipeline record."""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT b.id, b.title, b.author, b.source_file, b.word_count,
@@ -32,8 +30,6 @@ class BackfillManager:
                 ORDER BY b.title
             """)
             return [dict(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
 
     def run(self, dry_run: bool = False) -> dict:
         """Backfill all untracked books.
@@ -105,8 +101,7 @@ class BackfillManager:
 
     def _write_audit(self, book_id: str) -> None:
         """Record backfill in audit trail."""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             conn.execute(
                 """
                 INSERT INTO approval_audit
@@ -117,8 +112,6 @@ class BackfillManager:
                  "Legacy book registered in pipeline"),
             )
             conn.commit()
-        finally:
-            conn.close()
 
     @staticmethod
     def _compute_hash(book: dict) -> str:

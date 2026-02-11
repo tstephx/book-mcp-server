@@ -1,9 +1,10 @@
 """Calibration engine for measuring accuracy vs confidence."""
 
-import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 class CalibrationEngine:
@@ -15,19 +16,13 @@ class CalibrationEngine:
         min_samples: int = 50,
         target_accuracy: float = 0.95,
     ):
-        self.db_path = db_path
+        self.db_path = str(db_path)
         self.min_samples = min_samples
         self.target_accuracy = target_accuracy
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        conn.row_factory = sqlite3.Row
-        return conn
-
     def calculate_calibration(self, book_type: str, days: int = 90) -> Optional[dict]:
         """Calculate calibration metrics for a book type."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -58,13 +53,10 @@ class CalibrationEngine:
                 "accuracy": accuracy,
                 "avg_confidence": row["avg_confidence"],
             }
-        finally:
-            conn.close()
 
     def calculate_threshold(self, book_type: str) -> Optional[float]:
         """Calculate the safe auto-approve threshold for a book type."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
@@ -94,13 +86,10 @@ class CalibrationEngine:
                     return threshold
 
             return None
-        finally:
-            conn.close()
 
     def update_thresholds(self) -> dict:
         """Recalculate and update all thresholds."""
-        conn = self._connect()
-        try:
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Get all book types with data
@@ -136,5 +125,3 @@ class CalibrationEngine:
 
             conn.commit()
             return results
-        finally:
-            conn.close()

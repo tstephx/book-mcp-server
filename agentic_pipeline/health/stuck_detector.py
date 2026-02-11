@@ -1,9 +1,9 @@
 """Stuck detection for pipelines."""
 
-import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.pipeline.states import PipelineState
 
 
@@ -42,15 +42,13 @@ class StuckDetector:
         stuck_multiplier: float = 2.0,
         custom_thresholds: dict = None,
     ):
-        self.db_path = db_path
+        self.db_path = str(db_path)
         self.stuck_multiplier = stuck_multiplier
         self.thresholds = {**DEFAULT_STATE_TIMEOUTS, **(custom_thresholds or {})}
 
     def detect(self) -> list[dict]:
         """Find pipelines that appear to be stuck."""
-        conn = sqlite3.connect(self.db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             stuck = []
@@ -101,5 +99,3 @@ class StuckDetector:
                     })
 
             return stuck
-        finally:
-            conn.close()

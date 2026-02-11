@@ -1,11 +1,12 @@
 """Batch filter for selecting pipelines."""
 
 import json
-import sqlite3
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from agentic_pipeline.db.connection import get_pipeline_db
 
 
 @dataclass
@@ -23,9 +24,7 @@ class BatchFilter:
 
     def apply(self, db_path: Path) -> list[dict]:
         """Apply filter and return matching pipelines."""
-        conn = sqlite3.connect(db_path, timeout=10)
-        try:
-            conn.row_factory = sqlite3.Row
+        with get_pipeline_db(str(db_path)) as conn:
             cursor = conn.cursor()
 
             conditions = []
@@ -61,8 +60,6 @@ class BatchFilter:
             """, params + [self.max_count * 2])  # Fetch extra for post-filtering
 
             rows = cursor.fetchall()
-        finally:
-            conn.close()
 
         results = []
         for row in rows:
