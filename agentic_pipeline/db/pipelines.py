@@ -325,6 +325,55 @@ class PipelineRepository:
         finally:
             conn.close()
 
+    def create_backfill(
+        self,
+        book_id: str,
+        source_path: str,
+        content_hash: str,
+    ) -> bool:
+        """Create a pipeline record for an existing library book.
+
+        Inserts directly at COMPLETE state, bypassing normal transitions.
+        Used to register legacy books that were ingested before the pipeline existed.
+
+        Returns True if created, False if skipped (hash already exists).
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+
+            # Skip if content_hash already tracked
+            cursor.execute(
+                "SELECT id FROM processing_pipelines WHERE content_hash = ?",
+                (content_hash,),
+            )
+            if cursor.fetchone():
+                return False
+
+            cursor.execute(
+                """
+                INSERT INTO processing_pipelines
+                (id, source_path, content_hash, state, approved_by,
+                 created_at, updated_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    book_id,
+                    source_path,
+                    content_hash,
+                    PipelineState.COMPLETE.value,
+                    "backfill:automated",
+                    now,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
     def get_queue_by_priority(self) -> dict[int, int]:
         """Get count of queued items by priority."""
         conn = self._connect()
