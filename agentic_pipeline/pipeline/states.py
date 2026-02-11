@@ -34,7 +34,7 @@ TRANSITIONS = {
     PipelineState.PENDING_APPROVAL: {PipelineState.APPROVED, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
     PipelineState.NEEDS_RETRY: {PipelineState.PROCESSING, PipelineState.REJECTED},
     PipelineState.APPROVED: {PipelineState.EMBEDDING},
-    PipelineState.EMBEDDING: {PipelineState.COMPLETE, PipelineState.REJECTED},
+    PipelineState.EMBEDDING: {PipelineState.COMPLETE, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books
     PipelineState.REJECTED: {PipelineState.ARCHIVED},
     PipelineState.ARCHIVED: set(),  # Terminal

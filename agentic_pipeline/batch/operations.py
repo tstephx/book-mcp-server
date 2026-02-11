@@ -34,12 +34,25 @@ class BatchOperations:
                 "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
             }
 
+        from agentic_pipeline.approval.actions import _complete_approved
+
+        embedded = 0
+        embedding_failures = []
+
         for pipeline in matches:
             self.repo.mark_approved(
                 pipeline["id"],
                 approved_by=f"batch:{actor}",
                 confidence=None
             )
+            embed_result = _complete_approved(self.db_path, pipeline["id"], pipeline)
+            if embed_result["state"] == PipelineState.COMPLETE.value:
+                embedded += 1
+            else:
+                embedding_failures.append({
+                    "id": pipeline["id"],
+                    "error": embed_result.get("embedding_error", "unknown"),
+                })
 
         # Log batch operation to audit
         self.audit.log(
@@ -52,6 +65,8 @@ class BatchOperations:
         return {
             "approved": len(matches),
             "would_approve": len(matches),
+            "embedded": embedded,
+            "embedding_failures": embedding_failures,
             "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
         }
 

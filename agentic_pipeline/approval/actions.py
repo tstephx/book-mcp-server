@@ -1,5 +1,6 @@
 """Approval actions - approve, reject, rollback."""
 
+import logging
 import sqlite3
 import json
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Optional
 
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
+
+logger = logging.getLogger(__name__)
 
 
 def _record_audit(
@@ -49,13 +52,67 @@ def _record_audit(
     conn.close()
 
 
+def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
+    """Run embedding for an approved book and transition to COMPLETE.
+
+    Returns a dict with state and embedding details. On failure, transitions
+    to NEEDS_RETRY instead.
+    """
+    repo = PipelineRepository(db_path)
+
+    # Extract book_id from processing_result (same logic as orchestrator)
+    processing_result = pipeline.get("processing_result")
+    if processing_result and isinstance(processing_result, str):
+        processing_result = json.loads(processing_result)
+
+    book_id = (
+        processing_result.get("book_id", pipeline_id)
+        if processing_result
+        else pipeline_id
+    )
+
+    # Transition to EMBEDDING
+    repo.update_state(pipeline_id, PipelineState.EMBEDDING)
+
+    try:
+        # Lazy import — book_ingestion may not be installed in test envs
+        from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
+
+        adapter = ProcessingAdapter(db_path=db_path)
+        result = adapter.generate_embeddings(book_id=book_id)
+
+        if not result.success:
+            logger.warning(
+                "Embedding failed for %s: %s", pipeline_id, result.error
+            )
+            repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            return {
+                "state": PipelineState.NEEDS_RETRY.value,
+                "embedding_error": result.error,
+            }
+
+        repo.update_state(pipeline_id, PipelineState.COMPLETE)
+        return {
+            "state": PipelineState.COMPLETE.value,
+            "chapters_embedded": result.chapters_processed,
+        }
+
+    except Exception as e:
+        logger.error("Embedding exception for %s: %s", pipeline_id, e)
+        repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+        return {
+            "state": PipelineState.NEEDS_RETRY.value,
+            "embedding_error": str(e),
+        }
+
+
 def approve_book(
     db_path: Path,
     pipeline_id: str,
     actor: str,
     adjustments: Optional[dict] = None,
 ) -> dict:
-    """Approve a book for ingestion."""
+    """Approve a book and generate embeddings inline."""
     repo = PipelineRepository(db_path)
     pipeline = repo.get(pipeline_id)
 
@@ -74,7 +131,10 @@ def approve_book(
     # Mark as approved
     repo.mark_approved(pipeline_id, approved_by=actor, confidence=confidence)
 
-    after_state = {"state": PipelineState.APPROVED.value}
+    # Run embedding inline (APPROVED → EMBEDDING → COMPLETE)
+    embed_result = _complete_approved(db_path, pipeline_id, pipeline)
+
+    after_state = {"state": embed_result["state"]}
 
     # Record audit
     _record_audit(
@@ -92,7 +152,7 @@ def approve_book(
     return {
         "success": True,
         "pipeline_id": pipeline_id,
-        "state": PipelineState.APPROVED.value,
+        **embed_result,
     }
 
 
