@@ -179,7 +179,7 @@ class ProcessingAdapter:
         batch_size: int = 32,
     ) -> EmbeddingResult:
         """
-        Generate embeddings for book chapters.
+        Generate embeddings for book chapters using direct SQL.
 
         If book_id is provided, generates embeddings only for that book.
         Otherwise, generates embeddings for all chapters without embeddings.
@@ -191,49 +191,89 @@ class ProcessingAdapter:
         Returns:
             EmbeddingResult with generation details
         """
+        import hashlib
+        import io
+        import sqlite3
+
+        import numpy as np
+
         try:
             # Lazy-load embedding generator
             if self._embedding_generator is None:
                 self._embedding_generator = EmbeddingGenerator()
 
-            # Get chapters needing embeddings from database
-            from book_ingestion import BookDatabase
-
-            db = BookDatabase(str(self.db_path))
+            conn = sqlite3.connect(str(self.db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
             if book_id:
-                chapters = db.get_chapters_by_book(book_id)
+                cursor.execute(
+                    "SELECT id, file_path FROM chapters "
+                    "WHERE book_id = ? AND embedding IS NULL",
+                    (book_id,),
+                )
             else:
-                # Get all chapters without embeddings
-                chapters = db.get_chapters_without_embeddings()
+                cursor.execute(
+                    "SELECT id, file_path FROM chapters WHERE embedding IS NULL"
+                )
+
+            chapters = cursor.fetchall()
 
             if not chapters:
-                return EmbeddingResult(
-                    success=True,
-                    chapters_processed=0,
-                )
+                conn.close()
+                return EmbeddingResult(success=True, chapters_processed=0)
 
-            # Generate embeddings
             logger.info(f"Generating embeddings for {len(chapters)} chapters")
-            results = self._embedding_generator.generate_for_chapters(
-                chapters,
-                text_key="content",
-                id_key="id",
-                batch_size=batch_size,
-            )
+            books_dir = self.db_path.parent / "books"
+            processed = 0
 
-            # Store embeddings in database
-            for embedding_result in results:
-                db.store_embedding(
-                    chapter_id=embedding_result.chapter_id,
-                    embedding=embedding_result.embedding,
-                    model_name=embedding_result.model_name,
+            for i in range(0, len(chapters), batch_size):
+                batch = chapters[i : i + batch_size]
+                texts = []
+                valid = []
+
+                for ch in batch:
+                    try:
+                        content = self._read_chapter_content(
+                            ch["file_path"], books_dir
+                        )
+                        if content.strip():
+                            texts.append(content)
+                            valid.append(ch)
+                    except Exception as e:
+                        logger.warning(f"Cannot read chapter {ch['id']}: {e}")
+
+                if not texts:
+                    continue
+
+                embeddings = self._embedding_generator.generate_batch(
+                    texts, batch_size=batch_size
                 )
 
-            return EmbeddingResult(
-                success=True,
-                chapters_processed=len(results),
-            )
+                for ch, content, emb in zip(valid, texts, embeddings):
+                    emb_blob = io.BytesIO()
+                    np.save(emb_blob, emb)
+                    content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+                    cursor.execute(
+                        """
+                        UPDATE chapters
+                        SET embedding = ?, embedding_model = ?, content_hash = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            emb_blob.getvalue(),
+                            "all-MiniLM-L6-v2",
+                            content_hash,
+                            ch["id"],
+                        ),
+                    )
+                    processed += 1
+
+                conn.commit()
+
+            conn.close()
+            return EmbeddingResult(success=True, chapters_processed=processed)
 
         except ImportError as e:
             logger.warning(f"Embedding dependencies not available: {e}")
@@ -249,6 +289,39 @@ class ProcessingAdapter:
                 chapters_processed=0,
                 error=str(e),
             )
+
+    @staticmethod
+    def _read_chapter_content(file_path: str, books_dir: Path) -> str:
+        """Read chapter content from file, handling split chapters."""
+        path = Path(file_path)
+
+        if not path.is_absolute():
+            # Resolve relative paths (e.g. data/books/...) against books_dir
+            try:
+                rel = path.relative_to("data/books")
+                path = books_dir / rel
+            except ValueError:
+                path = books_dir / path
+
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
+
+        # Handle split chapters (directory with numbered .md parts)
+        dir_path = path if path.is_dir() else path.with_suffix("")
+        if dir_path.is_dir():
+            parts = sorted(
+                p for p in dir_path.glob("[0-9]*.md")
+                if not p.name.startswith("_")
+            )
+            if not parts:
+                parts = sorted(
+                    p for p in dir_path.glob("*.md")
+                    if not p.name.startswith("_")
+                )
+            if parts:
+                return "\n\n".join(p.read_text(encoding="utf-8") for p in parts)
+
+        raise FileNotFoundError(f"Chapter not found: {file_path}")
 
     def get_processing_status(self, book_id: str) -> Optional[dict]:
         """

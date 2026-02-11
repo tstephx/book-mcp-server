@@ -15,6 +15,7 @@ MIGRATIONS = [
         book_profile JSON,
         strategy_config JSON,
         validation_result JSON,
+        processing_result JSON,
         retry_count INTEGER DEFAULT 0,
         max_retries INTEGER DEFAULT 2,
         error_log JSON,
@@ -246,6 +247,14 @@ def run_migrations(db_path: Path) -> None:
     # Run index creation
     for index in INDEXES:
         cursor.execute(index)
+
+    # Add processing_result column to existing DBs (safe if already exists)
+    try:
+        cursor.execute(
+            "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
+        )
+    except sqlite3.OperationalError:
+        pass  # Column already exists
 
     # Insert default autonomy config if not exists
     cursor.execute(

@@ -29,10 +29,9 @@ def test_config_from_env(monkeypatch):
     assert config.confidence_threshold == 0.8
 
 
-def test_config_book_ingestion_path():
+def test_config_has_no_book_ingestion_path():
     from agentic_pipeline.config import OrchestratorConfig
-    from pathlib import Path
 
     config = OrchestratorConfig()
 
-    assert isinstance(config.book_ingestion_path, Path)
+    assert not hasattr(config, "book_ingestion_path")

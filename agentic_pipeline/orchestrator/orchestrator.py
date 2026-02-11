@@ -301,6 +301,81 @@ class Orchestrator:
             "confidence": confidence
         }
 
+    def _complete_approved(self, pipeline_id: str) -> dict:
+        """Complete an approved book by running embedding and marking complete."""
+        record = self.repo.get(pipeline_id)
+        if not record:
+            raise ProcessingError(f"Pipeline not found: {pipeline_id}")
+
+        # Extract book_id from processing_result
+        import json as json_module
+
+        processing_result = record.get("processing_result")
+        if processing_result and isinstance(processing_result, str):
+            processing_result = json_module.loads(processing_result)
+
+        book_id = (
+            processing_result.get("book_id", pipeline_id)
+            if processing_result
+            else pipeline_id
+        )
+
+        # EMBEDDING
+        self._transition(pipeline_id, PipelineState.EMBEDDING)
+        try:
+            self._run_embedding(book_id=book_id)
+        except (EmbeddingError, PipelineTimeoutError) as e:
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
+            return {
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.NEEDS_RETRY.value,
+                "error": str(e),
+            }
+
+        # COMPLETE
+        self._transition(pipeline_id, PipelineState.COMPLETE)
+        return {
+            "pipeline_id": pipeline_id,
+            "state": PipelineState.COMPLETE.value,
+        }
+
+    def _retry_one(self, book: dict) -> dict:
+        """Retry a single book in NEEDS_RETRY state."""
+        retry_count = book.get("retry_count", 0)
+
+        if retry_count >= self.config.max_retry_attempts:
+            self.logger.error(
+                book["id"],
+                "MaxRetriesExceeded",
+                f"Exceeded {self.config.max_retry_attempts} retries",
+            )
+            self.repo.update_state(
+                book["id"],
+                PipelineState.REJECTED,
+                error_details={"reason": "max_retries_exceeded"},
+            )
+            return {
+                "pipeline_id": book["id"],
+                "state": PipelineState.REJECTED.value,
+                "reason": "max_retries_exceeded",
+            }
+
+        new_count = self.repo.increment_retry_count(book["id"])
+        self.logger.retry_scheduled(book["id"], new_count)
+
+        try:
+            return self._process_book(
+                book["id"], book["source_path"], book["content_hash"]
+            )
+        except Exception as e:
+            self.logger.error(book["id"], type(e).__name__, str(e))
+            return {
+                "pipeline_id": book["id"],
+                "state": PipelineState.NEEDS_RETRY.value,
+                "error": str(e),
+            }
+
     def run_worker(self):
         """Run as queue worker, processing books continuously."""
         # Register signal handlers
@@ -310,19 +385,40 @@ class Orchestrator:
         self.logger.worker_started()
 
         while not self.shutdown_requested:
-            # Find next book to process
-            pending = self.repo.find_by_state(PipelineState.DETECTED, limit=1)
-
-            if not pending:
-                time.sleep(self.config.worker_poll_interval)
+            # Priority 1: Complete approved books
+            approved = self.repo.find_by_state(PipelineState.APPROVED, limit=1)
+            if approved:
+                try:
+                    self._complete_approved(approved[0]["id"])
+                except Exception as e:
+                    self.logger.error(approved[0]["id"], type(e).__name__, str(e))
+                    self.repo.update_state(approved[0]["id"], PipelineState.NEEDS_RETRY)
                 continue
 
-            book = pending[0]
-            try:
-                self._process_book(book["id"], book["source_path"], book["content_hash"])
-            except Exception as e:
-                self.logger.error(book["id"], type(e).__name__, str(e))
-                self.repo.update_state(book["id"], PipelineState.NEEDS_RETRY)
+            # Priority 2: Process new books
+            pending = self.repo.find_by_state(PipelineState.DETECTED, limit=1)
+            if pending:
+                try:
+                    self._process_book(
+                        pending[0]["id"],
+                        pending[0]["source_path"],
+                        pending[0]["content_hash"],
+                    )
+                except Exception as e:
+                    self.logger.error(pending[0]["id"], type(e).__name__, str(e))
+                    self.repo.update_state(pending[0]["id"], PipelineState.NEEDS_RETRY)
+                continue
+
+            # Priority 3: Retry failed
+            retryable = self.repo.find_by_state(PipelineState.NEEDS_RETRY, limit=1)
+            if retryable:
+                try:
+                    self._retry_one(retryable[0])
+                except Exception as e:
+                    self.logger.error(retryable[0]["id"], type(e).__name__, str(e))
+                continue
+
+            time.sleep(self.config.worker_poll_interval)
 
         self.logger.worker_stopped()
 
@@ -337,44 +433,7 @@ class Orchestrator:
         retryable = self.repo.find_by_state(PipelineState.NEEDS_RETRY)
 
         for book in retryable:
-            retry_count = book.get("retry_count", 0)
-
-            if retry_count >= self.config.max_retry_attempts:
-                self.logger.error(
-                    book["id"],
-                    "MaxRetriesExceeded",
-                    f"Exceeded {self.config.max_retry_attempts} retries"
-                )
-                self.repo.update_state(
-                    book["id"],
-                    PipelineState.REJECTED,
-                    error_details={"reason": "max_retries_exceeded"}
-                )
-                results.append({
-                    "pipeline_id": book["id"],
-                    "state": PipelineState.REJECTED.value,
-                    "reason": "max_retries_exceeded"
-                })
-                continue
-
-            # Increment retry count
-            new_count = self.repo.increment_retry_count(book["id"])
-            self.logger.retry_scheduled(book["id"], new_count)
-
-            # Attempt reprocessing
-            try:
-                result = self._process_book(
-                    book["id"],
-                    book["source_path"],
-                    book["content_hash"]
-                )
-                results.append(result)
-            except Exception as e:
-                self.logger.error(book["id"], type(e).__name__, str(e))
-                results.append({
-                    "pipeline_id": book["id"],
-                    "state": PipelineState.NEEDS_RETRY.value,
-                    "error": str(e)
-                })
+            result = self._retry_one(book)
+            results.append(result)
 
         return results

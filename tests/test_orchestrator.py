@@ -24,7 +24,6 @@ def config(db_path):
 
     return OrchestratorConfig(
         db_path=db_path,
-        book_ingestion_path=Path("/mock/path"),
         processing_timeout=10,
         embedding_timeout=5,
     )

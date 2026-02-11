@@ -1,6 +1,7 @@
 """Database configuration."""
 
 import os
+import warnings
 from pathlib import Path
 
 # Default path to shared library.db (override with AGENTIC_PIPELINE_DB env var)
@@ -12,4 +13,11 @@ def get_db_path() -> Path:
     env_path = os.environ.get("AGENTIC_PIPELINE_DB")
     if env_path:
         return Path(env_path)
+
+    if not DEFAULT_DB_PATH.exists():
+        warnings.warn(
+            f"Default DB path not found: {DEFAULT_DB_PATH}. "
+            f"Set AGENTIC_PIPELINE_DB environment variable.",
+            stacklevel=2,
+        )
     return DEFAULT_DB_PATH

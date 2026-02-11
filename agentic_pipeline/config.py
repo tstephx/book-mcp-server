@@ -14,11 +14,6 @@ class OrchestratorConfig:
 
     # Paths
     db_path: Path = field(default_factory=get_db_path)
-    book_ingestion_path: Path = field(default_factory=lambda: Path(
-        os.environ.get(
-            "BOOK_INGESTION_PATH", "."
-        )
-    ))
 
     # Timeouts (seconds)
     processing_timeout: int = 600  # 10 minutes
@@ -36,9 +31,6 @@ class OrchestratorConfig:
         """Create configuration from environment variables."""
         return cls(
             db_path=get_db_path(),
-            book_ingestion_path=Path(os.environ.get(
-                "BOOK_INGESTION_PATH", "."
-            )),
             processing_timeout=int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", 600)),
             embedding_timeout=int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300)),
             confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", 0.7)),

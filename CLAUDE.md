@@ -1,13 +1,7 @@
 # Claude Project Context
-
-## Session Initialization (READ FIRST)
+<!-- project-name: book-mcp-server -->
 
 **DO NOT scan directories on startup.** This project is well-documented below.
-
-### Quick Start Protocol
-1. Run `get_context(project="book-mcp-server")` for project memory
-2. Check `git status` and `git log -3` for recent state
-3. Ask the user what they want to work on
 
 ---
 
