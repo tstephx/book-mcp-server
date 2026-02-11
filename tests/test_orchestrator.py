@@ -137,7 +137,6 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
     from unittest.mock import MagicMock
-    import subprocess
 
     orchestrator = Orchestrator(config)
 
@@ -151,11 +150,23 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     orchestrator.classifier = MagicMock()
     orchestrator.classifier.classify.return_value = mock_profile
 
-    with patch('subprocess.run') as mock_run:
-        mock_run.return_value = MagicMock(returncode=0)
-        with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
-            with patch.object(orchestrator, '_extract_sample', return_value="text"):
-                result = orchestrator.process_one("/book.epub")
+    mock_processing_result = {
+        "book_id": "test-book-id",
+        "quality_score": 85,
+        "detection_confidence": 0.9,
+        "detection_method": "mock",
+        "needs_review": False,
+        "warnings": [],
+        "chapter_count": 10,
+        "word_count": 50000,
+        "llm_fallback_used": False,
+    }
+
+    with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
+        with patch.object(orchestrator, '_run_embedding', return_value={"chapters_processed": 10}):
+            with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
+                with patch.object(orchestrator, '_extract_sample', return_value="text"):
+                    result = orchestrator.process_one("/book.epub")
 
     # Check that it was auto-approved
     repo = PipelineRepository(db_path)

@@ -5,7 +5,6 @@ import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-import subprocess
 
 
 @pytest.fixture
@@ -50,7 +49,7 @@ def config(db_path):
 
 
 def test_full_pipeline_mocked(config, sample_book):
-    """Test full pipeline with mocked subprocess calls."""
+    """Test full pipeline with mocked processing."""
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
     from agentic_pipeline.db.pipelines import PipelineRepository
@@ -65,11 +64,22 @@ def test_full_pipeline_mocked(config, sample_book):
         reasoning="Contains code examples"
     )
 
-    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+    mock_processing_result = {
+        "book_id": "test-book-id",
+        "quality_score": 85,
+        "detection_confidence": 0.9,
+        "detection_method": "mock",
+        "needs_review": False,
+        "warnings": [],
+        "chapter_count": 10,
+        "word_count": 50000,
+        "llm_fallback_used": False,
+    }
 
-            result = orchestrator.process_one(sample_book)
+    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
+        with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
+            with patch.object(orchestrator, '_run_embedding', return_value={"chapters_processed": 10}):
+                result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "complete"
     assert result["book_type"] == "technical_tutorial"
@@ -97,10 +107,20 @@ def test_low_confidence_needs_approval(config, sample_book):
         reasoning="Unclear structure"
     )
 
-    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
-        with patch('subprocess.run') as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+    mock_processing_result = {
+        "book_id": "test-book-id",
+        "quality_score": 40,
+        "detection_confidence": 0.5,
+        "detection_method": "mock",
+        "needs_review": True,
+        "warnings": [],
+        "chapter_count": 3,
+        "word_count": 10000,
+        "llm_fallback_used": False,
+    }
 
+    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
+        with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
             result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "pending_approval"
