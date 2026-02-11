@@ -3,6 +3,7 @@
 
 import hashlib
 import signal
+import sqlite3
 import time
 from pathlib import Path
 from typing import Optional
@@ -32,6 +33,7 @@ class Orchestrator:
         self.classifier = ClassifierAgent(config.db_path)
         self.strategy_selector = StrategySelector()
         self.shutdown_requested = False
+        self._seen_paths: set[str] = set()
 
         # Initialize processing adapter for direct library calls
         self.processing_adapter = ProcessingAdapter(
@@ -354,13 +356,21 @@ class Orchestrator:
 
         for ext in extensions:
             for book_path in watch_path.rglob(ext):
+                path_str = str(book_path)
+                if path_str in self._seen_paths:
+                    continue
                 try:
-                    content_hash = self._compute_hash(str(book_path))
+                    content_hash = self._compute_hash(path_str)
                     if self._check_idempotency(content_hash):
+                        self._seen_paths.add(path_str)
                         continue  # Already in pipeline
-                    self.repo.create(str(book_path), content_hash)
-                    self.logger.processing_started("detected", str(book_path))
+                    self.repo.create(path_str, content_hash)
+                    self._seen_paths.add(path_str)
+                    self.logger.processing_started("detected", path_str)
                     detected += 1
+                except sqlite3.IntegrityError:
+                    self._seen_paths.add(path_str)
+                    continue  # Race: another cycle already created this record
                 except Exception as e:
                     self.logger.error("scan", type(e).__name__, str(e))
 

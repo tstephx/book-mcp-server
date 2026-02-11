@@ -249,8 +249,26 @@ def test_scan_directory_skips_already_queued(db_path, config, tmp_path):
 
     # First scan detects the book
     assert orchestrator._scan_watch_dir() == 1
-    # Second scan skips it (already in pipeline via hash)
+    # Second scan skips it (cached in _seen_paths, no re-hash needed)
     assert orchestrator._scan_watch_dir() == 0
+
+
+def test_scan_directory_uses_seen_cache(db_path, config, tmp_path):
+    from agentic_pipeline.orchestrator import Orchestrator
+    from unittest.mock import patch
+
+    (tmp_path / "book1.epub").write_bytes(b"fake epub 1")
+
+    config.watch_dir = tmp_path
+    orchestrator = Orchestrator(config)
+
+    # First scan hashes and detects the book
+    assert orchestrator._scan_watch_dir() == 1
+
+    # Second scan should NOT call _compute_hash (path is cached)
+    with patch.object(orchestrator, '_compute_hash') as mock_hash:
+        assert orchestrator._scan_watch_dir() == 0
+        mock_hash.assert_not_called()
 
 
 def test_scan_directory_noop_when_no_watch_dir(db_path, config):
