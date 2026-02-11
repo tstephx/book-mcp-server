@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-from agentic_pipeline.pipeline.states import PipelineState
+from agentic_pipeline.pipeline.states import PipelineState, can_transition
 
 
 class PipelineRepository:
@@ -100,6 +100,18 @@ class PipelineRepository:
             old_state = row["state"]
             old_updated = row["updated_at"]
             now = datetime.now(timezone.utc).isoformat()
+
+            # Validate transition
+            try:
+                old_state_enum = PipelineState(old_state)
+                if not can_transition(old_state_enum, new_state):
+                    raise ValueError(
+                        f"Invalid transition: {old_state} -> {new_state.value}"
+                    )
+            except ValueError as e:
+                if "Invalid transition" in str(e):
+                    raise
+                # Unknown old state in DB — allow the transition
 
             # Calculate duration
             duration_ms = None
@@ -266,10 +278,12 @@ class PipelineRepository:
                 WHERE state = ?
                 ORDER BY priority ASC, created_at ASC
             """
+            params = [state.value]
             if limit:
-                query += f" LIMIT {limit}"
+                query += " LIMIT ?"
+                params.append(limit)
 
-            cursor.execute(query, (state.value,))
+            cursor.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
         finally:

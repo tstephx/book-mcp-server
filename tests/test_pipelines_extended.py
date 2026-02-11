@@ -5,6 +5,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -26,7 +28,7 @@ def test_find_by_state(db_path):
     # Create pipelines in different states
     id1 = repo.create("/book1.epub", "hash1")
     id2 = repo.create("/book2.epub", "hash2")
-    repo.update_state(id2, PipelineState.CLASSIFYING)
+    transition_to(repo, id2, PipelineState.CLASSIFYING)
 
     detected = repo.find_by_state(PipelineState.DETECTED)
 

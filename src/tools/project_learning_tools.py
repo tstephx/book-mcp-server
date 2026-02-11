@@ -327,7 +327,7 @@ def _search_library_for_topics(search_terms: list, limit_per_term: int = 5) -> l
                             excerpt = extract_relevant_excerpt(
                                 query_embedding, content, generator, max_chars=400
                             )
-                        except:
+                        except Exception:
                             excerpt = ""
                         
                         all_results.append({

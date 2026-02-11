@@ -5,6 +5,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -26,11 +28,11 @@ def test_filter_by_min_confidence(db_path):
 
     # Create pipelines with different confidence
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id1, {"book_type": "technical_tutorial", "confidence": 0.95})
 
     id2 = repo.create("/book2.epub", "hash2")
-    repo.update_state(id2, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id2, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id2, {"book_type": "technical_tutorial", "confidence": 0.7})
 
     filter = BatchFilter(min_confidence=0.9)
@@ -48,11 +50,11 @@ def test_filter_by_book_type(db_path):
     repo = PipelineRepository(db_path)
 
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id1, {"book_type": "technical_tutorial", "confidence": 0.9})
 
     id2 = repo.create("/book2.epub", "hash2")
-    repo.update_state(id2, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id2, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id2, {"book_type": "newspaper", "confidence": 0.9})
 
     filter = BatchFilter(book_type="technical_tutorial")
@@ -70,10 +72,10 @@ def test_filter_by_state(db_path):
     repo = PipelineRepository(db_path)
 
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
 
     id2 = repo.create("/book2.epub", "hash2")
-    repo.update_state(id2, PipelineState.NEEDS_RETRY)
+    transition_to(repo, id2, PipelineState.NEEDS_RETRY)
 
     filter = BatchFilter(state="needs_retry")
     results = filter.apply(db_path)
@@ -91,7 +93,7 @@ def test_filter_max_count(db_path):
 
     for i in range(10):
         pid = repo.create(f"/book{i}.epub", f"hash{i}")
-        repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+        transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
 
     filter = BatchFilter(max_count=3)
     results = filter.apply(db_path)

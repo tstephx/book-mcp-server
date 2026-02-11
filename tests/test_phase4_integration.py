@@ -5,6 +5,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -29,7 +31,7 @@ def test_full_batch_approve_flow(db_path):
     # Create books with different confidence
     for i in range(5):
         pid = repo.create(f"/book{i}.epub", f"hash{i}")
-        repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+        transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
         repo.update_book_profile(pid, {
             "book_type": "technical_tutorial",
             "confidence": 0.85 + (i * 0.03)  # 0.85, 0.88, 0.91, 0.94, 0.97
@@ -66,7 +68,7 @@ def test_health_with_stuck_detection(db_path):
 
     # Create active pipeline
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.PROCESSING)
+    transition_to(repo, pid, PipelineState.PROCESSING)
 
     # Make it stuck
     conn = sqlite3.connect(db_path)

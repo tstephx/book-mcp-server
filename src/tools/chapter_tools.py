@@ -694,7 +694,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                         tokens = int(token_match.group(1)) if token_match else "?"
                     else:
                         tokens = len(content) // 4  # Estimate
-                except:
+                except Exception:
                     tokens = "?"
 
                 # Extract title from filename

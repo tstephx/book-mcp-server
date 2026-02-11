@@ -24,16 +24,16 @@ class PipelineState(Enum):
 
 # Valid state transitions
 TRANSITIONS = {
-    PipelineState.DETECTED: {PipelineState.HASHING},
-    PipelineState.HASHING: {PipelineState.CLASSIFYING, PipelineState.DUPLICATE},
+    PipelineState.DETECTED: {PipelineState.HASHING, PipelineState.NEEDS_RETRY},
+    PipelineState.HASHING: {PipelineState.CLASSIFYING, PipelineState.DUPLICATE, PipelineState.NEEDS_RETRY},
     PipelineState.DUPLICATE: set(),  # Terminal
-    PipelineState.CLASSIFYING: {PipelineState.SELECTING_STRATEGY, PipelineState.REJECTED},
-    PipelineState.SELECTING_STRATEGY: {PipelineState.PROCESSING},
+    PipelineState.CLASSIFYING: {PipelineState.SELECTING_STRATEGY, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
+    PipelineState.SELECTING_STRATEGY: {PipelineState.PROCESSING, PipelineState.NEEDS_RETRY},
     PipelineState.PROCESSING: {PipelineState.VALIDATING, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.VALIDATING: {PipelineState.PENDING_APPROVAL, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.PENDING_APPROVAL: {PipelineState.APPROVED, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
-    PipelineState.NEEDS_RETRY: {PipelineState.PROCESSING, PipelineState.REJECTED},
-    PipelineState.APPROVED: {PipelineState.EMBEDDING},
+    PipelineState.NEEDS_RETRY: {PipelineState.HASHING, PipelineState.PROCESSING, PipelineState.REJECTED},
+    PipelineState.APPROVED: {PipelineState.EMBEDDING, PipelineState.NEEDS_RETRY},
     PipelineState.EMBEDDING: {PipelineState.COMPLETE, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books
     PipelineState.REJECTED: {PipelineState.ARCHIVED},

@@ -266,13 +266,15 @@ class Orchestrator:
         confidence = processing_result.get("detection_confidence", 0)
         needs_review = processing_result.get("needs_review", False)
 
+        # Route through PENDING_APPROVAL for both paths
+        self._transition(pipeline_id, PipelineState.PENDING_APPROVAL)
+
         if confidence >= self.config.confidence_threshold and not needs_review:
             # Auto-approve
-            self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
             self._transition(pipeline_id, PipelineState.APPROVED)
+            self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
         else:
             # Needs human review
-            self._transition(pipeline_id, PipelineState.PENDING_APPROVAL)
             return {
                 "pipeline_id": pipeline_id,
                 "state": PipelineState.PENDING_APPROVAL.value,

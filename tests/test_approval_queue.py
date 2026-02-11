@@ -5,6 +5,8 @@ import tempfile
 import json
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -30,7 +32,7 @@ def test_get_pending_returns_formatted_queue(db_path):
         "confidence": 0.92,
         "suggested_tags": ["ai", "python"]
     })
-    repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
 
     # Test
     queue = ApprovalQueue(db_path)
@@ -53,7 +55,7 @@ def test_get_pending_calculates_stats(db_path):
     for i, conf in enumerate([0.95, 0.85, 0.72]):
         pid = repo.create(f"/book{i}.epub", f"hash{i}")
         repo.update_book_profile(pid, {"confidence": conf, "book_type": "technical_tutorial"})
-        repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+        transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
 
     queue = ApprovalQueue(db_path)
     result = queue.get_pending()

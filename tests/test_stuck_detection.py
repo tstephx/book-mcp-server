@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -26,7 +28,7 @@ def test_detect_stuck_pipeline(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.PROCESSING)
+    transition_to(repo, pid, PipelineState.PROCESSING)
 
     # Manually set updated_at to 2 hours ago
     conn = sqlite3.connect(db_path)
@@ -50,7 +52,7 @@ def test_not_stuck_if_recent(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.PROCESSING)
+    transition_to(repo, pid, PipelineState.PROCESSING)
 
     # Recently updated - should not be stuck
     detector = StuckDetector(db_path)
@@ -67,7 +69,7 @@ def test_completed_not_flagged_as_stuck(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.COMPLETE)
+    transition_to(repo, pid, PipelineState.COMPLETE)
 
     # Set old updated_at
     conn = sqlite3.connect(db_path)

@@ -13,6 +13,19 @@ from agentic_pipeline.pipeline.states import PipelineState
 logger = logging.getLogger(__name__)
 
 
+def _extract_book_id(pipeline: dict) -> Optional[str]:
+    """Extract book_id from the processing_result JSON in a pipeline record."""
+    processing_result = pipeline.get("processing_result")
+    if processing_result and isinstance(processing_result, str):
+        try:
+            processing_result = json.loads(processing_result)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    if isinstance(processing_result, dict):
+        return processing_result.get("book_id")
+    return None
+
+
 def _record_audit(
     db_path: Path,
     pipeline_id: str,
@@ -142,7 +155,7 @@ def approve_book(
     _record_audit(
         db_path,
         pipeline_id,
-        pipeline.get("book_id"),
+        _extract_book_id(pipeline),
         action="approved",
         actor=actor,
         before_state=before_state,
@@ -187,7 +200,7 @@ def reject_book(
     _record_audit(
         db_path,
         pipeline_id,
-        pipeline.get("book_id"),
+        _extract_book_id(pipeline),
         action="rejected",
         actor=actor,
         reason=reason,
@@ -226,7 +239,7 @@ def rollback_book(
     _record_audit(
         db_path,
         pipeline_id,
-        pipeline.get("book_id"),
+        _extract_book_id(pipeline),
         action="rollback",
         actor=actor,
         reason=reason,

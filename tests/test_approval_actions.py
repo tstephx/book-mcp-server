@@ -28,13 +28,22 @@ def _mock_embedding_result(success=True, chapters_processed=5, error=None):
 
 
 def _create_pending_pipeline(db_path, processing_result=None):
-    """Create a pipeline in PENDING_APPROVAL state and return its ID."""
+    """Create a pipeline in PENDING_APPROVAL state via valid transitions."""
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+    # Walk through valid transitions to reach PENDING_APPROVAL
+    for state in [
+        PipelineState.HASHING,
+        PipelineState.CLASSIFYING,
+        PipelineState.SELECTING_STRATEGY,
+        PipelineState.PROCESSING,
+        PipelineState.VALIDATING,
+        PipelineState.PENDING_APPROVAL,
+    ]:
+        repo.update_state(pid, state)
     if processing_result is not None:
         repo.update_processing_result(pid, processing_result)
     return pid

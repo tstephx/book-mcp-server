@@ -5,6 +5,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -52,7 +54,7 @@ def test_health_report_with_active(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book1.epub", "hash1")
-    repo.update_state(pid, PipelineState.PROCESSING)
+    transition_to(repo, pid, PipelineState.PROCESSING)
 
     monitor = HealthMonitor(db_path)
     report = monitor.get_health()
@@ -68,7 +70,7 @@ def test_health_report_with_failed(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/book1.epub", "hash1")
-    repo.update_state(pid, PipelineState.NEEDS_RETRY)
+    transition_to(repo, pid, PipelineState.NEEDS_RETRY)
 
     monitor = HealthMonitor(db_path)
     report = monitor.get_health()

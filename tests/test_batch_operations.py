@@ -5,6 +5,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -27,11 +29,11 @@ def test_batch_approve(db_path):
 
     # Create pending approval books
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id1, {"book_type": "technical_tutorial", "confidence": 0.95})
 
     id2 = repo.create("/book2.epub", "hash2")
-    repo.update_state(id2, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id2, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id2, {"book_type": "technical_tutorial", "confidence": 0.92})
 
     ops = BatchOperations(db_path)
@@ -56,7 +58,7 @@ def test_batch_approve_dry_run(db_path):
     repo = PipelineRepository(db_path)
 
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
 
     ops = BatchOperations(db_path)
     filter = BatchFilter()
@@ -79,7 +81,7 @@ def test_batch_reject(db_path):
     repo = PipelineRepository(db_path)
 
     id1 = repo.create("/book1.epub", "hash1")
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
     repo.update_book_profile(id1, {"book_type": "newspaper", "confidence": 0.9})
 
     ops = BatchOperations(db_path)

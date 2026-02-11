@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -46,8 +48,7 @@ def test_orchestrator_idempotency_skips_complete(db_path, config):
     # Create a completed pipeline
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.HASHING)
-    repo.update_state(pid, PipelineState.COMPLETE)
+    transition_to(repo, pid, PipelineState.COMPLETE)
 
     orchestrator = Orchestrator(config)
 
@@ -67,8 +68,7 @@ def test_orchestrator_idempotency_skips_in_progress(db_path, config):
     # Create an in-progress pipeline
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_state(pid, PipelineState.HASHING)
-    repo.update_state(pid, PipelineState.PROCESSING)
+    transition_to(repo, pid, PipelineState.PROCESSING)
 
     orchestrator = Orchestrator(config)
 
@@ -190,7 +190,7 @@ def test_orchestrator_worker_processes_queue(db_path, config):
 
     # Mock processing to just mark complete
     def mock_process(pipeline_id, book_path, content_hash):
-        repo.update_state(pipeline_id, PipelineState.COMPLETE)
+        transition_to(repo, pipeline_id, PipelineState.COMPLETE)
         return {"pipeline_id": pipeline_id, "state": "complete"}
 
     orchestrator._process_book = mock_process

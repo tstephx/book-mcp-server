@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -75,9 +77,9 @@ def test_list_pending_approval(db_path):
     id2 = repo.create("/book2.epub", "hash2")
     id3 = repo.create("/book3.epub", "hash3")
 
-    repo.update_state(id1, PipelineState.PENDING_APPROVAL)
-    repo.update_state(id2, PipelineState.PENDING_APPROVAL)
-    repo.update_state(id3, PipelineState.COMPLETE)
+    transition_to(repo, id1, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id2, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, id3, PipelineState.COMPLETE)
 
     pending = repo.list_pending_approval()
     assert len(pending) == 2

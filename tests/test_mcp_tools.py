@@ -4,6 +4,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+from conftest import transition_to
+
 
 @pytest.fixture
 def db_path():
@@ -27,7 +29,7 @@ def setup_pending_books(db_path):
         "book_type": "technical_tutorial",
         "confidence": 0.92
     })
-    repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+    transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
     return pid
 
 
