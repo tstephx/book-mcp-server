@@ -35,3 +35,27 @@ def test_config_has_no_book_ingestion_path():
     config = OrchestratorConfig()
 
     assert not hasattr(config, "book_ingestion_path")
+
+
+def test_config_watch_dir_default_none():
+    from agentic_pipeline.config import OrchestratorConfig
+
+    config = OrchestratorConfig()
+    assert config.watch_dir is None
+
+
+def test_config_watch_dir_from_env(monkeypatch):
+    from pathlib import Path
+    from agentic_pipeline.config import OrchestratorConfig
+
+    monkeypatch.setenv("WATCH_DIR", "/tmp/books")
+    config = OrchestratorConfig.from_env()
+    assert config.watch_dir == Path("/tmp/books")
+
+
+def test_config_watch_dir_not_set_in_env(monkeypatch):
+    from agentic_pipeline.config import OrchestratorConfig
+
+    monkeypatch.delenv("WATCH_DIR", raising=False)
+    config = OrchestratorConfig.from_env()
+    assert config.watch_dir is None
