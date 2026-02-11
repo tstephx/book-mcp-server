@@ -408,6 +408,13 @@ class Orchestrator:
                     self.logger.error(retryable[0]["id"], type(e).__name__, str(e))
                 continue
 
+            # Priority 4: Scan watch directory for new books
+            if self.config.watch_dir:
+                detected = self._scan_watch_dir()
+                if detected > 0:
+                    self.logger.state_transition("watch", "scanning", f"detected:{detected}")
+                    continue
+
             time.sleep(self.config.worker_poll_interval)
 
         self.logger.worker_stopped()

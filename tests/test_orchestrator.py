@@ -267,3 +267,37 @@ def test_scan_directory_noop_when_dir_missing(db_path, config, tmp_path):
     config.watch_dir = tmp_path / "nonexistent"
     orchestrator = Orchestrator(config)
     assert orchestrator._scan_watch_dir() == 0
+
+
+def test_worker_scans_watch_dir(db_path, config, tmp_path):
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+    import threading
+    import time
+
+    (tmp_path / "newbook.epub").write_bytes(b"new book content")
+    config.watch_dir = tmp_path
+    config.worker_poll_interval = 0  # No delay for tests
+
+    orchestrator = Orchestrator(config)
+
+    # Mock _process_book to just mark complete
+    repo = PipelineRepository(db_path)
+
+    def mock_process(pid, path, hash):
+        transition_to(repo, pid, PipelineState.COMPLETE)
+        return {"pipeline_id": pid, "state": "complete"}
+
+    orchestrator._process_book = mock_process
+
+    def stop_later():
+        time.sleep(0.3)
+        orchestrator.shutdown_requested = True
+
+    threading.Thread(target=stop_later).start()
+    orchestrator.run_worker()
+
+    # The new book should have been detected and processed
+    pipelines = repo.find_by_state(PipelineState.COMPLETE)
+    assert len(pipelines) >= 1
