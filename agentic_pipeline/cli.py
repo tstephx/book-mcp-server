@@ -583,6 +583,75 @@ def library_status(as_json: bool):
             console.print(f"  {state}: {count}")
 
 
+@main.command()
+@click.option("--dry-run", is_flag=True, help="Preview without changes")
+@click.option("--execute", is_flag=True, help="Actually create pipeline records")
+def backfill(dry_run: bool, execute: bool):
+    """Register legacy library books in the pipeline.
+
+    Creates pipeline records for books that were ingested via the raw CLI
+    and have no audit trail. Safe and non-destructive.
+    """
+    from .db.config import get_db_path
+    from .backfill import BackfillManager
+
+    if not dry_run and not execute:
+        console.print("[yellow]Use --dry-run to preview or --execute to backfill[/yellow]")
+        return
+
+    db_path = get_db_path()
+    manager = BackfillManager(db_path)
+
+    if dry_run:
+        result = manager.run(dry_run=True)
+        count = result["would_backfill"]
+
+        if count == 0:
+            console.print("[green]All library books are tracked in the pipeline.[/green]")
+            return
+
+        console.print(f"\n[bold]Would backfill {count} books:[/bold]\n")
+
+        table = Table()
+        table.add_column("Title", max_width=40)
+        table.add_column("Author", max_width=20)
+        table.add_column("Chapters", justify="right")
+        table.add_column("Embedded", justify="right")
+        table.add_column("Quality")
+
+        for book in result["books"]:
+            quality = book["quality"]
+            if quality == "good":
+                q_display = "[green]good[/green]"
+            elif quality == "missing_embeddings":
+                q_display = "[yellow]missing embeddings[/yellow]"
+            else:
+                q_display = "[red]no chapters[/red]"
+
+            table.add_row(
+                (book["title"] or "?")[:40],
+                (book["author"] or "")[:20],
+                str(book["chapter_count"]),
+                str(book["embedded_count"]),
+                q_display,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Run with --execute to backfill[/dim]")
+    else:
+        result = manager.run(dry_run=False)
+        console.print(f"[green]Backfilled {result['backfilled']} books[/green]")
+        if result["skipped"] > 0:
+            console.print(f"[yellow]Skipped {result['skipped']} (hash collision)[/yellow]")
+
+        # Report quality issues
+        issues = [b for b in result["books"] if b["quality"] != "good"]
+        if issues:
+            console.print(f"\n[yellow]{len(issues)} books with quality issues:[/yellow]")
+            for b in issues[:10]:
+                console.print(f"  {b['title'][:40]} - {b['quality']}")
+
+
 # Phase 5: Autonomy Commands
 
 @main.group()

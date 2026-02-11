@@ -218,3 +218,37 @@ def test_reingest_not_found(db_path):
 
     with pytest.raises(ValueError, match="not found"):
         repo.prepare_reingest("nonexistent-id")
+
+
+def test_backfill_cli_dry_run(db_path, monkeypatch):
+    from click.testing import CliRunner
+    from agentic_pipeline.cli import main
+
+    _insert_library_book(db_path, "book-1", "Book One", "/books/one.epub")
+
+    monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["backfill", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "would backfill" in result.output.lower() or "Would backfill" in result.output
+
+
+def test_backfill_cli_execute(db_path, monkeypatch):
+    from click.testing import CliRunner
+    from agentic_pipeline.cli import main
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    _insert_library_book(db_path, "book-1", "Book One", "/books/one.epub")
+
+    monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["backfill", "--execute"])
+
+    assert result.exit_code == 0
+    assert "1" in result.output  # backfilled count
+
+    repo = PipelineRepository(db_path)
+    assert repo.get("book-1") is not None
