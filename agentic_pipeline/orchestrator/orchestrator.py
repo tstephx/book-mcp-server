@@ -302,43 +302,19 @@ class Orchestrator:
         }
 
     def _complete_approved(self, pipeline_id: str) -> dict:
-        """Complete an approved book by running embedding and marking complete."""
+        """Complete an approved book by running embedding and marking complete.
+
+        Delegates to the shared _complete_approved in approval.actions.
+        """
+        from agentic_pipeline.approval.actions import _complete_approved
+
         record = self.repo.get(pipeline_id)
         if not record:
             raise ProcessingError(f"Pipeline not found: {pipeline_id}")
 
-        # Extract book_id from processing_result
-        import json as json_module
-
-        processing_result = record.get("processing_result")
-        if processing_result and isinstance(processing_result, str):
-            processing_result = json_module.loads(processing_result)
-
-        book_id = (
-            processing_result.get("book_id", pipeline_id)
-            if processing_result
-            else pipeline_id
-        )
-
-        # EMBEDDING
-        self._transition(pipeline_id, PipelineState.EMBEDDING)
-        try:
-            self._run_embedding(book_id=book_id)
-        except (EmbeddingError, PipelineTimeoutError) as e:
-            self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
-            return {
-                "pipeline_id": pipeline_id,
-                "state": PipelineState.NEEDS_RETRY.value,
-                "error": str(e),
-            }
-
-        # COMPLETE
-        self._transition(pipeline_id, PipelineState.COMPLETE)
-        return {
-            "pipeline_id": pipeline_id,
-            "state": PipelineState.COMPLETE.value,
-        }
+        result = _complete_approved(self.config.db_path, pipeline_id, record)
+        result["pipeline_id"] = pipeline_id
+        return result
 
     def _retry_one(self, book: dict) -> dict:
         """Retry a single book in NEEDS_RETRY state."""

@@ -305,7 +305,7 @@ def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0
                     excerpt = extract_relevant_excerpt(
                         query_embedding, content, generator, max_chars=600
                     )
-                except:
+                except Exception:
                     excerpt = ""
                 
                 sources.append({
@@ -475,116 +475,168 @@ def _synthesize_definition(concept: str, sources: list) -> str:
 
 
 def _generate_business_impact(concept: str, sources: list) -> str:
-    """Generate business impact statement"""
-    # Default business impacts by common concepts
-    impact_templates = {
-        "git": "Reduces coordination overhead between teams, enables parallel development, and provides complete audit trail for compliance.",
-        "docker": "Standardizes deployment environments, reduces 'works on my machine' issues, and enables faster scaling.",
-        "container": "Reduces infrastructure costs, speeds up deployment cycles, and improves resource utilization.",
-        "api": "Enables team independence, reduces integration complexity, and creates clear contracts between systems.",
-        "branch": "Enables risk-free experimentation and parallel workstreams without disrupting production.",
-        "merge": "Critical for integrating work from distributed teams. Poor merge practices cause delays.",
-        "kubernetes": "Automates scaling and recovery, reducing operational burden and improving reliability.",
-    }
-    
-    concept_lower = concept.lower()
-    for key, impact in impact_templates.items():
-        if key in concept_lower:
-            return impact
-    
-    # Default template
+    """Generate business impact statement from source excerpts."""
+    # Try to extract impact-related content from sources
+    impact_keywords = [
+        "benefit", "advantage", "improve", "reduce", "enable", "save",
+        "cost", "risk", "scale", "performance", "reliable", "maintain",
+        "team", "deploy", "product", "customer", "business", "efficien",
+    ]
+
+    impact_sentences = []
+    for source in sources[:3]:
+        excerpt = source.get("excerpt", "")
+        if not excerpt:
+            continue
+        for sentence in _split_sentences(excerpt):
+            if any(kw in sentence.lower() for kw in impact_keywords) and len(sentence) > 30:
+                impact_sentences.append(sentence.strip())
+                if len(impact_sentences) >= 3:
+                    break
+        if len(impact_sentences) >= 3:
+            break
+
+    if impact_sentences:
+        attribution = f"(from *{sources[0]['book_title']}*)"
+        return "\n\n".join(impact_sentences) + f"\n\n{attribution}"
+
     return f"Understanding {concept} helps you make informed decisions about technical approaches, evaluate vendor solutions, and communicate effectively with engineering teams."
 
 
 def _extract_vocabulary(concept: str, sources: list) -> dict:
-    """Extract key vocabulary terms from sources"""
-    # Static vocabulary for common concepts
-    vocab_database = {
-        "git": {
-            "Repository (repo)": "The project folder with all version history",
-            "Commit": "A saved checkpoint with a message explaining changes",
-            "Branch": "A parallel version for isolated development",
-            "Merge": "Combining changes from one branch into another",
-            "Pull Request (PR)": "A formal request to merge with review process",
-            "Clone": "Creating a local copy of a remote repository",
-            "Push/Pull": "Uploading to or downloading from a shared repository"
-        },
-        "docker": {
-            "Image": "A template/blueprint for creating containers",
-            "Container": "A running instance of an image",
-            "Dockerfile": "Instructions for building an image",
-            "Registry": "Where images are stored and shared",
-            "Volume": "Persistent storage that survives container restarts",
-            "Compose": "Tool for defining multi-container applications"
-        },
-        "api": {
-            "Endpoint": "A specific URL where requests are sent",
-            "REST": "A common architectural style for web APIs",
-            "Request/Response": "The ask and answer pattern",
-            "Authentication": "Verifying who's making the request",
-            "Rate Limiting": "Controlling how many requests are allowed"
-        }
-    }
-    
-    concept_lower = concept.lower()
-    for key, vocab in vocab_database.items():
-        if key in concept_lower:
-            return vocab
-    
-    return {}
+    """Extract key vocabulary terms from source excerpts.
+
+    Looks for definition-like patterns (bold terms, 'X is a/an', 'X refers to')
+    in the actual book content.
+    """
+    import re
+
+    vocab = {}
+    for source in sources[:5]:
+        excerpt = source.get("excerpt", "")
+        if not excerpt:
+            continue
+
+        # Match markdown bold definitions: **term** — definition or **term**: definition
+        for match in re.finditer(
+            r"\*\*([^*]{2,40})\*\*\s*[:\u2014\u2013\-]\s*(.{10,120})", excerpt
+        ):
+            term = match.group(1).strip()
+            defn = match.group(2).strip().rstrip(".")
+            if term.lower() != concept.lower():
+                vocab[term] = defn
+                if len(vocab) >= 8:
+                    break
+
+        # Match "X is a/an ..." patterns
+        if len(vocab) < 8:
+            for match in re.finditer(
+                r"(?:^|\.\s+)([A-Z][a-zA-Z ]{2,30})\s+(?:is|refers to|means)\s+(?:a |an |the )?(.{10,120}?)(?:\.|$)",
+                excerpt,
+            ):
+                term = match.group(1).strip()
+                defn = match.group(2).strip()
+                if term.lower() != concept.lower() and term not in vocab:
+                    vocab[term] = defn
+                    if len(vocab) >= 8:
+                        break
+
+    return vocab
 
 
 def _generate_decisions(concept: str, sources: list) -> str:
-    """Generate common decisions a PM might face"""
-    decision_templates = {
-        "git": """- **Branching strategy**: How should the team organize branches? (GitFlow, trunk-based, feature branches)
-- **Code review requirements**: How many approvers? What's the SLA?
-- **Release cadence**: How often do we merge to production?""",
-        
-        "docker": """- **When to containerize**: Is the migration effort worth it for this project?
-- **Build vs buy**: Use managed container services or self-host?
-- **Image management**: How do we version and store container images?""",
-        
-        "api": """- **API versioning**: How do we evolve without breaking consumers?
-- **Documentation requirements**: What's mandatory before launch?
-- **SLA commitments**: What uptime and latency do we guarantee?"""
-    }
-    
-    concept_lower = concept.lower()
-    for key, decisions in decision_templates.items():
-        if key in concept_lower:
-            return decisions
-    
+    """Generate common decisions from source excerpts."""
+    decision_keywords = [
+        "choose", "decision", "option", "consider", "whether",
+        "trade-off", "tradeoff", "versus", " vs ", "alternative",
+        "should", "recommend", "approach", "strategy",
+    ]
+
+    decision_sentences = []
+    for source in sources[:4]:
+        excerpt = source.get("excerpt", "")
+        if not excerpt:
+            continue
+        for sentence in _split_sentences(excerpt):
+            if any(kw in sentence.lower() for kw in decision_keywords) and len(sentence) > 25:
+                clean = sentence.strip()
+                if clean not in decision_sentences:
+                    decision_sentences.append(clean)
+                    if len(decision_sentences) >= 4:
+                        break
+        if len(decision_sentences) >= 4:
+            break
+
+    if decision_sentences:
+        return "\n".join(f"- {s}" for s in decision_sentences)
+
     return f"- When to invest in {concept} vs alternatives\n- Build vs buy decisions\n- Team training and adoption timeline"
 
 
 def _generate_tradeoffs(concept: str, sources: list) -> str:
-    """Generate tradeoff analysis for practitioner level"""
-    return f"""When evaluating {concept}, consider these tradeoffs:
+    """Generate tradeoff analysis from source excerpts."""
+    tradeoff_keywords = [
+        "tradeoff", "trade-off", "downside", "drawback", "however",
+        "but", "although", "cost", "complex", "overhead", "risk",
+        "limitation", "caveat", "challenge", "disadvantage",
+    ]
 
-**Complexity vs Flexibility**: More powerful solutions often require more expertise to implement and maintain.
+    tradeoff_sentences = []
+    for source in sources[:5]:
+        excerpt = source.get("excerpt", "")
+        if not excerpt:
+            continue
+        for sentence in _split_sentences(excerpt):
+            if any(kw in sentence.lower() for kw in tradeoff_keywords) and len(sentence) > 30:
+                clean = sentence.strip()
+                if clean not in tradeoff_sentences:
+                    tradeoff_sentences.append(clean)
+                    if len(tradeoff_sentences) >= 4:
+                        break
+        if len(tradeoff_sentences) >= 4:
+            break
 
-**Speed vs Stability**: Moving fast can introduce risk; more process means slower but safer changes.
+    if tradeoff_sentences:
+        attribution = f"(from *{sources[0]['book_title']}*)"
+        return "\n\n".join(tradeoff_sentences) + f"\n\n{attribution}"
 
-**Team Capability vs Tooling**: The best tool is worthless if the team can't use it effectively.
-
-Review the source chapters for specific tradeoffs mentioned by the authors."""
+    return f"Review the source chapters above for specific tradeoffs the authors discuss about {concept}."
 
 
 def _extract_related_concepts(concept: str, sources: list) -> list:
-    """Extract related concepts to learn next"""
-    related_map = {
-        "git": ["branching strategies", "code review", "CI/CD", "GitHub Actions"],
-        "docker": ["container orchestration", "Kubernetes", "microservices", "container security"],
-        "api": ["REST vs GraphQL", "API gateway", "authentication", "rate limiting"],
-        "branch": ["merge strategies", "pull requests", "code review"],
-        "container": ["Docker", "container networking", "volumes", "orchestration"]
-    }
-    
+    """Extract related concepts from source chapter titles and content."""
+    if not sources:
+        return []
+
+    # Use chapter titles from lower-ranked sources as "related"
+    related = []
+    seen = set()
     concept_lower = concept.lower()
-    for key, related in related_map.items():
-        if key in concept_lower:
-            return related
-    
-    return ["architecture patterns", "best practices", "team workflows"]
+
+    for source in sources[1:]:  # Skip most-relevant, start from #2
+        title = source.get("chapter_title", "")
+        if title and title.lower() != concept_lower and title.lower() not in seen:
+            seen.add(title.lower())
+            related.append(title)
+
+    # Also look at book titles for broader topics
+    for source in sources:
+        book = source.get("book_title", "")
+        if book and book.lower() not in seen:
+            seen.add(book.lower())
+            related.append(f"{book} (book)")
+
+    return related[:6]
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split text into sentences, handling common abbreviations."""
+    import re
+    # Split on period followed by space and uppercase, or newlines
+    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    # Also split on double newlines
+    result = []
+    for part in parts:
+        result.extend(part.split("\n\n"))
+    return [s.strip() for s in result if s.strip()]
 
