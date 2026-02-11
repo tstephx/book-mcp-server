@@ -24,6 +24,9 @@ agentic-pipeline health
 
 # Check autonomy status
 agentic-pipeline autonomy status
+
+# Run worker with directory watching
+agentic-pipeline worker --watch-dir /path/to/books/
 ```
 
 ## Project Structure
@@ -81,6 +84,14 @@ High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and aut
 - **supervised** - All books require human approval (default)
 - **partial** - Auto-approve high-confidence known types
 - **confident** - Per-type calibrated thresholds
+
+### File Watcher
+The worker can watch a directory for new `.epub`/`.pdf` files and automatically queue them:
+```bash
+agentic-pipeline worker --watch-dir /path/to/books/
+# Or via env var: WATCH_DIR=/path/to/books agentic-pipeline worker
+```
+Scans run as the lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
 
 ### Escape Hatch
 One command reverts to fully supervised mode:
