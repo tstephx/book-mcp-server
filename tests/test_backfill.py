@@ -188,3 +188,33 @@ def test_backfill_manager_includes_quality_stats(db_path):
     assert book["chapter_count"] == 5
     assert book["embedded_count"] == 5
     assert book["quality"] == "good"
+
+
+def test_reingest_archives_old_record(db_path):
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    repo.create_backfill("book-1", "/books/one.epub", "backfill:hash1")
+
+    # Reingest should archive the old record and return a new pipeline_id
+    new_pid = repo.prepare_reingest("book-1")
+
+    # Old record should be archived
+    old = repo.get("book-1")
+    assert old["state"] == PipelineState.ARCHIVED.value
+
+    # New record should exist in DETECTED state
+    new = repo.get(new_pid)
+    assert new is not None
+    assert new["state"] == PipelineState.DETECTED.value
+    assert new["source_path"] == "/books/one.epub"
+
+
+def test_reingest_not_found(db_path):
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    repo = PipelineRepository(db_path)
+
+    with pytest.raises(ValueError, match="not found"):
+        repo.prepare_reingest("nonexistent-id")

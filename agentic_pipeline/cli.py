@@ -260,6 +260,58 @@ def retry(max_attempts: int):
 
 
 @main.command()
+@click.argument("book_id")
+def reingest(book_id: str):
+    """Reprocess a book through the full pipeline.
+
+    Archives the existing pipeline record and creates a new one.
+    The book will go through classification, processing, validation,
+    and approval again.
+    """
+    from .db.config import get_db_path
+    from .db.pipelines import PipelineRepository
+    from .config import OrchestratorConfig
+    from .orchestrator import Orchestrator
+
+    db_path = get_db_path()
+    repo = PipelineRepository(db_path)
+
+    # Check the book exists
+    record = repo.get(book_id)
+    if not record:
+        console.print(f"[red]Pipeline record not found: {book_id}[/red]")
+        console.print("[dim]Use 'agentic-pipeline backfill' first if this is a legacy book[/dim]")
+        return
+
+    source_path = record["source_path"]
+    if not source_path or not Path(source_path).exists():
+        console.print(f"[red]Source file not found: {source_path}[/red]")
+        console.print("[dim]The original book file is needed for reingestion[/dim]")
+        return
+
+    console.print(f"[blue]Reingesting: {source_path}[/blue]")
+    console.print(f"[dim]Archiving old record: {book_id}[/dim]")
+
+    new_pid = repo.prepare_reingest(book_id)
+    console.print(f"[dim]New pipeline: {new_pid}[/dim]")
+
+    # Process through the pipeline
+    config = OrchestratorConfig.from_env()
+    orchestrator = Orchestrator(config)
+    result = orchestrator._process_book(new_pid, source_path, record["content_hash"])
+
+    state = result.get("state", "unknown")
+    if state == "complete":
+        console.print("[green]Reingestion complete![/green]")
+    elif state == "pending_approval":
+        console.print("[yellow]Reingestion done - pending approval[/yellow]")
+    else:
+        console.print(f"[red]Reingestion ended in state: {state}[/red]")
+        if result.get("error"):
+            console.print(f"  Error: {result['error']}")
+
+
+@main.command()
 @click.argument("pipeline_id")
 def status(pipeline_id: str):
     """Show status of a pipeline."""

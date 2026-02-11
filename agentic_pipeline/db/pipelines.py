@@ -374,6 +374,68 @@ class PipelineRepository:
         finally:
             conn.close()
 
+    def prepare_reingest(self, pipeline_id: str) -> str:
+        """Archive an existing pipeline record and create a new one for reingestion.
+
+        Returns the new pipeline_id.
+        """
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+            now = datetime.now(timezone.utc).isoformat()
+
+            # Get existing record
+            cursor.execute(
+                "SELECT * FROM processing_pipelines WHERE id = ?",
+                (pipeline_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError(f"Pipeline not found: {pipeline_id}")
+
+            old = dict(row)
+
+            # Archive the old record
+            cursor.execute(
+                "UPDATE processing_pipelines SET state = ?, updated_at = ? WHERE id = ?",
+                (PipelineState.ARCHIVED.value, now, pipeline_id),
+            )
+
+            # Record archive in state history
+            cursor.execute(
+                """
+                INSERT INTO pipeline_state_history
+                (pipeline_id, from_state, to_state, agent_output)
+                VALUES (?, ?, ?, ?)
+                """,
+                (pipeline_id, old["state"], PipelineState.ARCHIVED.value,
+                 json.dumps({"reason": "reingest_requested"})),
+            )
+
+            # Remove the UNIQUE constraint collision by clearing old hash
+            old_hash = old["content_hash"]
+            cursor.execute(
+                "UPDATE processing_pipelines SET content_hash = ? WHERE id = ?",
+                (f"archived:{old_hash}", pipeline_id),
+            )
+
+            # Create new pipeline record
+            new_id = str(uuid.uuid4())
+            cursor.execute(
+                """
+                INSERT INTO processing_pipelines
+                (id, source_path, content_hash, state, priority, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (new_id, old["source_path"], old_hash,
+                 PipelineState.DETECTED.value, 3, now, now),
+            )
+
+            conn.commit()
+            return new_id
+        finally:
+            conn.close()
+
     def get_queue_by_priority(self) -> dict[int, int]:
         """Get count of queued items by priority."""
         conn = self._connect()
