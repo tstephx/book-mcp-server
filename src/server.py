@@ -20,6 +20,7 @@ from .tools.book_tools import register_book_tools
 from .tools.chapter_tools import register_chapter_tools
 from .tools.search_tools import register_search_tools
 from .tools.semantic_search_tool import register_semantic_search_tools
+from .tools.hybrid_search_tool import register_hybrid_search_tools
 from .tools.discovery_tools import register_discovery_tools
 from .tools.reading_tools import register_reading_tools
 from .tools.analytics_tools import register_analytics_tools
@@ -64,6 +65,7 @@ def create_server() -> FastMCP:
     register_chapter_tools(mcp)
     register_search_tools(mcp)
     register_semantic_search_tools(mcp)  # Semantic search tool + resource
+    register_hybrid_search_tools(mcp)  # Hybrid FTS+semantic search with RRF fusion
     register_discovery_tools(mcp)  # Cross-book discovery tools
     register_reading_tools(mcp)  # Reading progress and bookmarks
     register_analytics_tools(mcp)  # Library analytics and statistics
@@ -113,6 +115,44 @@ def create_server() -> FastMCP:
                 'errors': 1
             }
 
+    # Register summary embeddings tool
+    @mcp.tool()
+    def generate_summary_embeddings(force: bool = False) -> dict:
+        """Generate embeddings for chapter summaries
+
+        Creates vector embeddings for existing chapter summaries,
+        enabling future summary-based semantic search.
+
+        Args:
+            force: If True, regenerate ALL summary embeddings (default: False)
+
+        Returns:
+            Dictionary with:
+            - generated: Number of embeddings created
+            - skipped: Number already existing (when force=False)
+            - errors: Number of failures
+            - total: Total summaries processed
+
+        Examples:
+            generate_summary_embeddings()  # Only missing
+            generate_summary_embeddings(force=True)  # Regenerate all
+        """
+        try:
+            from .utils.summaries import batch_generate_summary_embeddings
+
+            result = batch_generate_summary_embeddings(force=force)
+            logger.info(f"Summary embedding generation: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Summary embedding error: {e}", exc_info=True)
+            return {
+                'status': 'error',
+                'error': str(e),
+                'generated': 0,
+                'skipped': 0,
+                'errors': 1
+            }
+
     # Register cache management tool
     @mcp.tool()
     def get_cache_stats() -> dict:
@@ -138,7 +178,7 @@ def create_server() -> FastMCP:
         """Clear cached data
 
         Args:
-            cache_type: What to clear - "chapters", "embeddings", or "all" (default)
+            cache_type: What to clear - "chapters", "embeddings", "summary_embeddings", or "all" (default)
 
         Returns:
             Dictionary with confirmation and updated stats
@@ -155,11 +195,14 @@ def create_server() -> FastMCP:
         elif cache_type == "embeddings":
             cache.invalidate_embeddings()
             message = "Embeddings cache invalidated"
+        elif cache_type == "summary_embeddings":
+            cache.invalidate_summary_embeddings()
+            message = "Summary embeddings cache invalidated"
         elif cache_type == "all":
             cache.clear_all()
             message = "All caches cleared"
         else:
-            return {"error": f"Invalid cache_type: {cache_type}. Use 'chapters', 'embeddings', or 'all'"}
+            return {"error": f"Invalid cache_type: {cache_type}. Use 'chapters', 'embeddings', 'summary_embeddings', or 'all'"}
 
         return {
             "message": message,

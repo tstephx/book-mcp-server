@@ -10,14 +10,13 @@ Follows MCP best practices:
 import logging
 from typing import Optional
 import numpy as np
-import io
 
-from ..database import get_db_connection
 from ..utils.vector_store import find_top_k
 from ..utils.context_managers import embedding_model_context
 from ..utils.file_utils import read_chapter_content, get_chapter_excerpt
 from ..utils.excerpt_utils import extract_relevant_excerpt
 from ..utils.cache import get_cache
+from ..utils.embedding_loader import load_chapter_embeddings
 from ..schemas.tool_schemas import SemanticSearchInput
 
 logger = logging.getLogger(__name__)
@@ -80,61 +79,14 @@ def register_semantic_search_tools(mcp):
                 # Generate query embedding
                 query_embedding = generator.generate(validated.query)
 
-                # Try to get embeddings from cache first
-                cache = get_cache()
-                cached = cache.get_embeddings()
+                # Load embeddings from cache or database
+                embeddings_matrix, chapter_metadata = load_chapter_embeddings()
 
-                if cached:
-                    embeddings_matrix, chapter_metadata = cached
-                else:
-                    # Fetch all chapter embeddings from database
-                    with get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            SELECT
-                                c.id,
-                                c.chapter_number,
-                                c.title as chapter_title,
-                                c.embedding,
-                                c.file_path,
-                                b.title as book_title
-                            FROM chapters c
-                            JOIN books b ON c.book_id = b.id
-                            WHERE c.embedding IS NOT NULL
-                            ORDER BY c.id
-                        """)
-
-                        rows = cursor.fetchall()
-
-                    if not rows:
-                        logger.warning("No embeddings found in database")
-                        return {
-                            "message": "No embeddings found. Run generate_embeddings.py first.",
-                            "results": []
-                        }
-
-                    # Convert embeddings from BLOB to numpy arrays
-                    chapter_embeddings = []
-                    chapter_metadata = []
-
-                    for row in rows:
-                        # Deserialize embedding from BLOB
-                        embedding_blob = row['embedding']
-                        embedding = np.load(io.BytesIO(embedding_blob))
-                        chapter_embeddings.append(embedding)
-                        chapter_metadata.append({
-                            'id': row['id'],
-                            'book_title': row['book_title'],
-                            'chapter_title': row['chapter_title'],
-                            'chapter_number': row['chapter_number'],
-                            'file_path': row['file_path']
-                        })
-
-                    # Stack into matrix for batch similarity calculation
-                    embeddings_matrix = np.vstack(chapter_embeddings)
-
-                    # Store in cache for subsequent searches
-                    cache.set_embeddings(embeddings_matrix, chapter_metadata)
+                if embeddings_matrix is None:
+                    return {
+                        "message": "No embeddings found. Run generate_embeddings.py first.",
+                        "results": []
+                    }
 
                 # Find top K most similar
                 top_results = find_top_k(
