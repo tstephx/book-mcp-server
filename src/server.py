@@ -27,6 +27,7 @@ from .tools.export_tools import register_export_tools
 from .tools.learning_tools import register_learning_tools
 from .tools.project_learning_tools import register_project_learning_tools
 from .tools.project_planning_tools import register_project_planning_tools
+from .tools.audit_tools import register_audit_tools
 from .utils.cache import get_cache
 
 def create_server() -> FastMCP:
@@ -70,6 +71,7 @@ def create_server() -> FastMCP:
     register_learning_tools(mcp)  # PM-focused concept teaching
     register_project_learning_tools(mcp)  # Project-based learning paths
     register_project_planning_tools(mcp)  # Implementation plans and project artifacts
+    register_audit_tools(mcp)  # Chapter quality audit
 
     # Register embedding sync tool
     @mcp.tool()
