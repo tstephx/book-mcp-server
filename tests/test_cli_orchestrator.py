@@ -41,3 +41,13 @@ def test_status_command_exists():
     result = runner.invoke(main, ["status", "--help"])
 
     assert result.exit_code == 0
+
+
+def test_worker_command_accepts_watch_dir():
+    from agentic_pipeline.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["worker", "--help"])
+
+    assert result.exit_code == 0
+    assert "--watch-dir" in result.output

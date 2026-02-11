@@ -216,14 +216,21 @@ def process(book_path: str):
 
 
 @main.command()
-def worker():
+@click.option("--watch-dir", type=click.Path(exists=True), default=None,
+              help="Directory to watch for new book files (.epub, .pdf)")
+def worker(watch_dir):
     """Run the queue worker (processes books continuously)."""
     from .config import OrchestratorConfig
     from .orchestrator import Orchestrator
 
     config = OrchestratorConfig.from_env()
+    if watch_dir:
+        config.watch_dir = Path(watch_dir)
+
     orchestrator = Orchestrator(config)
 
+    if config.watch_dir:
+        console.print(f"[blue]Watching: {config.watch_dir}[/blue]")
     console.print("[blue]Starting worker... Press Ctrl+C to stop gracefully.[/blue]")
     orchestrator.run_worker()
     console.print("[green]Worker stopped.[/green]")
