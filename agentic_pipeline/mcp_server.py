@@ -142,9 +142,11 @@ def get_pipeline_health() -> dict:
     """
     Get current pipeline health status.
 
-    Returns health metrics including active, queued, stuck counts and alerts.
+    Returns health metrics including active, queued, stuck counts,
+    alerts, and number of untracked library books.
     """
     from agentic_pipeline.health import HealthMonitor, StuckDetector
+    from agentic_pipeline.backfill import BackfillManager
 
     db_path = get_db_path()
     monitor = HealthMonitor(db_path)
@@ -152,6 +154,14 @@ def get_pipeline_health() -> dict:
 
     report = monitor.get_health()
     report["stuck"] = detector.detect()
+
+    # Include untracked books count
+    try:
+        manager = BackfillManager(db_path)
+        untracked = manager.find_untracked()
+        report["untracked_books"] = len(untracked)
+    except Exception:
+        report["untracked_books"] = None
 
     return report
 
@@ -357,3 +367,92 @@ def get_autonomy_readiness() -> dict:
         "ready_for_confident": ready_for_confident,
         "recommendation": "confident" if ready_for_confident else ("partial" if ready_for_partial else "supervised"),
     }
+
+
+# Phase 6: Backfill & Validation Tools
+
+def backfill_library(
+    db_path: Optional[str] = None,
+    dry_run: bool = True,
+) -> dict:
+    """
+    Register legacy library books in the pipeline.
+
+    Creates pipeline records for books ingested via the raw CLI that have
+    no audit trail. Safe and non-destructive.
+
+    Args:
+        dry_run: If True (default), preview what would be backfilled without changes.
+                 Set to False to actually create pipeline records.
+
+    Returns:
+        Dict with backfilled/would_backfill count and per-book details.
+    """
+    from agentic_pipeline.backfill import BackfillManager
+
+    path = Path(db_path) if db_path else get_db_path()
+    manager = BackfillManager(path)
+    return manager.run(dry_run=dry_run)
+
+
+def validate_library(db_path: Optional[str] = None) -> dict:
+    """
+    Check all library books for quality issues.
+
+    Scans for: missing chapters, missing embeddings, low word count.
+
+    Returns:
+        Dict with issue_count and list of issues per book.
+    """
+    from agentic_pipeline.backfill import LibraryValidator
+
+    path = Path(db_path) if db_path else get_db_path()
+    validator = LibraryValidator(path)
+    issues = validator.validate()
+    return {
+        "issue_count": len(issues),
+        "issues": issues,
+    }
+
+
+def reingest_book_tool(
+    db_path: Optional[str] = None,
+    book_id: str = "",
+) -> dict:
+    """
+    Reprocess a book through the full pipeline.
+
+    Archives the existing pipeline record and creates a new one.
+    The book goes through classification, processing, validation,
+    and approval again. Requires the original source file to exist.
+
+    Args:
+        book_id: The book/pipeline ID to reingest.
+
+    Returns:
+        Dict with new pipeline_id and resulting state.
+    """
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    path = Path(db_path) if db_path else get_db_path()
+    repo = PipelineRepository(path)
+
+    record = repo.get(book_id)
+    if not record:
+        return {"error": f"Pipeline record not found: {book_id}"}
+
+    source_path = record["source_path"]
+    if not source_path or not Path(source_path).exists():
+        return {"error": f"Source file not found: {source_path}"}
+
+    new_pid = repo.prepare_reingest(book_id)
+
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    config = OrchestratorConfig.from_env()
+    orchestrator = Orchestrator(config)
+    result = orchestrator._process_book(new_pid, source_path, record["content_hash"])
+    result["new_pipeline_id"] = new_pid
+    result["old_pipeline_id"] = book_id
+    return result
