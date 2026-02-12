@@ -3,12 +3,15 @@ Database connection management with context managers
 Follows MCP best practices for resource management
 """
 
+import logging
 import sqlite3
 from contextlib import contextmanager
 from typing import Generator
 from pathlib import Path
 
 from .config import Config
+
+logger = logging.getLogger(__name__)
 
 class DatabaseError(Exception):
     """Custom exception for database errors"""
@@ -144,9 +147,6 @@ def ensure_library_schema() -> None:
     - bookmarks
     - Tracking columns on chapters table (content_hash, file_mtime, embedding_updated_at)
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     with get_db_connection() as conn:
         cursor = conn.cursor()
         created = []
