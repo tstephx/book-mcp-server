@@ -218,7 +218,9 @@ def process(book_path: str):
 @main.command()
 @click.option("--watch-dir", type=click.Path(exists=True), default=None,
               help="Directory to watch for new book files (.epub, .pdf)")
-def worker(watch_dir):
+@click.option("--processed-dir", type=click.Path(), default=None,
+              help="Directory to move processed book files into")
+def worker(watch_dir, processed_dir):
     """Run the queue worker (processes books continuously)."""
     from .config import OrchestratorConfig
     from .orchestrator import Orchestrator
@@ -226,11 +228,15 @@ def worker(watch_dir):
     config = OrchestratorConfig.from_env()
     if watch_dir:
         config.watch_dir = Path(watch_dir)
+    if processed_dir:
+        config.processed_dir = Path(processed_dir)
 
     orchestrator = Orchestrator(config)
 
     if config.watch_dir:
         console.print(f"[blue]Watching: {config.watch_dir}[/blue]")
+    if config.processed_dir:
+        console.print(f"[blue]Archive to: {config.processed_dir}[/blue]")
     console.print("[blue]Starting worker... Press Ctrl+C to stop gracefully.[/blue]")
     orchestrator.run_worker()
     console.print("[green]Worker stopped.[/green]")

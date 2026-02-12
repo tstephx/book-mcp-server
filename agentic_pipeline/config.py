@@ -16,6 +16,7 @@ class OrchestratorConfig:
     # Paths
     db_path: Path = field(default_factory=get_db_path)
     watch_dir: Optional[Path] = None
+    processed_dir: Optional[Path] = None
 
     # Timeouts (seconds)
     processing_timeout: int = 600  # 10 minutes
@@ -32,9 +33,11 @@ class OrchestratorConfig:
     def from_env(cls) -> "OrchestratorConfig":
         """Create configuration from environment variables."""
         watch_dir_str = os.environ.get("WATCH_DIR")
+        processed_dir_str = os.environ.get("PROCESSED_DIR")
         return cls(
             db_path=get_db_path(),
             watch_dir=Path(watch_dir_str) if watch_dir_str else None,
+            processed_dir=Path(processed_dir_str) if processed_dir_str else None,
             processing_timeout=int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", 600)),
             embedding_timeout=int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300)),
             confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", 0.7)),

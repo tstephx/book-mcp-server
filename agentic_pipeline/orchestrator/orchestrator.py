@@ -2,6 +2,7 @@
 """Pipeline Orchestrator - coordinates book processing."""
 
 import hashlib
+import shutil
 import signal
 import sqlite3
 import time
@@ -287,6 +288,8 @@ class Orchestrator:
 
         # EMBEDDING → COMPLETE (delegate to shared helper)
         result = self._complete_approved(pipeline_id)
+        if result.get("state") == PipelineState.COMPLETE.value:
+            self._archive_source_file(pipeline_id, book_path)
         result["book_type"] = profile.get("book_type")
         result["confidence"] = confidence
         return result
@@ -305,6 +308,31 @@ class Orchestrator:
         result = _complete_approved(self.config.db_path, pipeline_id, record)
         result["pipeline_id"] = pipeline_id
         return result
+
+    def _archive_source_file(self, pipeline_id: str, source_path: str) -> None:
+        """Move source file to processed directory after successful completion."""
+        if not self.config.processed_dir:
+            return
+
+        src = Path(source_path)
+        if not src.exists():
+            self.logger.state_transition(pipeline_id, "archive", f"skipped:file_missing:{src.name}")
+            return
+
+        dest_dir = Path(self.config.processed_dir)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+
+        # Handle name collision
+        if dest.exists():
+            stem, suffix = dest.stem, dest.suffix
+            counter = 1
+            while dest.exists():
+                dest = dest_dir / f"{stem}_{counter}{suffix}"
+                counter += 1
+
+        shutil.move(str(src), str(dest))
+        self.logger.state_transition(pipeline_id, "complete", f"archived:{dest.name}")
 
     def _retry_one(self, book: dict) -> dict:
         """Retry a single book in NEEDS_RETRY state."""
@@ -356,6 +384,9 @@ class Orchestrator:
 
         for ext in extensions:
             for book_path in watch_path.rglob(ext):
+                # Skip files in processed directory
+                if self.config.processed_dir and book_path.is_relative_to(self.config.processed_dir):
+                    continue
                 path_str = str(book_path)
                 if path_str in self._seen_paths:
                     continue
@@ -390,6 +421,10 @@ class Orchestrator:
             if approved:
                 try:
                     self._complete_approved(approved[0]["id"])
+                    # Archive source file on success
+                    record = self.repo.get(approved[0]["id"])
+                    if record and record["state"] == PipelineState.COMPLETE.value:
+                        self._archive_source_file(approved[0]["id"], record["source_path"])
                 except Exception as e:
                     self.logger.error(approved[0]["id"], type(e).__name__, str(e))
                     self.repo.update_state(approved[0]["id"], PipelineState.NEEDS_RETRY)
