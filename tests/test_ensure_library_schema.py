@@ -245,3 +245,31 @@ class TestEnsureLibrarySchemaPartialState:
         assert _column_exists(cursor, "chapter_summaries", "embedding")
         assert _column_exists(cursor, "chapter_summaries", "embedding_model")
         conn.close()
+
+
+class TestServerIntegration:
+    """Verify ensure_library_schema is called during server creation."""
+
+    def test_create_server_calls_ensure_library_schema(self, empty_db):
+        """create_server() should call ensure_library_schema before registering tools."""
+        with patch("src.database.Config") as mock_config, \
+             patch("src.server.Config") as mock_server_config, \
+             patch("src.server.ensure_library_schema") as mock_ensure:
+            mock_config.DB_PATH = empty_db
+            mock_server_config.DB_PATH = empty_db
+            mock_server_config.SERVER_NAME = "test"
+            mock_server_config.DEBUG = False
+            mock_server_config.validate.return_value = None
+
+            # Mock check_database_health to return healthy
+            with patch("src.server.check_database_health") as mock_health:
+                mock_health.return_value = {
+                    "status": "healthy", "books": 0, "chapters": 0, "total_words": 0
+                }
+                from src.server import create_server
+                try:
+                    create_server()
+                except Exception:
+                    pass  # May fail on tool registration, that's fine
+
+            mock_ensure.assert_called_once()

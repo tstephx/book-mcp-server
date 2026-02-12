@@ -14,7 +14,7 @@ Architecture:
 from mcp.server.fastmcp import FastMCP
 
 from .config import Config
-from .database import check_database_health
+from .database import check_database_health, ensure_library_schema
 from .utils.logging import logger
 from .tools.book_tools import register_book_tools
 from .tools.chapter_tools import register_chapter_tools
@@ -55,7 +55,10 @@ def create_server() -> FastMCP:
     
     logger.info(f"Database healthy: {health['books']} books, {health['chapters']} chapters, "
                f"{health['total_words']:,} total words")
-    
+
+    # Ensure library-side tables and columns exist
+    ensure_library_schema()
+
     # Create server
     mcp = FastMCP(Config.SERVER_NAME)
     

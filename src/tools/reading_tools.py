@@ -15,49 +15,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _ensure_reading_tables():
-    """Create reading_progress and bookmarks tables if they don't exist"""
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-
-        # Reading progress table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS reading_progress (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                book_id TEXT NOT NULL,
-                chapter_number INTEGER NOT NULL,
-                status TEXT DEFAULT 'unread',
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                notes TEXT,
-                FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
-                UNIQUE(book_id, chapter_number)
-            )
-        """)
-
-        # Bookmarks table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS bookmarks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                book_id TEXT NOT NULL,
-                chapter_number INTEGER NOT NULL,
-                position INTEGER DEFAULT 0,
-                title TEXT,
-                note TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
-            )
-        """)
-
-        conn.commit()
-        logger.info("Reading tables ensured")
-
-
 def register_reading_tools(mcp: "FastMCP") -> None:
     """Register reading management tools with the MCP server"""
-
-    # Ensure tables exist on registration
-    _ensure_reading_tables()
 
     @mcp.tool()
     def mark_as_read(
