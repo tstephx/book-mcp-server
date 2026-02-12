@@ -167,14 +167,17 @@ def full_text_search(
 
 
 def rebuild_fts_index() -> dict:
-    """Rebuild FTS index from scratch
+    """Rebuild FTS index by repopulating from chapters table and files on disk.
 
-    Useful after bulk updates or if index becomes corrupted.
+    Deletes all existing FTS rows and re-indexes every chapter.
+    Useful when the FTS index is stale (e.g. after DB migration or bulk import).
     """
     if not fts_table_exists():
         return {"error": "FTS table does not exist"}
 
     try:
+        from .file_utils import read_chapter_content
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
@@ -182,20 +185,41 @@ def rebuild_fts_index() -> dict:
             cursor.execute("SELECT COUNT(*) as count FROM chapters_fts")
             before_count = cursor.fetchone()['count']
 
-            # Rebuild uses FTS5's optimize command
-            cursor.execute("INSERT INTO chapters_fts(chapters_fts) VALUES('rebuild')")
+            # Clear existing FTS data
+            cursor.execute("DELETE FROM chapters_fts")
+
+            # Re-index all chapters from source
+            cursor.execute("SELECT id, title, file_path FROM chapters")
+            chapters = cursor.fetchall()
+
+            indexed = 0
+            errors = 0
+
+            for chapter in chapters:
+                try:
+                    content = read_chapter_content(chapter['file_path'])
+                    cursor.execute(
+                        "INSERT INTO chapters_fts (chapter_id, title, content) VALUES (?, ?, ?)",
+                        (chapter['id'], chapter['title'] or '', content)
+                    )
+                    indexed += 1
+
+                    if indexed % 100 == 0:
+                        conn.commit()
+                        logger.info(f"FTS rebuild: indexed {indexed} chapters...")
+
+                except Exception as e:
+                    logger.warning(f"FTS rebuild: error indexing chapter {chapter['id']}: {e}")
+                    errors += 1
+
             conn.commit()
-
-            # Get count after
-            cursor.execute("SELECT COUNT(*) as count FROM chapters_fts")
-            after_count = cursor.fetchone()['count']
-
-            logger.info(f"FTS index rebuilt: {after_count} entries")
+            logger.info(f"FTS index rebuilt: {indexed} indexed, {errors} errors (was {before_count} entries)")
 
             return {
                 "status": "rebuilt",
                 "entries_before": before_count,
-                "entries_after": after_count
+                "entries_after": indexed,
+                "errors": errors
             }
 
     except Exception as e:
