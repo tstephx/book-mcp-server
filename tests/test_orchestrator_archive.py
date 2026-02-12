@@ -29,66 +29,66 @@ def config(db_path):
     )
 
 
-def test_archive_moves_file_to_processed_dir(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+# --- Standalone _archive_source_file tests (approval/actions.py) ---
+
+
+def test_archive_moves_file_to_processed_dir(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"fake epub content")
 
     processed_dir = tmp_path / "processed"
-    config.processed_dir = processed_dir
 
-    orchestrator = Orchestrator(config)
-    orchestrator._archive_source_file("pipe-1", str(src_file))
+    result = _archive_source_file(str(src_file), processed_dir=processed_dir)
 
+    assert result == "book.epub"
     assert not src_file.exists()
     assert (processed_dir / "book.epub").exists()
     assert (processed_dir / "book.epub").read_bytes() == b"fake epub content"
 
 
-def test_archive_creates_processed_dir(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_creates_processed_dir(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"content")
 
     processed_dir = tmp_path / "deep" / "nested" / "processed"
-    config.processed_dir = processed_dir
 
-    orchestrator = Orchestrator(config)
-    orchestrator._archive_source_file("pipe-1", str(src_file))
+    _archive_source_file(str(src_file), processed_dir=processed_dir)
 
     assert processed_dir.exists()
     assert (processed_dir / "book.epub").exists()
 
 
-def test_archive_noop_when_processed_dir_not_set(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_noop_when_no_processed_dir(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"content")
 
-    config.processed_dir = None
+    # No processed_dir argument, no PROCESSED_DIR env var
+    with patch.dict("os.environ", {}, clear=True):
+        result = _archive_source_file(str(src_file))
 
-    orchestrator = Orchestrator(config)
-    orchestrator._archive_source_file("pipe-1", str(src_file))
-
+    assert result is None
     # File should remain untouched
     assert src_file.exists()
 
 
-def test_archive_handles_missing_source_file(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_handles_missing_source_file(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
-    config.processed_dir = tmp_path / "processed"
+    processed_dir = tmp_path / "processed"
 
-    orchestrator = Orchestrator(config)
-    # Should not raise — just logs and returns
-    orchestrator._archive_source_file("pipe-1", str(tmp_path / "nonexistent.epub"))
+    # Should not raise — just logs and returns None
+    result = _archive_source_file(str(tmp_path / "nonexistent.epub"), processed_dir=processed_dir)
+    assert result is None
 
 
-def test_archive_handles_name_collision(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_handles_name_collision(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     processed_dir = tmp_path / "processed"
     processed_dir.mkdir()
@@ -99,11 +99,9 @@ def test_archive_handles_name_collision(config, tmp_path):
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"new content")
 
-    config.processed_dir = processed_dir
+    result = _archive_source_file(str(src_file), processed_dir=processed_dir)
 
-    orchestrator = Orchestrator(config)
-    orchestrator._archive_source_file("pipe-1", str(src_file))
-
+    assert result == "book_1.epub"
     assert not src_file.exists()
     # Original should be untouched
     assert (processed_dir / "book.epub").read_bytes() == b"existing"
@@ -112,8 +110,8 @@ def test_archive_handles_name_collision(config, tmp_path):
     assert (processed_dir / "book_1.epub").read_bytes() == b"new content"
 
 
-def test_archive_handles_multiple_collisions(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_handles_multiple_collisions(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     processed_dir = tmp_path / "processed"
     processed_dir.mkdir()
@@ -125,31 +123,46 @@ def test_archive_handles_multiple_collisions(config, tmp_path):
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"v2")
 
-    config.processed_dir = processed_dir
+    result = _archive_source_file(str(src_file), processed_dir=processed_dir)
 
-    orchestrator = Orchestrator(config)
-    orchestrator._archive_source_file("pipe-1", str(src_file))
-
+    assert result == "book_2.epub"
     assert (processed_dir / "book_2.epub").exists()
     assert (processed_dir / "book_2.epub").read_bytes() == b"v2"
 
 
-def test_archive_logs_error_on_move_failure(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+def test_archive_logs_error_on_move_failure(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
 
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"content")
 
-    config.processed_dir = tmp_path / "processed"
+    processed_dir = tmp_path / "processed"
 
-    orchestrator = Orchestrator(config)
+    with patch("agentic_pipeline.approval.actions.shutil.move", side_effect=OSError("disk full")):
+        result = _archive_source_file(str(src_file), processed_dir=processed_dir)
 
-    with patch("agentic_pipeline.orchestrator.orchestrator.shutil.move", side_effect=OSError("disk full")):
-        # Should not raise
-        orchestrator._archive_source_file("pipe-1", str(src_file))
-
+    assert result is None
     # Source file should still exist (move failed)
     assert src_file.exists()
+
+
+def test_archive_uses_env_var_fallback(tmp_path):
+    from agentic_pipeline.approval.actions import _archive_source_file
+
+    src_file = tmp_path / "book.epub"
+    src_file.write_bytes(b"content")
+
+    processed_dir = tmp_path / "processed"
+
+    with patch.dict("os.environ", {"PROCESSED_DIR": str(processed_dir)}):
+        result = _archive_source_file(str(src_file))
+
+    assert result == "book.epub"
+    assert not src_file.exists()
+    assert (processed_dir / "book.epub").exists()
+
+
+# --- Orchestrator scan exclusion test ---
 
 
 def test_scan_skips_files_in_processed_dir(db_path, config, tmp_path):
@@ -172,39 +185,69 @@ def test_scan_skips_files_in_processed_dir(db_path, config, tmp_path):
     assert detected == 1
 
 
-def test_archive_not_called_when_completion_fails(config, tmp_path):
-    from agentic_pipeline.orchestrator import Orchestrator
+# --- Integration: _complete_approved calls archive ---
+
+
+def test_complete_approved_archives_on_success(db_path, tmp_path):
+    from agentic_pipeline.approval.actions import _complete_approved
+    from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
+    from tests.conftest import transition_to
 
     src_file = tmp_path / "book.epub"
     src_file.write_bytes(b"content")
 
     processed_dir = tmp_path / "processed"
-    config.processed_dir = processed_dir
 
-    orchestrator = Orchestrator(config)
+    # Create a real pipeline record and walk it to APPROVED
+    repo = PipelineRepository(db_path)
+    pipeline_id = repo.create(str(src_file), "abc123hash")
+    transition_to(repo, pipeline_id, PipelineState.APPROVED)
 
-    # Mock _complete_approved to return a non-COMPLETE state
-    with patch.object(orchestrator, '_complete_approved', return_value={"state": PipelineState.NEEDS_RETRY.value}):
-        with patch.object(orchestrator, '_archive_source_file') as mock_archive:
-            with patch.object(orchestrator, '_run_processing', return_value={
-                "book_id": "test", "quality_score": 85, "detection_confidence": 0.9,
-                "detection_method": "mock", "needs_review": False, "warnings": [],
-                "chapter_count": 10, "word_count": 50000, "llm_fallback_used": False,
-            }):
-                with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
-                    with patch.object(orchestrator, '_extract_sample', return_value="text"):
-                        from agentic_pipeline.agents.classifier_types import BookProfile, BookType
-                        mock_profile = BookProfile(
-                            book_type=BookType.TECHNICAL_TUTORIAL,
-                            confidence=0.9,
-                            suggested_tags=["python"],
-                            reasoning="Test",
-                        )
-                        orchestrator.classifier = MagicMock()
-                        orchestrator.classifier.classify.return_value = mock_profile
+    pipeline = repo.get(pipeline_id)
 
-                        result = orchestrator.process_one(str(src_file))
+    with patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter") as MockAdapter:
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.chapters_processed = 5
+        MockAdapter.return_value.generate_embeddings.return_value = mock_result
 
-            # Archive should NOT have been called since state != COMPLETE
-            mock_archive.assert_not_called()
+        with patch.dict("os.environ", {"PROCESSED_DIR": str(processed_dir)}):
+            result = _complete_approved(db_path, pipeline_id, pipeline)
+
+    assert result["state"] == "complete"
+    assert not src_file.exists()
+    assert (processed_dir / "book.epub").exists()
+
+
+def test_complete_approved_does_not_archive_on_failure(db_path, tmp_path):
+    from agentic_pipeline.approval.actions import _complete_approved
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+    from tests.conftest import transition_to
+
+    src_file = tmp_path / "book.epub"
+    src_file.write_bytes(b"content")
+
+    processed_dir = tmp_path / "processed"
+
+    # Create a real pipeline record and walk it to APPROVED
+    repo = PipelineRepository(db_path)
+    pipeline_id = repo.create(str(src_file), "def456hash")
+    transition_to(repo, pipeline_id, PipelineState.APPROVED)
+
+    pipeline = repo.get(pipeline_id)
+
+    with patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter") as MockAdapter:
+        mock_result = MagicMock()
+        mock_result.success = False
+        mock_result.error = "embedding failed"
+        MockAdapter.return_value.generate_embeddings.return_value = mock_result
+
+        with patch.dict("os.environ", {"PROCESSED_DIR": str(processed_dir)}):
+            result = _complete_approved(db_path, pipeline_id, pipeline)
+
+    assert result["state"] == "needs_retry"
+    # File should NOT have been archived
+    assert src_file.exists()
+    assert not processed_dir.exists()

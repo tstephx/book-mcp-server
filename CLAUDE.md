@@ -25,8 +25,8 @@ agentic-pipeline health
 # Check autonomy status
 agentic-pipeline autonomy status
 
-# Run worker with directory watching
-agentic-pipeline worker --watch-dir /path/to/books/
+# Run worker with directory watching + auto-archive
+agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
 ```
 
 ## Project Structure
@@ -109,6 +109,14 @@ agentic-pipeline worker --watch-dir /path/to/books/
 # Or via env var: WATCH_DIR=/path/to/books agentic-pipeline worker
 ```
 Scans run as the lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
+
+### Auto-Archive
+After a book completes the pipeline, the source file can be automatically moved to a processed directory:
+```bash
+agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
+# Or via env var: PROCESSED_DIR=/path/to/books/processed
+```
+Files in `processed_dir` are excluded from watch scans. Name collisions are handled with counter suffixes (`book_1.epub`, `book_2.epub`). Archive failures are logged but don't affect pipeline state.
 
 ### Escape Hatch
 One command reverts to fully supervised mode:
@@ -252,4 +260,4 @@ This project uses claude-innit for persistent context:
 
 ---
 
-*Last updated: 2026-02-11 (DB context manager refactor)*
+*Last updated: 2026-02-11 (auto-archive processed books)*

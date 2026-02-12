@@ -2,6 +2,8 @@
 
 import logging
 import json
+import os
+import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -64,6 +66,55 @@ def _record_audit(
         conn.commit()
 
 
+def _get_processed_dir() -> Optional[Path]:
+    """Get processed directory from environment."""
+    processed_dir_str = os.environ.get("PROCESSED_DIR")
+    return Path(processed_dir_str).resolve() if processed_dir_str else None
+
+
+def _archive_source_file(
+    source_path: str,
+    processed_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """Move source file to processed directory after successful completion.
+
+    Args:
+        source_path: Path to the source file to archive.
+        processed_dir: Target directory. Falls back to PROCESSED_DIR env var.
+
+    Returns:
+        Destination filename if archived, None otherwise.
+    """
+    if processed_dir is None:
+        processed_dir = _get_processed_dir()
+    if not processed_dir:
+        return None
+
+    src = Path(source_path)
+    if not src.exists():
+        logger.info("Archive skipped, file missing: %s", src.name)
+        return None
+
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    dest = processed_dir / src.name
+
+    # Handle name collision
+    if dest.exists():
+        stem, suffix = dest.stem, dest.suffix
+        counter = 1
+        while dest.exists():
+            dest = processed_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+
+    try:
+        shutil.move(str(src), str(dest))
+        logger.info("Archived %s to %s", src.name, dest.name)
+        return dest.name
+    except OSError as e:
+        logger.error("Failed to archive %s: %s", src.name, e)
+        return None
+
+
 def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
     """Run embedding for an approved book and transition to COMPLETE.
 
@@ -104,6 +155,12 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
             }
 
         repo.update_state(pipeline_id, PipelineState.COMPLETE)
+
+        # Archive source file if configured
+        source_path = pipeline.get("source_path")
+        if source_path:
+            _archive_source_file(source_path)
+
         return {
             "state": PipelineState.COMPLETE.value,
             "chapters_embedded": result.chapters_processed,
