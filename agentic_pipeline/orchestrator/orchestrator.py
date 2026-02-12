@@ -331,8 +331,11 @@ class Orchestrator:
                 dest = dest_dir / f"{stem}_{counter}{suffix}"
                 counter += 1
 
-        shutil.move(str(src), str(dest))
-        self.logger.state_transition(pipeline_id, "complete", f"archived:{dest.name}")
+        try:
+            shutil.move(str(src), str(dest))
+            self.logger.state_transition(pipeline_id, "complete", f"archived:{dest.name}")
+        except OSError as e:
+            self.logger.error(pipeline_id, "ArchiveError", f"Failed to move {src.name}: {e}")
 
     def _retry_one(self, book: dict) -> dict:
         """Retry a single book in NEEDS_RETRY state."""

@@ -229,7 +229,7 @@ def worker(watch_dir, processed_dir):
     if watch_dir:
         config.watch_dir = Path(watch_dir)
     if processed_dir:
-        config.processed_dir = Path(processed_dir)
+        config.processed_dir = Path(processed_dir).resolve()
 
     orchestrator = Orchestrator(config)
 
