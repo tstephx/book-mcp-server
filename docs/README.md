@@ -148,7 +148,7 @@ Traditional exact-match search.
 
 **Example:**
 ```python
-search_books("Docker", limit=10)
+search_titles("Docker", limit=10)
 ```
 
 ---

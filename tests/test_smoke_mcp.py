@@ -109,7 +109,7 @@ BOOK_TOOLS = [
     ("get_section", {"book_id": _BOOK_ID, "chapter_number": _CH_NUM, "section_number": 1}),
     ("list_sections", {"book_id": _BOOK_ID, "chapter_number": _CH_NUM}),
     # --- Search (no OpenAI) ---
-    ("search_books", {"query": "docker"}),
+    ("search_titles", {"query": "docker"}),
     ("text_search", {"query": "docker", "limit": 5}),
     # --- Discovery (no OpenAI) ---
     ("extract_code_examples", {"book_id": _BOOK_ID, "chapter_number": _CH_NUM}),

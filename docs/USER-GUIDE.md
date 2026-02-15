@@ -36,7 +36,7 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 |------|-------------|---------------|
 | `semantic_search` | AI-powered concept matching using embeddings | "error handling patterns" |
 | `text_search` | Fast keyword/phrase search (FTS5) | `"dependency injection"` |
-| `search_books` | Simple keyword search in titles/authors | "python docker" |
+| `search_titles` | Simple keyword search in titles/authors | "python docker" |
 | `search_all_books` | Search entire library grouped by book | "async programming" |
 | `topic_coverage` | Find which books cover a topic | "machine learning" |
 | `cross_book_comparison` | Compare how books approach a topic | "API design" |

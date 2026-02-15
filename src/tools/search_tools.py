@@ -22,10 +22,12 @@ def register_search_tools(mcp: "FastMCP") -> None:
     """
     
     @mcp.tool()
-    def search_books(query: str, limit: int = 10) -> str:
+    def search_titles(query: str, limit: int = 10) -> str:
         """
-        Search for books and chapters containing specific text
-        
+        Search book titles, authors, and chapter titles (metadata only).
+
+        For searching chapter *content*, use text_search or hybrid_search instead.
+
         Args:
             query: Search query text
             limit: Maximum number of results per category (default: 10, max: 50)
@@ -83,15 +85,15 @@ def register_search_tools(mcp: "FastMCP") -> None:
             else:
                 result += f"\nFound {len(books)} books and {len(chapters)} chapters"
             
-            logger.info(f"Search for '{query}' returned {len(books)} books, {len(chapters)} chapters")
+            logger.info(f"search_titles '{query}' returned {len(books)} books, {len(chapters)} chapters")
             return result
             
         except ValidationError as e:
-            logger.warning(f"Validation error in search_books: {e}")
+            logger.warning(f"Validation error in search_titles: {e}")
             return f"Validation error: {str(e)}"
         except DatabaseError as e:
-            logger.error(f"Database error in search_books: {e}")
+            logger.error(f"Database error in search_titles: {e}")
             return f"Error accessing database: {str(e)}"
         except Exception as e:
-            logger.error(f"Unexpected error in search_books: {e}")
+            logger.error(f"Unexpected error in search_titles: {e}")
             return f"Unexpected error: {str(e)}"
