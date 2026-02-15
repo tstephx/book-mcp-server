@@ -1002,6 +1002,17 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
         )
 
         with get_pipeline_db(db_path) as conn:
+            # Get chapter IDs for cleaning up related tables
+            ch_ids = [r[0] for r in conn.execute(
+                "SELECT id FROM chapters WHERE book_id = ?", (book["book_id"],)
+            ).fetchall()]
+            if ch_ids:
+                placeholders = ",".join("?" * len(ch_ids))
+                for table in ("chapters_fts", "chapter_summaries", "chunks"):
+                    try:
+                        conn.execute(f"DELETE FROM {table} WHERE chapter_id IN ({placeholders})", ch_ids)
+                    except Exception:
+                        pass  # Table may not exist in all environments
             conn.execute("DELETE FROM chapters WHERE book_id = ?", (book["book_id"],))
             conn.execute("DELETE FROM books WHERE id = ?", (book["book_id"],))
             conn.execute("DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)", (source_file,))
