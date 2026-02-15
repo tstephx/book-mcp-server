@@ -457,3 +457,143 @@ class TestExtractionValidator:
 
         assert result.metrics["chapter_count"] == 10
         assert result.metrics["total_words"] == 10000
+
+
+# ===========================================================================
+# CLI audit-quality command tests
+# ===========================================================================
+
+
+class TestAuditQualityCLI:
+    """Tests for the audit-quality CLI command."""
+
+    @pytest.fixture
+    def cli_db(self, tmp_path, monkeypatch):
+        """Create a test DB with good + bad books and set env var."""
+        db_path = tmp_path / "test.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        conn.execute("""
+            CREATE TABLE books (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                author TEXT,
+                word_count INTEGER,
+                source_file TEXT,
+                processing_status TEXT,
+                added_date TEXT,
+                book_type TEXT,
+                classification_confidence REAL,
+                suggested_tags TEXT,
+                classification_reasoning TEXT,
+                classified_at TEXT,
+                classified_by TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE chapters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                book_id TEXT,
+                chapter_number INTEGER,
+                title TEXT,
+                file_path TEXT,
+                word_count INTEGER,
+                embedding BLOB,
+                embedding_model TEXT,
+                content_hash TEXT,
+                file_mtime TEXT,
+                embedding_updated_at TEXT
+            )
+        """)
+        # Good book: 10 chapters, 4000 words each
+        conn.execute("INSERT INTO books (id, title) VALUES (?, ?)", ("good-1", "Good Book"))
+        for i in range(10):
+            conn.execute(
+                "INSERT INTO chapters (book_id, chapter_number, title, word_count, content_hash) VALUES (?, ?, ?, ?, ?)",
+                ("good-1", i + 1, f"Chapter {i + 1}", 4000, _hash(f"good-{i}")),
+            )
+        # Bad book: 1 chapter, 200 words
+        conn.execute("INSERT INTO books (id, title) VALUES (?, ?)", ("bad-1", "Bad Book"))
+        conn.execute(
+            "INSERT INTO chapters (book_id, chapter_number, title, word_count, content_hash) VALUES (?, ?, ?, ?, ?)",
+            ("bad-1", 1, "Only Chapter", 200, _hash("bad-0")),
+        )
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+        return db_path
+
+    def test_audit_quality_runs(self, cli_db):
+        from click.testing import CliRunner
+        from agentic_pipeline.cli import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["audit-quality"])
+
+        assert result.exit_code == 0
+        # Bad book should be flagged
+        assert "Bad Book" in result.output
+        # Good book should not appear in flagged list
+        assert "Good Book" not in result.output
+        # Summary counts
+        assert "Pass: 1" in result.output
+        assert "Fail: 1" in result.output
+
+    def test_audit_quality_json(self, cli_db):
+        import json as json_module
+        from click.testing import CliRunner
+        from agentic_pipeline.cli import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["audit-quality", "--json"])
+
+        assert result.exit_code == 0
+        data = json_module.loads(result.output)
+        assert data["total"] == 2
+        assert data["passed"] == 1
+        assert data["flagged"] == 1
+        assert len(data["books"]) == 1
+        assert data["books"][0]["book_id"] == "bad-1"
+        assert data["books"][0]["title"] == "Bad Book"
+        assert len(data["books"][0]["reasons"]) > 0
+        assert "metrics" in data["books"][0]
+
+    def test_audit_quality_all_pass(self, tmp_path, monkeypatch):
+        """When all books pass, show the all-pass message."""
+        from click.testing import CliRunner
+        from agentic_pipeline.cli import main
+
+        db_path = tmp_path / "allgood.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("""
+            CREATE TABLE books (
+                id TEXT PRIMARY KEY, title TEXT, author TEXT, word_count INTEGER,
+                source_file TEXT, processing_status TEXT, added_date TEXT,
+                book_type TEXT, classification_confidence REAL, suggested_tags TEXT,
+                classification_reasoning TEXT, classified_at TEXT, classified_by TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE chapters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, book_id TEXT,
+                chapter_number INTEGER, title TEXT, file_path TEXT,
+                word_count INTEGER, embedding BLOB, embedding_model TEXT,
+                content_hash TEXT, file_mtime TEXT, embedding_updated_at TEXT
+            )
+        """)
+        conn.execute("INSERT INTO books (id, title) VALUES (?, ?)", ("ok-1", "OK Book"))
+        for i in range(10):
+            conn.execute(
+                "INSERT INTO chapters (book_id, chapter_number, title, word_count, content_hash) VALUES (?, ?, ?, ?, ?)",
+                ("ok-1", i + 1, f"Chapter {i + 1}", 2000, _hash(f"ok-{i}")),
+            )
+        conn.commit()
+        conn.close()
+        monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["audit-quality"])
+
+        assert result.exit_code == 0
+        assert "All books pass quality checks" in result.output

@@ -836,5 +836,74 @@ def validate(as_json: bool):
     console.print(table)
 
 
+@main.command("audit-quality")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def audit_quality(as_json: bool):
+    """Audit library books for extraction quality issues."""
+    import json as json_module
+    from .db.config import get_db_path
+    from .db.connection import get_pipeline_db
+    from .validation import check_extraction_quality
+
+    db_path = get_db_path()
+
+    with get_pipeline_db(db_path) as conn:
+        books = conn.execute("SELECT id, title FROM books").fetchall()
+
+        results = []
+        for book in books:
+            rows = conn.execute(
+                "SELECT title, word_count, content_hash FROM chapters WHERE book_id = ? ORDER BY chapter_number",
+                (book["id"],),
+            ).fetchall()
+
+            chapter_count = len(rows)
+            word_counts = [r["word_count"] or 0 for r in rows]
+            titles = [r["title"] or "" for r in rows]
+            content_hashes = [r["content_hash"] or "" for r in rows]
+
+            validation = check_extraction_quality(chapter_count, word_counts, titles, content_hashes)
+
+            if not validation.passed:
+                results.append({
+                    "book_id": book["id"],
+                    "title": book["title"],
+                    "chapter_count": chapter_count,
+                    "reasons": validation.reasons,
+                    "metrics": validation.metrics,
+                })
+
+    if as_json:
+        console.print(json_module.dumps({
+            "total": len(books),
+            "passed": len(books) - len(results),
+            "flagged": len(results),
+            "books": results,
+        }, indent=2))
+        return
+
+    console.print(f"\n[bold]Quality Audit: {len(books)} books[/bold]")
+    console.print(f"  [green]Pass: {len(books) - len(results)}[/green]")
+    console.print(f"  [red]Fail: {len(results)}[/red]\n")
+
+    if not results:
+        console.print("[green]All books pass quality checks.[/green]")
+        return
+
+    table = Table(title="Flagged Books")
+    table.add_column("Title", max_width=45)
+    table.add_column("Ch", justify="right")
+    table.add_column("Issues")
+
+    for book in results:
+        table.add_row(
+            book["title"][:45],
+            str(book["chapter_count"]),
+            "; ".join(book["reasons"][:2]) + ("..." if len(book["reasons"]) > 2 else ""),
+        )
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     main()
