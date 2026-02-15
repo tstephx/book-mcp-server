@@ -215,9 +215,9 @@ def update_embeddings_incremental(
     logger.info(f"Found {len(chapters_to_update)} chapters needing embedding update")
 
     # Import here to avoid circular imports and defer model loading
-    from .embeddings import EmbeddingGenerator
+    from .openai_embeddings import OpenAIEmbeddingGenerator
 
-    generator = EmbeddingGenerator()
+    generator = OpenAIEmbeddingGenerator()
 
     updated = 0
     errors = 0
@@ -277,7 +277,7 @@ def update_embeddings_incremental(
                         WHERE id = ?
                     """, (
                         embedding_bytes,
-                        'all-MiniLM-L6-v2',
+                        'text-embedding-3-small',
                         content_hash,
                         file_mtime,
                         now,

@@ -19,6 +19,7 @@ from ..utils.vector_store import find_top_k
 from ..utils.file_utils import read_chapter_content
 from ..utils.excerpt_utils import extract_relevant_excerpt
 from ..utils.cache import get_cache
+from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 import numpy as np
 import io
 
@@ -245,77 +246,35 @@ def register_learning_tools(mcp):
 # =============================================================================
 
 def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0.30) -> list:
-    """Find relevant sources from the library using semantic search"""
+    """Find relevant sources from the library using chunk-level semantic search"""
     try:
-        # Get cached embeddings or load from database
-        cache = get_cache()
-        cached = cache.get_embeddings()
-        
+        embeddings_matrix, chunk_metadata = load_chunk_embeddings()
+        if embeddings_matrix is None:
+            return []
+
         with embedding_model_context() as generator:
             query_embedding = generator.generate(query)
-            
-            if cached:
-                embeddings_matrix, chapter_metadata = cached
-            else:
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT
-                            c.id, c.chapter_number, c.title as chapter_title,
-                            c.embedding, c.file_path, b.title as book_title
-                        FROM chapters c
-                        JOIN books b ON c.book_id = b.id
-                        WHERE c.embedding IS NOT NULL
-                    """)
-                    rows = cursor.fetchall()
-                
-                if not rows:
-                    return []
-                
-                chapter_embeddings = []
-                chapter_metadata = []
-                
-                for row in rows:
-                    embedding = np.load(io.BytesIO(row['embedding']))
-                    chapter_embeddings.append(embedding)
-                    chapter_metadata.append({
-                        'id': row['id'],
-                        'book_title': row['book_title'],
-                        'chapter_title': row['chapter_title'],
-                        'chapter_number': row['chapter_number'],
-                        'file_path': row['file_path']
-                    })
-                
-                embeddings_matrix = np.vstack(chapter_embeddings)
-                cache.set_embeddings(embeddings_matrix, chapter_metadata)
-            
-            # Find top matches
+
+            # Search at chunk level (fetch extra to ensure enough chapters after aggregation)
             top_results = find_top_k(
                 query_embedding, embeddings_matrix,
-                k=limit, min_similarity=min_similarity
+                k=limit * 3, min_similarity=min_similarity
             )
-            
-            sources = []
+
+            chunk_results = []
             for idx, similarity in top_results:
-                metadata = chapter_metadata[idx]
-                
-                # Get excerpt
-                try:
-                    content = read_chapter_content(metadata['file_path'])
-                    excerpt = extract_relevant_excerpt(
-                        query_embedding, content, generator, max_chars=600
-                    )
-                except Exception:
-                    excerpt = ""
-                
-                sources.append({
-                    **metadata,
+                meta = chunk_metadata[idx]
+                chunk_results.append({
+                    **meta,
+                    'id': meta['chapter_id'],
                     'similarity': similarity,
-                    'excerpt': excerpt
                 })
-            
+
+            # Aggregate to chapter level (best chunk per chapter)
+            sources = best_chunk_per_chapter(chunk_results)[:limit]
+
             return sources
-            
+
     except Exception as e:
         logger.error(f"Source search error: {e}", exc_info=True)
         return []

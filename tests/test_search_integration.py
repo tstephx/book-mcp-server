@@ -83,10 +83,10 @@ def test_load_chunk_embeddings_round_trip():
     conn = sqlite3.connect(f.name)
     conn.row_factory = sqlite3.Row
 
-    conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT, author TEXT)")
     conn.execute(
         "CREATE TABLE chapters (id TEXT PRIMARY KEY, book_id TEXT, title TEXT, "
-        "chapter_number INTEGER, file_path TEXT)"
+        "chapter_number INTEGER, file_path TEXT, word_count INTEGER)"
     )
     conn.execute(
         "CREATE TABLE chunks (id TEXT PRIMARY KEY, chapter_id TEXT, book_id TEXT, "
@@ -94,9 +94,9 @@ def test_load_chunk_embeddings_round_trip():
         "embedding BLOB, embedding_model TEXT, content_hash TEXT)"
     )
 
-    conn.execute("INSERT INTO books VALUES ('b1', 'Test Book')")
+    conn.execute("INSERT INTO books VALUES ('b1', 'Test Book', 'Author')")
     conn.execute(
-        "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md')"
+        "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)"
     )
 
     # Insert 3 chunks with known embeddings

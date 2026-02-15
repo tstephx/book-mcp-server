@@ -14,7 +14,7 @@ import numpy as np
 from .vector_store import cosine_similarity
 
 if TYPE_CHECKING:
-    from .embeddings import EmbeddingGenerator
+    from .openai_embeddings import OpenAIEmbeddingGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def split_paragraphs(content: str, min_length: int = 50) -> list[str]:
 def extract_relevant_excerpt(
     query_embedding: np.ndarray,
     content: str,
-    generator: "EmbeddingGenerator",
+    generator: "OpenAIEmbeddingGenerator",
     max_chars: int = 500
 ) -> str:
     """Extract the most query-relevant paragraph from content

@@ -27,6 +27,7 @@ from ..utils.vector_store import find_top_k
 from ..utils.file_utils import read_chapter_content
 from ..utils.excerpt_utils import extract_relevant_excerpt
 from ..utils.cache import get_cache
+from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 import numpy as np
 import io
 
@@ -616,71 +617,47 @@ def _detect_project_type(goal: str) -> tuple[str, dict]:
 
 
 def _search_for_best_practices(search_terms: list, limit: int = 3) -> list:
-    """Search library for best practices related to search terms"""
+    """Search library for best practices using chunk-level search"""
     results = []
-    
+
     try:
-        cache = get_cache()
-        cached = cache.get_embeddings()
-        
+        embeddings_matrix, chunk_metadata = load_chunk_embeddings()
+        if embeddings_matrix is None:
+            return []
+
         with embedding_model_context() as generator:
-            if cached:
-                embeddings_matrix, chapter_metadata = cached
-            else:
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT c.id, c.chapter_number, c.title as chapter_title,
-                               c.embedding, c.file_path,
-                               b.id as book_id, b.title as book_title
-                        FROM chapters c
-                        JOIN books b ON c.book_id = b.id
-                        WHERE c.embedding IS NOT NULL
-                    """)
-                    rows = cursor.fetchall()
-                
-                if not rows:
-                    return []
-                
-                chapter_embeddings = []
-                chapter_metadata = []
-                
-                for row in rows:
-                    embedding = np.load(io.BytesIO(row['embedding']))
-                    chapter_embeddings.append(embedding)
-                    chapter_metadata.append({
-                        'id': row['id'],
-                        'book_id': row['book_id'],
-                        'book_title': row['book_title'],
-                        'chapter_title': row['chapter_title'],
-                        'chapter_number': row['chapter_number'],
-                        'file_path': row['file_path']
-                    })
-                
-                embeddings_matrix = np.vstack(chapter_embeddings)
-                cache.set_embeddings(embeddings_matrix, chapter_metadata)
-            
             seen = set()
-            for term in search_terms[:3]:  # Limit terms for performance
+            for term in search_terms[:3]:
                 query_embedding = generator.generate(term)
                 top_results = find_top_k(
                     query_embedding, embeddings_matrix,
-                    k=limit, min_similarity=0.3
+                    k=limit * 3, min_similarity=0.3
                 )
-                
+
+                chunk_results = []
                 for idx, similarity in top_results:
-                    metadata = chapter_metadata[idx]
-                    key = (metadata['book_id'], metadata['chapter_number'])
+                    meta = chunk_metadata[idx]
+                    chunk_results.append({**meta, 'similarity': similarity})
+
+                chapter_results = best_chunk_per_chapter(chunk_results)
+
+                for r in chapter_results[:limit]:
+                    key = (r['book_id'], r['chapter_number'])
                     if key not in seen:
                         seen.add(key)
                         results.append({
-                            **metadata,
-                            'similarity': similarity
+                            'id': r['chapter_id'],
+                            'book_id': r['book_id'],
+                            'book_title': r['book_title'],
+                            'chapter_title': r['chapter_title'],
+                            'chapter_number': r['chapter_number'],
+                            'file_path': r.get('file_path', ''),
+                            'similarity': r['similarity']
                         })
-            
+
             results.sort(key=lambda x: x['similarity'], reverse=True)
             return results[:limit * 2]
-            
+
     except Exception as e:
         logger.error(f"Best practices search error: {e}", exc_info=True)
         return []

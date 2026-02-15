@@ -42,7 +42,7 @@ def batch_semantic_search(
     max_per_book: int = 5,
     min_similarity: float = 0.3
 ) -> dict:
-    """Search across multiple books with per-book result limits
+    """Search across multiple books with per-book result limits using chunk-level search
 
     Args:
         query: Semantic search query
@@ -55,11 +55,7 @@ def batch_semantic_search(
     """
     from .context_managers import embedding_model_context
     from .vector_store import find_top_k
-    from .cache import get_cache
-    from .file_utils import read_chapter_content
-    from .excerpt_utils import extract_relevant_excerpt
-    import numpy as np
-    import io
+    from .chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 
     # Get list of books to search
     if book_ids:
@@ -79,6 +75,16 @@ def batch_semantic_search(
             "results_by_book": []
         }
 
+    embeddings_matrix, chunk_metadata = load_chunk_embeddings()
+    if embeddings_matrix is None:
+        return {
+            "query": query,
+            "error": "No embeddings found",
+            "books_searched": 0,
+            "total_results": 0,
+            "results_by_book": []
+        }
+
     results_by_book = []
     total_results = 0
     errors = []
@@ -86,58 +92,11 @@ def batch_semantic_search(
     with embedding_model_context() as generator:
         query_embedding = generator.generate(query)
 
-        # Get all embeddings from cache
-        cache = get_cache()
-        cached = cache.get_embeddings()
-
-        if not cached:
-            # Load from database
-            with get_db_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT c.id, c.book_id, c.chapter_number, c.title as chapter_title,
-                           c.embedding, c.file_path, b.title as book_title
-                    FROM chapters c
-                    JOIN books b ON c.book_id = b.id
-                    WHERE c.embedding IS NOT NULL
-                    ORDER BY c.id
-                """)
-                rows = cursor.fetchall()
-
-            if not rows:
-                return {
-                    "query": query,
-                    "error": "No embeddings found",
-                    "books_searched": 0,
-                    "total_results": 0,
-                    "results_by_book": []
-                }
-
-            chapter_embeddings = []
-            chapter_metadata = []
-            for row in rows:
-                embedding = np.load(io.BytesIO(row['embedding']))
-                chapter_embeddings.append(embedding)
-                chapter_metadata.append({
-                    'id': row['id'],
-                    'book_id': row['book_id'],
-                    'book_title': row['book_title'],
-                    'chapter_title': row['chapter_title'],
-                    'chapter_number': row['chapter_number'],
-                    'file_path': row['file_path']
-                })
-
-            embeddings_matrix = np.vstack(chapter_embeddings)
-            cache.set_embeddings(embeddings_matrix, chapter_metadata)
-        else:
-            embeddings_matrix, chapter_metadata = cached
-
-        # Search each book
         for book in books:
             try:
-                # Filter to this book's chapters
+                # Filter to this book's chunks
                 book_indices = [
-                    i for i, m in enumerate(chapter_metadata)
+                    i for i, m in enumerate(chunk_metadata)
                     if m['book_id'] == book['id']
                 ]
 
@@ -145,34 +104,31 @@ def batch_semantic_search(
                     continue
 
                 book_embeddings = embeddings_matrix[book_indices]
-                book_metadata = [chapter_metadata[i] for i in book_indices]
+                book_chunk_meta = [chunk_metadata[i] for i in book_indices]
 
-                # Find top results for this book
+                # Find top chunk results for this book
                 top_results = find_top_k(
                     query_embedding,
                     book_embeddings,
-                    k=max_per_book,
+                    k=max_per_book * 3,
                     min_similarity=min_similarity
                 )
 
-                book_results = []
+                chunk_results = []
                 for idx, similarity in top_results:
-                    metadata = book_metadata[idx]
+                    meta = book_chunk_meta[idx]
+                    chunk_results.append({**meta, 'similarity': similarity})
 
-                    # Get excerpt
-                    try:
-                        content = read_chapter_content(metadata['file_path'])
-                        excerpt = extract_relevant_excerpt(
-                            query_embedding, content, generator, max_chars=300
-                        )
-                    except Exception:
-                        excerpt = "[Content not available]"
+                # Aggregate to chapter level
+                chapter_results = best_chunk_per_chapter(chunk_results)[:max_per_book]
 
+                book_results = []
+                for r in chapter_results:
                     book_results.append({
-                        'chapter_number': metadata['chapter_number'],
-                        'chapter_title': metadata['chapter_title'],
-                        'similarity': round(similarity, 3),
-                        'excerpt': excerpt
+                        'chapter_number': r['chapter_number'],
+                        'chapter_title': r['chapter_title'],
+                        'similarity': round(r['similarity'], 3),
+                        'excerpt': r.get('excerpt', '')[:300]
                     })
 
                 if book_results:

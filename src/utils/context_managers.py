@@ -14,40 +14,31 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def embedding_model_context() -> Generator:
-    """Manage embedding model lifecycle
-    
-    Ensures proper initialization and cleanup of the embedding model.
-    The model is expensive (~90MB) so proper lifecycle management is important.
-    
+    """Manage embedding model lifecycle.
+
+    Yields an OpenAIEmbeddingGenerator that calls the OpenAI
+    text-embedding-3-small API (1536-dim).
+
     Usage:
         with embedding_model_context() as generator:
             embedding = generator.generate("some text")
-    
+
     Yields:
-        EmbeddingGenerator: Initialized embedding generator
-        
-    Example:
-        with embedding_model_context() as gen:
-            query_emb = gen.generate("docker networking")
-            results = search_similar(query_emb)
+        OpenAIEmbeddingGenerator: Initialized embedding generator
     """
-    from .embeddings import EmbeddingGenerator
-    
-    logger.debug("Initializing embedding model context...")
-    generator = None
-    
+    from .openai_embeddings import OpenAIEmbeddingGenerator
+
+    logger.debug("Initializing OpenAI embedding model context...")
+
     try:
-        generator = EmbeddingGenerator()
-        logger.debug("Embedding model ready")
+        generator = OpenAIEmbeddingGenerator()
+        logger.debug("OpenAI embedding model ready")
         yield generator
     except Exception as e:
         logger.error(f"Embedding model context error: {e}")
         raise
     finally:
-        # Cleanup: In future, could release model from memory if needed
         logger.debug("Embedding model context closed")
-        # Note: Singleton pattern means model stays in memory
-        # This is intentional for performance
 
 @contextmanager
 def database_transaction() -> Generator:

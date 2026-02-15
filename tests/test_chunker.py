@@ -61,3 +61,45 @@ class TestChunkChapter:
         for chunk in chunks:
             assert chunk["word_count"] > 0
             assert chunk["content"].strip() != ""
+
+    def test_token_count_added(self):
+        """All chunks include token_count field."""
+        text = "This is a test. " * 100
+        chunks = chunk_chapter(text, target_words=500)
+        for chunk in chunks:
+            assert "token_count" in chunk
+            assert isinstance(chunk["token_count"], int)
+            assert chunk["token_count"] > 0
+
+    def test_single_paragraph_exceeds_token_limit(self):
+        """Single oversized paragraph gets split at sentence boundaries."""
+        # Create a single paragraph with many sentences that exceeds 8000 tokens
+        sentence = "This is a sentence with many words to inflate token count. " * 20
+        paragraph = sentence * 80  # ~96K tokens worth
+        chunks = chunk_chapter(paragraph, target_words=500, max_tokens=1000)
+
+        # Should split into multiple chunks
+        assert len(chunks) > 1
+        # Each chunk should be under token limit
+        for chunk in chunks:
+            assert chunk["token_count"] <= 1000
+
+    def test_code_block_as_single_paragraph(self):
+        """Large code block (single paragraph) gets split if needed."""
+        code = "def function():\n    return 42\n" * 500  # Large code block
+        chunks = chunk_chapter(code, target_words=500, max_tokens=2000)
+
+        # Should handle gracefully
+        assert len(chunks) >= 1
+        for chunk in chunks:
+            assert chunk["token_count"] <= 2000
+
+    def test_merged_chunk_stays_under_limit(self):
+        """Final merged chunk respects token limit."""
+        # Create scenario where final chunk gets merged
+        paragraphs = ["Para " + "word " * 50] * 3 + ["Tiny"]
+        text = "\n\n".join(paragraphs)
+        chunks = chunk_chapter(text, target_words=200, max_tokens=5000)
+
+        for chunk in chunks:
+            assert chunk["token_count"] <= 5000

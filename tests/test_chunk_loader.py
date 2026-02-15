@@ -16,10 +16,10 @@ class TestChunkLoader:
         f = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         conn = sqlite3.connect(f.name)
         conn.row_factory = sqlite3.Row
-        conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT)")
+        conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT, author TEXT)")
         conn.execute(
             "CREATE TABLE chapters (id TEXT PRIMARY KEY, book_id TEXT, "
-            "title TEXT, chapter_number INTEGER, file_path TEXT)"
+            "title TEXT, chapter_number INTEGER, file_path TEXT, word_count INTEGER)"
         )
         conn.execute(
             "CREATE TABLE chunks (id TEXT PRIMARY KEY, chapter_id TEXT, "
@@ -37,9 +37,9 @@ class TestChunkLoader:
 
     def test_loads_chunk_embeddings(self):
         db_path, conn = self._setup_db()
-        conn.execute("INSERT INTO books VALUES ('b1', 'Test Book')")
+        conn.execute("INSERT INTO books VALUES ('b1', 'Test Book', 'Test Author')")
         conn.execute(
-            "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md')"
+            "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)"
         )
         blob, arr = self._make_embedding_blob()
         conn.execute(

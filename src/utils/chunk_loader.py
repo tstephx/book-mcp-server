@@ -50,7 +50,9 @@ def load_chunk_embeddings(
                 c.title AS chapter_title,
                 c.chapter_number,
                 c.file_path,
-                b.title AS book_title
+                c.word_count,
+                b.title AS book_title,
+                b.author
             FROM chunks k
             JOIN chapters c ON k.chapter_id = c.id
             JOIN books b ON k.book_id = b.id
@@ -74,11 +76,13 @@ def load_chunk_embeddings(
             "chapter_id": row["chapter_id"],
             "book_id": row["book_id"],
             "book_title": row["book_title"],
+            "author": row["author"],
             "chapter_title": row["chapter_title"],
             "chapter_number": row["chapter_number"],
             "chunk_index": row["chunk_index"],
             "content": row["content"],
             "file_path": row["file_path"],
+            "word_count": row["word_count"],
         })
 
     matrix = np.vstack(embeddings)
@@ -88,3 +92,33 @@ def load_chunk_embeddings(
 
     logger.info(f"Loaded {len(metadata)} chunk embeddings from DB")
     return matrix, metadata
+
+
+def best_chunk_per_chapter(
+    chunk_results: list[dict],
+) -> list[dict]:
+    """Aggregate chunk-level search results to chapter level.
+
+    Takes the best-scoring chunk per chapter and returns chapter-level
+    results with the best chunk's content attached as ``excerpt``.
+
+    Each item in *chunk_results* must have at least:
+    ``chapter_id``, ``similarity``, and ``content`` (chunk text).
+    Any extra keys (book_title, chapter_title, etc.) are preserved
+    from the winning chunk.
+
+    Returns:
+        List of chapter-level result dicts sorted by descending similarity.
+    """
+    best: dict[str, dict] = {}
+
+    for r in chunk_results:
+        ch_id = r["chapter_id"]
+        if ch_id not in best or r["similarity"] > best[ch_id]["similarity"]:
+            entry = {k: v for k, v in r.items() if k not in ("chunk_id", "chunk_index")}
+            entry["excerpt"] = r.get("content", "")
+            best[ch_id] = entry
+
+    results = list(best.values())
+    results.sort(key=lambda x: x["similarity"], reverse=True)
+    return results

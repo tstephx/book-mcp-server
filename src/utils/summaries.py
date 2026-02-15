@@ -353,7 +353,7 @@ def generate_summary_embedding(chapter_id: str, generator) -> bool:
     np.save(buf, embedding)
     embedding_blob = buf.getvalue()
 
-    model_name = getattr(generator, 'model_name', 'all-MiniLM-L6-v2')
+    model_name = 'text-embedding-3-small'
 
     # Store in DB
     try:
