@@ -4,7 +4,6 @@ These tests mock the embedding generator and database to test the tool's
 orchestration logic without requiring a real library database.
 """
 
-import io
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -14,27 +13,29 @@ import pytest
 # ─── Fixtures ─────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mock_embeddings():
-    """Create mock embeddings matrix and metadata"""
+def mock_chunk_embeddings():
+    """Create mock chunk embeddings matrix and metadata"""
     np.random.seed(42)
-    n_chapters = 10
-    dim = 384
+    n_chunks = 10
+    dim = 1536
 
-    matrix = np.random.randn(n_chapters, dim).astype(np.float32)
-    # Normalize for realistic cosine similarities
+    matrix = np.random.randn(n_chunks, dim).astype(np.float32)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     matrix = matrix / norms
 
     metadata = [
         {
-            'id': f'ch-{i}',
+            'chunk_id': f'ch-{i}:0',
+            'chapter_id': f'ch-{i}',
             'book_id': f'book-{i % 3}',
             'book_title': f'Book {i % 3}',
             'chapter_title': f'Chapter {i}',
             'chapter_number': i + 1,
+            'chunk_index': 0,
+            'content': f'Content of chunk {i}',
             'file_path': f'/tmp/books/ch-{i}.md',
         }
-        for i in range(n_chapters)
+        for i in range(n_chunks)
     ]
 
     return matrix, metadata
@@ -42,14 +43,10 @@ def mock_embeddings():
 
 @pytest.fixture
 def mock_generator():
-    """Mock embedding generator"""
+    """Mock OpenAI embedding generator"""
     gen = MagicMock()
-    gen.model_name = 'test-model'
     np.random.seed(123)
-    gen.generate.return_value = np.random.randn(384).astype(np.float32)
-    gen.generate_batch.side_effect = lambda texts: [
-        np.random.randn(384).astype(np.float32) for _ in texts
-    ]
+    gen.generate.return_value = np.random.randn(1536).astype(np.float32)
     return gen
 
 
@@ -82,44 +79,50 @@ def mock_fts_results():
     }
 
 
+def _capture_hybrid_search():
+    """Register and capture the hybrid_search function."""
+    from src.tools.hybrid_search_tool import register_hybrid_search_tools
+
+    mcp = MagicMock()
+    captured_fn = {}
+
+    def capture_tool():
+        def decorator(fn):
+            captured_fn['hybrid_search'] = fn
+            return fn
+        return decorator
+
+    mcp.tool = capture_tool
+    register_hybrid_search_tools(mcp)
+    return captured_fn['hybrid_search']
+
+
 # ─── Tests ────────────────────────────────────────────────────────────
 
 class TestHybridSearchTool:
 
-    def test_returns_results(self, mock_embeddings, mock_generator, mock_fts_results):
+    def test_returns_results(self, mock_chunk_embeddings, mock_generator, mock_fts_results):
         """Basic happy path: returns fused results"""
-        matrix, metadata = mock_embeddings
+        matrix, metadata = mock_chunk_embeddings
 
-        with patch('src.tools.hybrid_search_tool.embedding_model_context') as mock_ctx, \
-             patch('src.tools.hybrid_search_tool.load_chapter_embeddings') as mock_load, \
+        with patch('src.tools.hybrid_search_tool._get_generator') as mock_get_gen, \
+             patch('src.tools.hybrid_search_tool.load_chunk_embeddings') as mock_load, \
              patch('src.tools.hybrid_search_tool.full_text_search') as mock_fts, \
-             patch('src.tools.hybrid_search_tool.read_chapter_content') as mock_read, \
-             patch('src.tools.hybrid_search_tool.extract_relevant_excerpt') as mock_excerpt:
+             patch('src.tools.hybrid_search_tool.rerank_results') as mock_rerank:
 
-            mock_ctx.return_value.__enter__ = MagicMock(return_value=mock_generator)
-            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-
+            mock_get_gen.return_value = mock_generator
             mock_load.return_value = (matrix, metadata)
-
             mock_fts.return_value = mock_fts_results
-            mock_read.return_value = "Some chapter content"
-            mock_excerpt.return_value = "Relevant excerpt..."
 
-            from src.tools.hybrid_search_tool import register_hybrid_search_tools
+            # rerank passes through with chunk_content + rerank_score
+            def passthrough_rerank(query, results, top_n=10, content_key="chunk_content"):
+                for r in results:
+                    r['rerank_score'] = 0.8
+                return results
+            mock_rerank.side_effect = passthrough_rerank
 
-            mcp = MagicMock()
-            captured_fn = {}
-
-            def capture_tool():
-                def decorator(fn):
-                    captured_fn['hybrid_search'] = fn
-                    return fn
-                return decorator
-
-            mcp.tool = capture_tool
-            register_hybrid_search_tools(mcp)
-
-            result = captured_fn['hybrid_search']("docker networking", limit=5)
+            fn = _capture_hybrid_search()
+            result = fn("docker networking", limit=5)
 
             assert 'results' in result
             assert 'fusion_stats' in result
@@ -127,27 +130,23 @@ class TestHybridSearchTool:
             assert len(result['results']) > 0
             assert result['fusion_stats']['fts_candidates'] == 2
 
-    def test_diverse_flag(self, mock_embeddings, mock_generator, mock_fts_results):
+    def test_diverse_flag(self, mock_chunk_embeddings, mock_generator, mock_fts_results):
         """diverse=True should apply MMR re-ranking"""
-        matrix, metadata = mock_embeddings
+        matrix, metadata = mock_chunk_embeddings
 
-        with patch('src.tools.hybrid_search_tool.embedding_model_context') as mock_ctx, \
-             patch('src.tools.hybrid_search_tool.load_chapter_embeddings') as mock_load, \
+        with patch('src.tools.hybrid_search_tool._get_generator') as mock_get_gen, \
+             patch('src.tools.hybrid_search_tool.load_chunk_embeddings') as mock_load, \
              patch('src.tools.hybrid_search_tool.full_text_search') as mock_fts, \
-             patch('src.tools.hybrid_search_tool.read_chapter_content') as mock_read, \
-             patch('src.tools.hybrid_search_tool.extract_relevant_excerpt') as mock_excerpt, \
+             patch('src.tools.hybrid_search_tool.rerank_results') as mock_rerank, \
+             patch('src.tools.hybrid_search_tool.find_top_k') as mock_topk, \
              patch('src.tools.hybrid_search_tool.maximal_marginal_relevance') as mock_mmr:
 
-            mock_ctx.return_value.__enter__ = MagicMock(return_value=mock_generator)
-            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-
+            mock_get_gen.return_value = mock_generator
             mock_load.return_value = (matrix, metadata)
-
             mock_fts.return_value = mock_fts_results
-            mock_read.return_value = "Content"
-            mock_excerpt.return_value = "Excerpt"
+            # Return multiple semantic hits so fusion produces >1 results
+            mock_topk.return_value = [(0, 0.9), (3, 0.85), (5, 0.7)]
 
-            # MMR returns a subset
             mock_mmr.return_value = [{
                 'chapter_id': 'ch-0',
                 'book_id': 'book-0',
@@ -160,79 +159,42 @@ class TestHybridSearchTool:
                 'sources': ['fts', 'semantic'],
             }]
 
-            from src.tools.hybrid_search_tool import register_hybrid_search_tools
+            def passthrough_rerank(query, results, top_n=10, content_key="chunk_content"):
+                for r in results:
+                    r['rerank_score'] = 0.8
+                return results
+            mock_rerank.side_effect = passthrough_rerank
 
-            mcp = MagicMock()
-            captured_fn = {}
-
-            def capture_tool():
-                def decorator(fn):
-                    captured_fn['hybrid_search'] = fn
-                    return fn
-                return decorator
-
-            mcp.tool = capture_tool
-            register_hybrid_search_tools(mcp)
-
-            result = captured_fn['hybrid_search']("docker networking", diverse=True, limit=5)
+            fn = _capture_hybrid_search()
+            result = fn("docker networking", diverse=True, limit=5)
 
             assert result['diverse'] is True
             mock_mmr.assert_called_once()
 
     def test_empty_query(self):
         """Empty query returns error"""
-        from src.tools.hybrid_search_tool import register_hybrid_search_tools
-
-        mcp = MagicMock()
-        captured_fn = {}
-
-        def capture_tool():
-            def decorator(fn):
-                captured_fn['hybrid_search'] = fn
-                return fn
-            return decorator
-
-        mcp.tool = capture_tool
-        register_hybrid_search_tools(mcp)
-
-        result = captured_fn['hybrid_search']("", limit=5)
+        fn = _capture_hybrid_search()
+        result = fn("", limit=5)
         assert 'error' in result
         assert result['results'] == []
 
-    def test_no_embeddings(self, mock_generator, mock_fts_results):
+    def test_no_embeddings(self, mock_generator):
         """Should return error when no embeddings loaded"""
-        with patch('src.tools.hybrid_search_tool.embedding_model_context') as mock_ctx, \
-             patch('src.tools.hybrid_search_tool.load_chapter_embeddings') as mock_load:
+        with patch('src.tools.hybrid_search_tool._get_generator') as mock_get_gen, \
+             patch('src.tools.hybrid_search_tool.load_chunk_embeddings') as mock_load:
 
-            mock_ctx.return_value.__enter__ = MagicMock(return_value=mock_generator)
-            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-
+            mock_get_gen.return_value = mock_generator
             mock_load.return_value = (None, None)
 
-            from src.tools.hybrid_search_tool import register_hybrid_search_tools
-
-            mcp = MagicMock()
-            captured_fn = {}
-
-            def capture_tool():
-                def decorator(fn):
-                    captured_fn['hybrid_search'] = fn
-                    return fn
-                return decorator
-
-            mcp.tool = capture_tool
-            register_hybrid_search_tools(mcp)
-
-            result = captured_fn['hybrid_search']("docker networking")
+            fn = _capture_hybrid_search()
+            result = fn("docker networking")
             assert 'error' in result
 
-    def test_fts_only_results(self, mock_embeddings, mock_generator):
+    def test_fts_only_results(self, mock_chunk_embeddings, mock_generator):
         """When semantic search finds nothing, FTS results still come through"""
-        matrix, metadata = mock_embeddings
+        matrix, metadata = mock_chunk_embeddings
 
-        # Create a query embedding that's very different from all chapters
-        # so semantic search returns nothing with min_similarity=0.9
-        orthogonal = np.zeros(384, dtype=np.float32)
+        orthogonal = np.zeros(1536, dtype=np.float32)
         orthogonal[0] = 1.0
         mock_generator.generate.return_value = orthogonal
 
@@ -250,76 +212,49 @@ class TestHybridSearchTool:
             'total_found': 1,
         }
 
-        with patch('src.tools.hybrid_search_tool.embedding_model_context') as mock_ctx, \
-             patch('src.tools.hybrid_search_tool.load_chapter_embeddings') as mock_load, \
+        with patch('src.tools.hybrid_search_tool._get_generator') as mock_get_gen, \
+             patch('src.tools.hybrid_search_tool.load_chunk_embeddings') as mock_load, \
              patch('src.tools.hybrid_search_tool.full_text_search') as mock_fts, \
-             patch('src.tools.hybrid_search_tool.read_chapter_content') as mock_read, \
-             patch('src.tools.hybrid_search_tool.extract_relevant_excerpt') as mock_excerpt:
+             patch('src.tools.hybrid_search_tool.rerank_results') as mock_rerank:
 
-            mock_ctx.return_value.__enter__ = MagicMock(return_value=mock_generator)
-            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-
+            mock_get_gen.return_value = mock_generator
             mock_load.return_value = (matrix, metadata)
-
             mock_fts.return_value = fts_results
-            mock_read.return_value = "Content"
-            mock_excerpt.return_value = "Excerpt"
 
-            from src.tools.hybrid_search_tool import register_hybrid_search_tools
+            def passthrough_rerank(query, results, top_n=10, content_key="chunk_content"):
+                for r in results:
+                    r['rerank_score'] = 0.5
+                return results
+            mock_rerank.side_effect = passthrough_rerank
 
-            mcp = MagicMock()
-            captured_fn = {}
-
-            def capture_tool():
-                def decorator(fn):
-                    captured_fn['hybrid_search'] = fn
-                    return fn
-                return decorator
-
-            mcp.tool = capture_tool
-            register_hybrid_search_tools(mcp)
-
-            result = captured_fn['hybrid_search']("obscure keyword", min_similarity=0.9)
+            fn = _capture_hybrid_search()
+            result = fn("obscure keyword", min_similarity=0.9)
 
             assert len(result['results']) >= 1
-            # At least the FTS result should be there
             ids = [r['chapter_id'] for r in result['results']]
             assert 'ch-0' in ids
 
-    def test_fusion_stats_overlap(self, mock_embeddings, mock_generator, mock_fts_results):
+    def test_fusion_stats_overlap(self, mock_chunk_embeddings, mock_generator, mock_fts_results):
         """fusion_stats.in_both should count overlap correctly"""
-        matrix, metadata = mock_embeddings
+        matrix, metadata = mock_chunk_embeddings
 
-        with patch('src.tools.hybrid_search_tool.embedding_model_context') as mock_ctx, \
-             patch('src.tools.hybrid_search_tool.load_chapter_embeddings') as mock_load, \
+        with patch('src.tools.hybrid_search_tool._get_generator') as mock_get_gen, \
+             patch('src.tools.hybrid_search_tool.load_chunk_embeddings') as mock_load, \
              patch('src.tools.hybrid_search_tool.full_text_search') as mock_fts, \
-             patch('src.tools.hybrid_search_tool.read_chapter_content') as mock_read, \
-             patch('src.tools.hybrid_search_tool.extract_relevant_excerpt') as mock_excerpt:
+             patch('src.tools.hybrid_search_tool.rerank_results') as mock_rerank:
 
-            mock_ctx.return_value.__enter__ = MagicMock(return_value=mock_generator)
-            mock_ctx.return_value.__exit__ = MagicMock(return_value=False)
-
+            mock_get_gen.return_value = mock_generator
             mock_load.return_value = (matrix, metadata)
-
             mock_fts.return_value = mock_fts_results
-            mock_read.return_value = "Content"
-            mock_excerpt.return_value = "Excerpt"
 
-            from src.tools.hybrid_search_tool import register_hybrid_search_tools
+            def passthrough_rerank(query, results, top_n=10, content_key="chunk_content"):
+                for r in results:
+                    r['rerank_score'] = 0.7
+                return results
+            mock_rerank.side_effect = passthrough_rerank
 
-            mcp = MagicMock()
-            captured_fn = {}
-
-            def capture_tool():
-                def decorator(fn):
-                    captured_fn['hybrid_search'] = fn
-                    return fn
-                return decorator
-
-            mcp.tool = capture_tool
-            register_hybrid_search_tools(mcp)
-
-            result = captured_fn['hybrid_search']("docker networking", limit=10)
+            fn = _capture_hybrid_search()
+            result = fn("docker networking", limit=10)
 
             stats = result['fusion_stats']
             assert 'fts_candidates' in stats
