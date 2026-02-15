@@ -1,0 +1,1222 @@
+{
+  "total": 206,
+  "passed": 128,
+  "flagged": 78,
+  "books": [
+    {
+      "book_id": "da4cacc1-f83b-48f4-93d0-36bad55ffe2d",
+      "title": "EXPLORE ESP32 MICROPYTHON: Python Coding, Arduino Coding, Raspberry Pi, ESP8266, IoT Projects, Android Application Projects",
+      "chapter_count": 23,
+      "reasons": [
+        "Largest chapter is 6.2x the median (7,288 vs 1,169) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 23,
+        "total_words": 48163,
+        "max_word_count": 7288,
+        "median_word_count": 1169,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "648150d6-c963-4f99-9aa3-b2dfc86de1ce",
+      "title": "Building AI Agents with LLMs, RAG, and Knowledge Graphs",
+      "chapter_count": 13,
+      "reasons": [
+        "Chapter exceeds max word count: 27,806 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 13,
+        "total_words": 158988,
+        "max_word_count": 27806,
+        "median_word_count": 10722,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "6ee3740a-206a-473f-b10a-cefef36acbd8",
+      "title": "Digital Twins in Action",
+      "chapter_count": 5,
+      "reasons": [
+        "Too few chapters: 5 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 5,
+        "total_words": 38838,
+        "max_word_count": 11416,
+        "median_word_count": 9262,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "e0eb996e-c220-46d0-8674-0f552ef1df07",
+      "title": "Building Production-Grade Web Applications with Supabase: A Comprehensive Guide to Database Design, Security, Real-Time Data, Storage, Multi-Tenancy, and More",
+      "chapter_count": 14,
+      "reasons": [
+        "Chapter exceeds max word count: 20,790 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 14,
+        "total_words": 129029,
+        "max_word_count": 20790,
+        "median_word_count": 8644.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "38b661f2-d612-49e6-9908-3cb505ace36d",
+      "title": "Data-Driven Graphic Design",
+      "chapter_count": 5,
+      "reasons": [
+        "Too few chapters: 5 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 5,
+        "total_words": 27032,
+        "max_word_count": 8791,
+        "median_word_count": 4311,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "9cd6259c-4088-4fad-9794-d9170bd6495b",
+      "title": "Docker: Complete Guide To Docker For Beginners And Intermediates: (Code tutorials Book 6)",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 11873,
+        "max_word_count": 4718,
+        "median_word_count": 3594,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "7af0960f-d884-4354-bae8-567ff79bd695",
+      "title": "Excel 2024: From Beginner to Pro- A Comprehensive Guide to Excel`s Power and Potential. Functions, Calculations, Charts, Pivot tables. With 3 Bonus.",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Largest chapter is 313.0x the median (17,995 vs 57.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 18264,
+        "max_word_count": 17995,
+        "median_word_count": 57.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "432a7d37-53f1-429b-8647-911af7818477",
+      "title": "Print",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 24998,
+        "max_word_count": 7460,
+        "median_word_count": 3436.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "f25bfb23-0095-4790-99e4-43a94df9d10b",
+      "title": "Python Workout, Second Edition",
+      "chapter_count": 8,
+      "reasons": [
+        "Chapter exceeds max word count: 29,968 words (max 20,000)",
+        "Largest chapter is 6.9x the median (29,968 vs 4,341.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 8,
+        "total_words": 60594,
+        "max_word_count": 29968,
+        "median_word_count": 4341.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "63d02f40-61c4-4691-bb4c-25a21e2e4817",
+      "title": "The AI Optimization Playbook",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 23,169 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 65662,
+        "max_word_count": 23169,
+        "median_word_count": 7179,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "99e8b63b-e2fc-4a63-84da-229b3b05025d",
+      "title": "Linux Coding & Programming The Complete Manual",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 9507,
+        "max_word_count": 2500,
+        "median_word_count": 2500.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "07223df6-2b28-4eba-9a68-0e6f5b30b70e",
+      "title": "Advanced Forecasting with Python",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 24,420 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 67473,
+        "max_word_count": 24420,
+        "median_word_count": 9870.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "870a1779-a120-4822-b70c-ba9e00f9ee82",
+      "title": "Clean Architecture with Python",
+      "chapter_count": 8,
+      "reasons": [
+        "Chapter exceeds max word count: 24,476 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 8,
+        "total_words": 63790,
+        "max_word_count": 24476,
+        "median_word_count": 6492.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "9cb419bb-f774-4128-934e-5d321c156eb8",
+      "title": "1394159641",
+      "chapter_count": 12,
+      "reasons": [
+        "Chapter exceeds max word count: 25,737 words (max 20,000)",
+        "Largest chapter is 4.3x the median (25,737 vs 5,922.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 12,
+        "total_words": 91073,
+        "max_word_count": 25737,
+        "median_word_count": 5922.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "800e36fc-2c67-4581-8c7d-2044bee5dd5c",
+      "title": "Cutting-Edge Artificial Intelligence Advances and Implications in Real-World Applications",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 21988,
+        "max_word_count": 8437,
+        "median_word_count": 6430.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "53b68400-d1f2-4ad9-bd8c-aaf8bc5b4929",
+      "title": "Poor Charlie's Almanack",
+      "chapter_count": 16,
+      "reasons": [
+        "Chapter exceeds max word count: 31,080 words (max 20,000)",
+        "Largest chapter is 7.6x the median (31,080 vs 4,069.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 16,
+        "total_words": 118874,
+        "max_word_count": 31080,
+        "median_word_count": 4069.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "9f0df364-d1de-401f-9df0-5b1a10489f9b",
+      "title": "How To Answer Interview Questions - II",
+      "chapter_count": 9,
+      "reasons": [
+        "Chapter exceeds max word count: 24,897 words (max 20,000)",
+        "Largest chapter is 19.2x the median (24,897 vs 1,298) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 9,
+        "total_words": 38899,
+        "max_word_count": 24897,
+        "median_word_count": 1298,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "9516b6ed-1c9f-47ac-b003-7caeb57ba07e",
+      "title": "What Makes Love Last?",
+      "chapter_count": 13,
+      "reasons": [
+        "Largest chapter is 6.4x the median (18,095 vs 2,814) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 13,
+        "total_words": 76629,
+        "max_word_count": 18095,
+        "median_word_count": 2814,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "ac9db416-6f0e-477f-9647-5e8c91b7bb51",
+      "title": "A Dirty Guide to a Clean Home",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 31,574 words (max 20,000)",
+        "Largest chapter is 8.9x the median (31,574 vs 3,551.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 57327,
+        "max_word_count": 31574,
+        "median_word_count": 3551.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "e5f211bc-3fd1-4a2c-b3af-3e5fe5151852",
+      "title": "506963636",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)",
+        "Total word count too low: 4,332 (minimum 5,000 required)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 4332,
+        "max_word_count": 4332,
+        "median_word_count": 4332,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "616930ae-dfd1-4acf-b843-d76d4773a9f3",
+      "title": "Introduction to the Design and Analysis of Algorithms",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 23894,
+        "max_word_count": 15606,
+        "median_word_count": 4874,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "b33a680e-824c-4186-a405-1da070054037",
+      "title": "Issue 301 - December 2025",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 40988,
+        "max_word_count": 15371,
+        "median_word_count": 4704.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "358efd6e-9186-4076-b89c-d0f211fa75c5",
+      "title": "Responsive Web Design with HTML 5 & CSS 9th By Jessica Minnick",
+      "chapter_count": 36,
+      "reasons": [
+        "Chapter exceeds max word count: 21,806 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 36,
+        "total_words": 249475,
+        "max_word_count": 21806,
+        "median_word_count": 5753.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "e1dc6331-2c67-465a-9cf0-ff0f18b9f015",
+      "title": "Modernizing Drupal 10 Theme Development",
+      "chapter_count": 14,
+      "reasons": [
+        "Chapter exceeds max word count: 24,199 words (max 20,000)",
+        "Largest chapter is 10.0x the median (24,199 vs 2,412.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 14,
+        "total_words": 74045,
+        "max_word_count": 24199,
+        "median_word_count": 2412.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "212aa51f-dfca-42a9-b4ea-c5fb9781d0e9",
+      "title": "Balancing Coupling in Software Design Universal Design Principles for Architecting Modular Software Systems",
+      "chapter_count": 30,
+      "reasons": [
+        "Largest chapter is 5.0x the median (8,933 vs 1,769.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 30,
+        "total_words": 82061,
+        "max_word_count": 8933,
+        "median_word_count": 1769.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "e7435d85-c896-4900-99c0-54dec5e8efc7",
+      "title": "Derivatives analytics with Python : data analysis, models, simulation, calibration and hedging",
+      "chapter_count": 10,
+      "reasons": [
+        "Largest chapter is 6.2x the median (19,183 vs 3,101.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 10,
+        "total_words": 62098,
+        "max_word_count": 19183,
+        "median_word_count": 3101.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "9a60e105-b0a1-49de-9023-cbb882cbb4d9",
+      "title": "Create GUI Applications with Python & Qt6: The hands-on guide to making apps with Python",
+      "chapter_count": 29,
+      "reasons": [
+        "Largest chapter is 6.7x the median (11,957 vs 1,793) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 29,
+        "total_words": 91871,
+        "max_word_count": 11957,
+        "median_word_count": 1793,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "29d7afe9-c5e6-461b-be72-cee42b83aebd",
+      "title": "IGI EPUB Test Book 85x11",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 26,915 words (max 20,000)",
+        "Largest chapter is 7.5x the median (26,915 vs 3,583) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 64991,
+        "max_word_count": 26915,
+        "median_word_count": 3583,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "d356a9e0-1cc6-4db6-b691-5e53cac6909a",
+      "title": "WordPress Styling with Blocks, Patterns, Templates, and Themes",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 47282,
+        "max_word_count": 13856,
+        "median_word_count": 9323.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "51dee4b9-84a8-40bc-b103-3d8bc3d1bdd5",
+      "title": "Beautiful C++: 30 Core Guidelines for Writing Clean, Safe, and Fast Code",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 48,828 words (max 20,000)",
+        "Largest chapter is 9.2x the median (48,828 vs 5,304.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 81122,
+        "max_word_count": 48828,
+        "median_word_count": 5304.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "5e3b09e0-10e7-4d7b-a310-c82050875af3",
+      "title": "A Self-Help Guide for Copywriters",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 16830,
+        "max_word_count": 6385,
+        "median_word_count": 4342.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "c29ad515-6472-4f15-a187-8aa072602fdf",
+      "title": "The Ultimate Copywriting Guide for Beginners to Advanced",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)",
+        "Total word count too low: 2,149 (minimum 5,000 required)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 2149,
+        "max_word_count": 2149,
+        "median_word_count": 2149,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "11085942-1079-4b69-8887-1e7bf40100ef",
+      "title": "The Copywriter's Handbook",
+      "chapter_count": 5,
+      "reasons": [
+        "Too few chapters: 5 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 5,
+        "total_words": 13206,
+        "max_word_count": 4718,
+        "median_word_count": 2807,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "42884b58-1673-481a-9d49-95d242e69098",
+      "title": "Building a StoryBrand 2.0: Clarify Your Message So Customers Will Listen",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 44,727 words (max 20,000)",
+        "Largest chapter is 13.0x the median (44,727 vs 3,438) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 66976,
+        "max_word_count": 44727,
+        "median_word_count": 3438,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "e22fc53c-7fd0-4d98-86eb-e6b9d361235c",
+      "title": "Blog Writing",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 16200,
+        "max_word_count": 6655,
+        "median_word_count": 4006.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "34b7852c-9a0b-4963-bc72-95dab057cb66",
+      "title": "Git Essentials - A Developer\u2019s Guide to Git",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)",
+        "Largest chapter is 4.9x the median (16,832 vs 3,465.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 26780,
+        "max_word_count": 16832,
+        "median_word_count": 3465.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "48eacb76-ece0-4b4a-a022-aa9256efef7d",
+      "title": "GitHub for Next-Generation Coders",
+      "chapter_count": 8,
+      "reasons": [
+        "Chapter exceeds max word count: 22,260 words (max 20,000)",
+        "Largest chapter is 4.4x the median (22,260 vs 5,075.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 8,
+        "total_words": 54761,
+        "max_word_count": 22260,
+        "median_word_count": 5075.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "b1a3304e-3012-4419-b4e5-2eeb3f55a02f",
+      "title": "Mastering GitHub Actions",
+      "chapter_count": 15,
+      "reasons": [
+        "Chapter exceeds max word count: 23,572 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 15,
+        "total_words": 105318,
+        "max_word_count": 23572,
+        "median_word_count": 6076,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "ea9e4609-9675-43ab-834f-388a48102377",
+      "title": "Building Modern CLI Applications in Go",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 74140,
+        "max_word_count": 15475,
+        "median_word_count": 13583.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "1fc1a5c0-3159-451a-b616-fc68cb56f242",
+      "title": "Python for DevOps: Master automation, CI/CD pipelines, and containerization with Python DevOps strategies",
+      "chapter_count": 15,
+      "reasons": [
+        "Chapter exceeds max word count: 20,076 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 15,
+        "total_words": 115476,
+        "max_word_count": 20076,
+        "median_word_count": 6586,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "eb8dbcf8-0757-4895-a5b4-9e0e51bd233b",
+      "title": "Just Use Postgres!: All the database you need",
+      "chapter_count": 10,
+      "reasons": [
+        "Largest chapter is 4.3x the median (14,670 vs 3,426.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 10,
+        "total_words": 51195,
+        "max_word_count": 14670,
+        "median_word_count": 3426.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "32c64bac-f4b5-46bb-abf4-f0e1f76d7195",
+      "title": "Python Object-Oriented Programming",
+      "chapter_count": 4,
+      "reasons": [
+        "Too few chapters: 4 (minimum 7 required)",
+        "Chapter exceeds max word count: 22,621 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 4,
+        "total_words": 39247,
+        "max_word_count": 22621,
+        "median_word_count": 6950.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "330363f3-c2aa-4c75-b1b6-7a233b749a54",
+      "title": "Knowledge Graphs and LLMs in Action",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 43,833 words (max 20,000)",
+        "Largest chapter is 4.5x the median (43,833 vs 9,823) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 104008,
+        "max_word_count": 43833,
+        "median_word_count": 9823,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "c341e840-c0dd-4e04-b256-b3833fbd2b5c",
+      "title": "Python Testing with pytest",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 31,396 words (max 20,000)",
+        "Largest chapter is 10.8x the median (31,396 vs 2,914) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 50558,
+        "max_word_count": 31396,
+        "median_word_count": 2914,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "699da0cc-2fca-4baf-b839-d6af69c148e0",
+      "title": "Rust Web Programming - Third Edition",
+      "chapter_count": 15,
+      "reasons": [
+        "Chapter exceeds max word count: 26,013 words (max 20,000)",
+        "Largest chapter is 4.1x the median (26,013 vs 6,292) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 15,
+        "total_words": 121974,
+        "max_word_count": 26013,
+        "median_word_count": 6292,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "eb1921db-ae8f-4ad9-a888-7ea006658ae2",
+      "title": "Building Natural Language and LLM Pipelines",
+      "chapter_count": 5,
+      "reasons": [
+        "Too few chapters: 5 (minimum 7 required)",
+        "Chapter exceeds max word count: 20,898 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 5,
+        "total_words": 63929,
+        "max_word_count": 20898,
+        "median_word_count": 16151,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "bf357c8c-5f0d-477e-a35c-cf60916b7218",
+      "title": "Fundamentals of Robust Machine Learning",
+      "chapter_count": 12,
+      "reasons": [
+        "Chapter exceeds max word count: 43,237 words (max 20,000)",
+        "Largest chapter is 11.1x the median (43,237 vs 3,879.0) \u2014 max allowed is 4.0x",
+        "1 suspicious chapter title(s): ['Table 2.2 Estimates from LSE, LAD, and Huber.']"
+      ],
+      "metrics": {
+        "chapter_count": 12,
+        "total_words": 96349,
+        "max_word_count": 43237,
+        "median_word_count": 3879.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "b22ba156-c231-47bc-b03f-4cd6140a710c",
+      "title": "Learning Angular, Fifth Edition",
+      "chapter_count": 11,
+      "reasons": [
+        "Chapter exceeds max word count: 48,535 words (max 20,000)",
+        "Largest chapter is 14.3x the median (48,535 vs 3,392) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 11,
+        "total_words": 80495,
+        "max_word_count": 48535,
+        "median_word_count": 3392,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "071244fb-9a53-4482-bee5-03115bbd890e",
+      "title": "William Ellet-The case study discussions etc",
+      "chapter_count": 11,
+      "reasons": [
+        "Chapter exceeds max word count: 35,816 words (max 20,000)",
+        "Largest chapter is 11.1x the median (35,816 vs 3,237) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 11,
+        "total_words": 87313,
+        "max_word_count": 35816,
+        "median_word_count": 3237,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "db1dbabf-914d-42fa-b40f-e37a732aaa0d",
+      "title": "Infrastructure as Code for Beginners Deploy and manage your cloud-based services with Terraform and Ansible",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)",
+        "Chapter exceeds max word count: 22,590 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 54741,
+        "max_word_count": 22590,
+        "median_word_count": 16449,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "adf8dad9-f2ba-4888-9935-ea9ac4b00955",
+      "title": "The All-or-Nothing Marriage",
+      "chapter_count": 8,
+      "reasons": [
+        "Chapter exceeds max word count: 25,522 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 8,
+        "total_words": 76066,
+        "max_word_count": 25522,
+        "median_word_count": 8037.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "401f7bb9-b8e6-49b9-9cc9-11c37b6492e4",
+      "title": "The Total Knife Manual",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 30,244 words (max 20,000)",
+        "Largest chapter is 9.0x the median (30,244 vs 3,342.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 46336,
+        "max_word_count": 30244,
+        "median_word_count": 3342.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "bf3d919a-68e0-45ce-8cf2-65066b99e181",
+      "title": "Linux\u00ae Command Line and Shell Scripting BIBLE",
+      "chapter_count": 15,
+      "reasons": [
+        "Chapter exceeds max word count: 28,242 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 15,
+        "total_words": 151002,
+        "max_word_count": 28242,
+        "median_word_count": 7475,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "f9ea4c32-f713-4a14-9024-c491d7f6451e",
+      "title": "Work the System",
+      "chapter_count": 21,
+      "reasons": [
+        "Largest chapter is 6.5x the median (19,187 vs 2,939) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 21,
+        "total_words": 86472,
+        "max_word_count": 19187,
+        "median_word_count": 2939,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "f6cca956-ad2a-4021-8af0-3c990d89a064",
+      "title": "Untangling AI: Driving Business Success Through Enterprise Automation and AI Agents",
+      "chapter_count": 7,
+      "reasons": [
+        "Chapter exceeds max word count: 37,776 words (max 20,000)",
+        "Largest chapter is 15.7x the median (37,776 vs 2,413) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 7,
+        "total_words": 66756,
+        "max_word_count": 37776,
+        "median_word_count": 2413,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "a520f02f-4c87-40f0-9ae6-3796e15895ec",
+      "title": "Artificial Intelligence: A Modern Approach",
+      "chapter_count": 36,
+      "reasons": [
+        "Chapter exceeds max word count: 32,596 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 36,
+        "total_words": 393520,
+        "max_word_count": 32596,
+        "median_word_count": 9902.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "63a9affd-79bd-4944-a5d5-69a442990189",
+      "title": "Mastering Claude AI: Practical Journey from First Prompts to Pro with Claude AI",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)",
+        "Total word count too low: 2,798 (minimum 5,000 required)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 2798,
+        "max_word_count": 2798,
+        "median_word_count": 2798,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "a3ca64b4-8d43-48f5-bc31-754da7b8dee8",
+      "title": "AI Success Beyond Perfect Data",
+      "chapter_count": 21,
+      "reasons": [
+        "Chapter exceeds max word count: 25,238 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 21,
+        "total_words": 167072,
+        "max_word_count": 25238,
+        "median_word_count": 7982,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "89964c3d-94db-4b60-9196-7122afa0363a",
+      "title": "Build Your First Home Server",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 10607,
+        "max_word_count": 6956,
+        "median_word_count": 2103,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "7e0bceb6-13eb-45e7-b325-8f6b5583e2bc",
+      "title": "Clean Code",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)",
+        "Total word count too low: 1,108 (minimum 5,000 required)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 1108,
+        "max_word_count": 1108,
+        "median_word_count": 1108,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "c21b3b8d-0f33-40e1-b364-e9a4754d5f69",
+      "title": "PHP and MySQL",
+      "chapter_count": 22,
+      "reasons": [
+        "4 suspicious chapter title(s): ['Table 5.2', 'Table 5.6', 'Table 8.1', 'Table 9.1']"
+      ],
+      "metrics": {
+        "chapter_count": 22,
+        "total_words": 78218,
+        "max_word_count": 6199,
+        "median_word_count": 3596.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "dd9685d4-17f8-4a32-8e7b-f50ab4621fc5",
+      "title": "The Last Economy",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)",
+        "Chapter exceeds max word count: 38,910 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 38910,
+        "max_word_count": 38910,
+        "median_word_count": 38910,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "bc628ef6-c680-40c9-b7c4-8b462af33e17",
+      "title": "Head First Design Patterns: Building Extensible and Maintainable Object-Oriented Software",
+      "chapter_count": 11,
+      "reasons": [
+        "Chapter exceeds max word count: 29,024 words (max 20,000)",
+        "Largest chapter is 8.0x the median (29,024 vs 3,650) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 11,
+        "total_words": 84964,
+        "max_word_count": 29024,
+        "median_word_count": 3650,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "3d1ff9e0-a6cf-4dec-b813-c6f53973ae20",
+      "title": "Claude Code for Product Managers: Harnessing Agentic AI for Strategic Outcomes",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 24,873 words (max 20,000)",
+        "Largest chapter is 5.7x the median (24,873 vs 4,334.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 45716,
+        "max_word_count": 24873,
+        "median_word_count": 4334.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "267b0e41-28c1-4f17-88f8-971091d77283",
+      "title": "Python in Excel Step-by-Step",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 26,738 words (max 20,000)",
+        "Largest chapter is 6.2x the median (26,738 vs 4,329.5) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 47271,
+        "max_word_count": 26738,
+        "median_word_count": 4329.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "28b0a737-b385-43de-b6fc-e8ebe5d81883",
+      "title": "Rethinking eLearning",
+      "chapter_count": 13,
+      "reasons": [
+        "Chapter exceeds max word count: 20,917 words (max 20,000)",
+        "Largest chapter is 4.9x the median (20,917 vs 4,226) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 13,
+        "total_words": 69866,
+        "max_word_count": 20917,
+        "median_word_count": 4226,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "1bf27ce5-98bb-4288-85ea-4a3b87c51730",
+      "title": "Mastering Web Design: A Comprehensive Guide to Learn Web Design",
+      "chapter_count": 6,
+      "reasons": [
+        "Too few chapters: 6 (minimum 7 required)",
+        "Chapter exceeds max word count: 24,404 words (max 20,000)",
+        "Largest chapter is 6.3x the median (24,404 vs 3,890.0) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 6,
+        "total_words": 42998,
+        "max_word_count": 24404,
+        "median_word_count": 3890.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "b60cc051-9b14-4f7c-916b-309be69ede9a",
+      "title": "Leveraging Kustomize for Kubernetes Manifests",
+      "chapter_count": 2,
+      "reasons": [
+        "Too few chapters: 2 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 2,
+        "total_words": 5997,
+        "max_word_count": 3422,
+        "median_word_count": 2998.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "785e8f52-5495-44ba-8827-d1e7e2a8ec2a",
+      "title": "DeepSeek in Action: LLM Deployment, Fine-Tuning, and Application",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 22542,
+        "max_word_count": 10619,
+        "median_word_count": 7063,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "dfa91e12-3435-43e2-87bd-c4d5507afbdc",
+      "title": "",
+      "chapter_count": 5,
+      "reasons": [
+        "Too few chapters: 5 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 5,
+        "total_words": 55087,
+        "max_word_count": 13858,
+        "median_word_count": 13472,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "36dbe13d-b6fc-49ec-b1f6-8d42e67b7031",
+      "title": "",
+      "chapter_count": 13,
+      "reasons": [
+        "Chapter exceeds max word count: 23,503 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 13,
+        "total_words": 139664,
+        "max_word_count": 23503,
+        "median_word_count": 8619,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "a8d1d382-e018-4ce3-a2b5-03ea393880c2",
+      "title": "You, I, and ReactiveUI",
+      "chapter_count": 1,
+      "reasons": [
+        "Too few chapters: 1 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 1,
+        "total_words": 18653,
+        "max_word_count": 18653,
+        "median_word_count": 18653,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "5646231a-05e7-424d-b367-4596dd572c2c",
+      "title": "Big Data, Data Mining and Data Science: Algorithms, Infrastructures, Management and Security",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)",
+        "Largest chapter is 5.3x the median (18,424 vs 3,484) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 23410,
+        "max_word_count": 18424,
+        "median_word_count": 3484,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "2e623500-66ec-4f13-b3d4-247b2a8f00b0",
+      "title": "Hands-On Website Scraping with Python: Crawling data scraping with Beautiful Soup, Selenium and more.",
+      "chapter_count": 2,
+      "reasons": [
+        "Too few chapters: 2 (minimum 7 required)",
+        "Chapter exceeds max word count: 25,917 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 2,
+        "total_words": 26313,
+        "max_word_count": 25917,
+        "median_word_count": 13156.5,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "c70c7bcc-4699-4981-b9ca-1e93b7421219",
+      "title": "Mastering Node.js Web Development",
+      "chapter_count": 17,
+      "reasons": [
+        "Chapter exceeds max word count: 41,418 words (max 20,000)",
+        "Largest chapter is 5.8x the median (41,418 vs 7,098) \u2014 max allowed is 4.0x"
+      ],
+      "metrics": {
+        "chapter_count": 17,
+        "total_words": 147939,
+        "max_word_count": 41418,
+        "median_word_count": 7098,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "007ff6f5-9fb5-42b1-91b3-56f8dfbd7246",
+      "title": "Data Mining",
+      "chapter_count": 18,
+      "reasons": [
+        "Chapter exceeds max word count: 29,119 words (max 20,000)"
+      ],
+      "metrics": {
+        "chapter_count": 18,
+        "total_words": 259025,
+        "max_word_count": 29119,
+        "median_word_count": 11727.0,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "af7814ba-c61d-479e-bf56-b4c5d6151be9",
+      "title": "Go Web Scraping Quick Start Guide",
+      "chapter_count": 3,
+      "reasons": [
+        "Too few chapters: 3 (minimum 7 required)"
+      ],
+      "metrics": {
+        "chapter_count": 3,
+        "total_words": 6645,
+        "max_word_count": 3462,
+        "median_word_count": 2165,
+        "duplicate_ratio": 0.0
+      }
+    },
+    {
+      "book_id": "c033143c-8c70-486c-add5-350e732ca3b0",
+      "title": "Web Scraping Projects Using Python: Build Best Practices and Examples Website Scraping with Python",
+      "chapter_count": 2,
+      "reasons": [
+        "Too few chapters: 2 (minimum 7 required)",
+        "Total word count too low: 4,058 (minimum 5,000 required)"
+      ],
+      "metrics": {
+        "chapter_count": 2,
+        "total_words": 4058,
+        "max_word_count": 2346,
+        "median_word_count": 2029.0,
+        "duplicate_ratio": 0.0
+      }
+    }
+  ]
+}
