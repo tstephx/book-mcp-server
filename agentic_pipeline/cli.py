@@ -848,7 +848,7 @@ def audit_quality(as_json: bool):
     total, results = find_flagged_books(db_path)
 
     if as_json:
-        console.print(json_module.dumps({
+        print(json_module.dumps({
             "total": total,
             "passed": total - len(results),
             "flagged": len(results),

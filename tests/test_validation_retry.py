@@ -191,3 +191,53 @@ def test_retry_uses_force_fallback(config, sample_book):
     # Second call: retry with force_fallback=True
     second_call = mock_run_processing.call_args_list[1]
     assert second_call == call(sample_book, book_id=result["pipeline_id"], force_fallback=True)
+
+
+def test_retry_processing_error_rejects_directly(config, sample_book):
+    """ProcessingError during force_fallback retry rejects without NEEDS_RETRY."""
+    import json as json_module
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.orchestrator.errors import ProcessingError
+    from agentic_pipeline.validation import ValidationResult
+    from agentic_pipeline.db.connection import get_pipeline_db
+
+    orchestrator = Orchestrator(config)
+
+    mock_profile = _make_mock_profile()
+    mock_processing_result = _make_processing_result()
+
+    fail_validation = ValidationResult(
+        passed=False,
+        reasons=["Too few chapters: 1 (minimum 7 required)"],
+        warnings=[],
+        metrics={"chapter_count": 1},
+    )
+
+    # First call succeeds, second call (retry) raises ProcessingError
+    mock_run_processing = MagicMock(
+        side_effect=[mock_processing_result, ProcessingError("Splitter crashed")]
+    )
+
+    with patch.object(orchestrator.classifier, "classify", return_value=mock_profile):
+        with patch.object(orchestrator, "_run_processing", mock_run_processing):
+            with patch(
+                "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                return_value=fail_validation,
+            ):
+                result = orchestrator.process_one(sample_book)
+
+    assert result["state"] == "rejected"
+    assert result["error"] == "Splitter crashed"
+    assert mock_run_processing.call_count == 2
+
+    # Verify state history records initial_validation and retry_error
+    with get_pipeline_db(str(config.db_path)) as conn:
+        row = conn.execute(
+            "SELECT error_details FROM pipeline_state_history "
+            "WHERE pipeline_id = ? AND to_state = 'rejected' ORDER BY rowid DESC LIMIT 1",
+            (result["pipeline_id"],),
+        ).fetchone()
+    assert row is not None
+    error_details = json_module.loads(row["error_details"])
+    assert "initial_validation" in error_details
+    assert error_details["retry_error"] == "Splitter crashed"

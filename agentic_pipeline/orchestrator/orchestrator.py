@@ -146,6 +146,18 @@ class Orchestrator:
         self.repo.update_book_profile(pipeline_id, profile_dict)
         return profile_dict
 
+    def _store_processing_result(self, pipeline_id: str, result: dict) -> None:
+        """Persist processing result metrics to the pipeline record."""
+        self.repo.update_processing_result(pipeline_id, {
+            "quality_score": result.get("quality_score"),
+            "detection_confidence": result.get("detection_confidence"),
+            "detection_method": result.get("detection_method"),
+            "chapter_count": result.get("chapter_count"),
+            "word_count": result.get("word_count"),
+            "warnings": result.get("warnings", []),
+            "llm_fallback_used": result.get("llm_fallback_used", False),
+        })
+
     def _run_processing(self, book_path: str, book_id: Optional[str] = None, force_fallback: bool = False) -> dict:
         """Run book-ingestion processing via direct library call.
 
@@ -262,15 +274,7 @@ class Orchestrator:
             return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
         # Store processing results in pipeline record
-        self.repo.update_processing_result(pipeline_id, {
-            "quality_score": processing_result.get("quality_score"),
-            "detection_confidence": processing_result.get("detection_confidence"),
-            "detection_method": processing_result.get("detection_method"),
-            "chapter_count": processing_result.get("chapter_count"),
-            "word_count": processing_result.get("word_count"),
-            "warnings": processing_result.get("warnings", []),
-            "llm_fallback_used": processing_result.get("llm_fallback_used", False),
-        })
+        self._store_processing_result(pipeline_id, processing_result)
 
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
@@ -283,7 +287,7 @@ class Orchestrator:
             # Check if we can retry with force_fallback
             current = self.repo.get(pipeline_id)
             retry_count = current.get("retry_count", 0) if current else 0
-            first_attempt = {"reasons": validation.reasons, "metrics": validation.metrics}
+            initial_validation = {"reasons": validation.reasons, "metrics": validation.metrics}
 
             if retry_count == 0:
                 # First failure — retry with force_fallback
@@ -305,22 +309,14 @@ class Orchestrator:
                         pipeline_id,
                         PipelineState.REJECTED,
                         error_details={
-                            "first_attempt": first_attempt,
+                            "initial_validation": initial_validation,
                             "retry_error": str(e),
                         },
                     )
                     return {"pipeline_id": pipeline_id, "state": PipelineState.REJECTED.value, "error": str(e)}
 
                 # Store updated processing results
-                self.repo.update_processing_result(pipeline_id, {
-                    "quality_score": processing_result.get("quality_score"),
-                    "detection_confidence": processing_result.get("detection_confidence"),
-                    "detection_method": processing_result.get("detection_method"),
-                    "chapter_count": processing_result.get("chapter_count"),
-                    "word_count": processing_result.get("word_count"),
-                    "warnings": processing_result.get("warnings", []),
-                    "llm_fallback_used": processing_result.get("llm_fallback_used", False),
-                })
+                self._store_processing_result(pipeline_id, processing_result)
 
                 # Re-validate
                 self._transition(pipeline_id, PipelineState.VALIDATING)
@@ -338,7 +334,7 @@ class Orchestrator:
                     error_details={
                         "validation_reasons": validation.reasons,
                         "metrics": validation.metrics,
-                        "first_attempt": first_attempt,
+                        "initial_validation": initial_validation,
                     },
                 )
                 return {
