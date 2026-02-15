@@ -20,6 +20,7 @@ from src.utils.openai_embeddings import OpenAIEmbeddingGenerator
 
 from agentic_pipeline.adapters.llm_fallback_adapter import LLMFallbackAdapter
 from agentic_pipeline.db.connection import get_pipeline_db
+from agentic_pipeline.library.chapter_reader import read_chapter_content
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,7 @@ class ProcessingAdapter:
 
                 for ch in chapters:
                     try:
-                        content = self._read_chapter_content(
+                        content = read_chapter_content(
                             ch["file_path"], books_dir
                         )
                         if not content.strip():
@@ -322,60 +323,6 @@ class ProcessingAdapter:
                 chapters_processed=0,
                 error=str(e),
             )
-
-    @staticmethod
-    def _read_chapter_content(file_path: str, books_dir: Path) -> str:
-        """Read chapter content from file, handling split chapters."""
-        path = Path(file_path)
-
-        if not path.is_absolute():
-            # Resolve relative paths (e.g. data/books/...) against books_dir
-            try:
-                rel = path.relative_to("data/books")
-                path = books_dir / rel
-            except ValueError:
-                path = books_dir / path
-
-        if path.is_file():
-            return path.read_text(encoding="utf-8")
-
-        # Handle split chapters (directory with numbered .md parts)
-        dir_path = path if path.is_dir() else path.with_suffix("")
-        if dir_path.is_dir():
-            parts = sorted(
-                p for p in dir_path.glob("[0-9]*.md")
-                if not p.name.startswith("_")
-            )
-            if not parts:
-                parts = sorted(
-                    p for p in dir_path.glob("*.md")
-                    if not p.name.startswith("_")
-                )
-            if parts:
-                return "\n\n".join(p.read_text(encoding="utf-8") for p in parts)
-
-        raise FileNotFoundError(f"Chapter not found: {file_path}")
-
-    @staticmethod
-    def _get_file_mtime(file_path: str, books_dir: Path) -> float:
-        """Get chapter file modification time. Returns 0 on any error."""
-        try:
-            path = Path(file_path)
-            if not path.is_absolute():
-                try:
-                    rel = path.relative_to("data/books")
-                    path = books_dir / rel
-                except ValueError:
-                    path = books_dir / path
-
-            if path.is_dir():
-                mtimes = [p.stat().st_mtime for p in path.glob("*.md")]
-                return max(mtimes) if mtimes else 0
-            elif path.is_file():
-                return path.stat().st_mtime
-            return 0
-        except Exception:
-            return 0
 
     def get_processing_status(self, book_id: str) -> Optional[dict]:
         """

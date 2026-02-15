@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from agentic_pipeline.db.connection import get_pipeline_db
+from agentic_pipeline.library.chapter_reader import read_chapter_content
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def chunk_all_books(db_path: str, dry_run: bool = False) -> dict:
 
         for ch in chapters:
             try:
-                content = _read_chapter_content(ch["file_path"], books_dir)
+                content = read_chapter_content(ch["file_path"], books_dir)
                 if not content.strip():
                     continue
 
@@ -155,34 +156,3 @@ def embed_all_chunks(db_path: str, dry_run: bool = False,
             "total_chunks": total,
             "needs_embedding": 0,
         }
-
-
-def _read_chapter_content(file_path: str, books_dir: Path) -> str:
-    """Read chapter content from file, handling split chapters."""
-    path = Path(file_path)
-
-    if not path.is_absolute():
-        try:
-            rel = path.relative_to("data/books")
-            path = books_dir / rel
-        except ValueError:
-            path = books_dir / path
-
-    if path.is_file():
-        return path.read_text(encoding="utf-8")
-
-    dir_path = path if path.is_dir() else path.with_suffix("")
-    if dir_path.is_dir():
-        parts = sorted(
-            p for p in dir_path.glob("[0-9]*.md")
-            if not p.name.startswith("_")
-        )
-        if not parts:
-            parts = sorted(
-                p for p in dir_path.glob("*.md")
-                if not p.name.startswith("_")
-            )
-        if parts:
-            return "\n\n".join(p.read_text(encoding="utf-8") for p in parts)
-
-    raise FileNotFoundError(f"Chapter not found: {file_path}")
