@@ -244,6 +244,7 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_feedback_category ON autonomy_feedback(feedback_category)",
     "CREATE INDEX IF NOT EXISTS idx_chunks_chapter ON chunks(chapter_id)",
     "CREATE INDEX IF NOT EXISTS idx_chunks_book ON chunks(book_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_chapter_index ON chunks(chapter_id, chunk_index)",
 ]
 
 DEFAULT_RETENTION = [
