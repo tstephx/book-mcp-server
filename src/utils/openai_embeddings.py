@@ -8,11 +8,23 @@ import logging
 
 import numpy as np
 import openai
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
 MODEL = "text-embedding-3-small"
 DIMENSIONS = 1536
+MAX_TOKENS = 8191  # text-embedding-3-small limit
+
+# Lazy-loaded tokenizer
+_encoding = None
+
+
+def _get_encoding():
+    global _encoding
+    if _encoding is None:
+        _encoding = tiktoken.encoding_for_model(MODEL)
+    return _encoding
 
 
 class OpenAIEmbeddingGenerator:
@@ -26,6 +38,16 @@ class OpenAIEmbeddingGenerator:
         self._client = openai.OpenAI()
         self._max_batch_size = max_batch_size
 
+    @staticmethod
+    def _truncate(text: str) -> str:
+        """Truncate text to stay within the model's token limit."""
+        enc = _get_encoding()
+        tokens = enc.encode(text)
+        if len(tokens) <= MAX_TOKENS:
+            return text
+        logger.warning(f"Truncating text from {len(tokens)} to {MAX_TOKENS} tokens")
+        return enc.decode(tokens[:MAX_TOKENS])
+
     def generate(self, text: str) -> np.ndarray:
         """Generate embedding for a single text."""
         if not text or not text.strip():
@@ -33,7 +55,7 @@ class OpenAIEmbeddingGenerator:
 
         response = self._client.embeddings.create(
             model=MODEL,
-            input=[text],
+            input=[self._truncate(text)],
         )
         return np.array(response.data[0].embedding, dtype=np.float32)
 
@@ -45,7 +67,7 @@ class OpenAIEmbeddingGenerator:
         all_embeddings: list[np.ndarray] = []
 
         for i in range(0, len(texts), self._max_batch_size):
-            batch = texts[i : i + self._max_batch_size]
+            batch = [self._truncate(t) for t in texts[i : i + self._max_batch_size]]
             response = self._client.embeddings.create(
                 model=MODEL,
                 input=batch,

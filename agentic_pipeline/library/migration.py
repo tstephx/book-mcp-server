@@ -92,7 +92,7 @@ def chunk_all_books(db_path: str, dry_run: bool = False) -> dict:
 
 
 def embed_all_chunks(db_path: str, dry_run: bool = False,
-                     batch_size: int = 100) -> dict:
+                     batch_size: int = 30) -> dict:
     """Embed all chunks that don't yet have embeddings.
 
     Args:
