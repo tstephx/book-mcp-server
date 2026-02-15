@@ -15,6 +15,9 @@ dependencies = [
     "openai>=1.0",
     "anthropic>=0.18",
     "ebooklib>=0.18",
+    "numpy>=1.24",
+    "tiktoken>=0.5",
+    "cohere>=5.0",
     # "book-ingestion",  # Install separately: pip install -e /path/to/book-ingestion-python
 ]
 
