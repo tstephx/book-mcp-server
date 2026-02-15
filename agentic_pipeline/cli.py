@@ -842,48 +842,22 @@ def audit_quality(as_json: bool):
     """Audit library books for extraction quality issues."""
     import json as json_module
     from .db.config import get_db_path
-    from .db.connection import get_pipeline_db
-    from .validation import check_extraction_quality
+    from .validation import find_flagged_books
 
     db_path = get_db_path()
-
-    with get_pipeline_db(db_path) as conn:
-        books = conn.execute("SELECT id, title FROM books").fetchall()
-
-        results = []
-        for book in books:
-            rows = conn.execute(
-                "SELECT title, word_count, content_hash FROM chapters WHERE book_id = ? ORDER BY chapter_number",
-                (book["id"],),
-            ).fetchall()
-
-            chapter_count = len(rows)
-            word_counts = [r["word_count"] or 0 for r in rows]
-            titles = [r["title"] or "" for r in rows]
-            content_hashes = [r["content_hash"] or "" for r in rows]
-
-            validation = check_extraction_quality(chapter_count, word_counts, titles, content_hashes)
-
-            if not validation.passed:
-                results.append({
-                    "book_id": book["id"],
-                    "title": book["title"],
-                    "chapter_count": chapter_count,
-                    "reasons": validation.reasons,
-                    "metrics": validation.metrics,
-                })
+    total, results = find_flagged_books(db_path)
 
     if as_json:
         console.print(json_module.dumps({
-            "total": len(books),
-            "passed": len(books) - len(results),
+            "total": total,
+            "passed": total - len(results),
             "flagged": len(results),
             "books": results,
         }, indent=2))
         return
 
-    console.print(f"\n[bold]Quality Audit: {len(books)} books[/bold]")
-    console.print(f"  [green]Pass: {len(books) - len(results)}[/green]")
+    console.print(f"\n[bold]Quality Audit: {total} books[/bold]")
+    console.print(f"  [green]Pass: {total - len(results)}[/green]")
     console.print(f"  [red]Fail: {len(results)}[/red]\n")
 
     if not results:
@@ -897,7 +871,7 @@ def audit_quality(as_json: bool):
 
     for book in results:
         table.add_row(
-            book["title"][:45],
+            (book["title"] or "?")[:45],
             str(book["chapter_count"]),
             "; ".join(book["reasons"][:2]) + ("..." if len(book["reasons"]) > 2 else ""),
         )
@@ -915,45 +889,20 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
     import json as json_module
     from .db.config import get_db_path
     from .db.connection import get_pipeline_db
-    from .validation import check_extraction_quality
     from .db.pipelines import PipelineRepository
+    from .audit.trail import AuditTrail
+    from .validation import find_flagged_books
 
     if not flagged:
         console.print("[red]Error: specify --flagged to reprocess books failing quality checks.[/red]")
         return
 
     db_path = get_db_path()
-
-    # Find flagged books
-    with get_pipeline_db(db_path) as conn:
-        books = conn.execute("SELECT id, title, source_file FROM books").fetchall()
-
-        flagged_books = []
-        for book in books:
-            rows = conn.execute(
-                "SELECT title, word_count, content_hash FROM chapters WHERE book_id = ? ORDER BY chapter_number",
-                (book["id"],),
-            ).fetchall()
-
-            chapter_count = len(rows)
-            word_counts = [r["word_count"] or 0 for r in rows]
-            titles = [r["title"] or "" for r in rows]
-            content_hashes = [r["content_hash"] or "" for r in rows]
-
-            validation = check_extraction_quality(chapter_count, word_counts, titles, content_hashes)
-
-            if not validation.passed:
-                flagged_books.append({
-                    "book_id": book["id"],
-                    "title": book["title"],
-                    "source_file": book["source_file"],
-                    "chapter_count": chapter_count,
-                    "reasons": validation.reasons,
-                })
+    total, flagged_books = find_flagged_books(db_path)
 
     if as_json and not execute:
         print(json_module.dumps({
-            "total": len(books),
+            "total": total,
             "flagged": len(flagged_books),
             "mode": "dry_run",
             "books": flagged_books,
@@ -986,48 +935,56 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
 
     # Execute mode: delete and re-queue
     repo = PipelineRepository(db_path)
+    audit = AuditTrail(db_path)
     requeued = 0
     skipped = 0
 
     for book in flagged_books:
         source_file = book["source_file"]
         if not source_file or not Path(source_file).exists():
-            console.print(f"[yellow]Skipping '{book['title']}': source file not found ({source_file})[/yellow]")
+            if not as_json:
+                console.print(f"[yellow]Skipping '{book['title']}': source file not found ({source_file})[/yellow]")
             skipped += 1
             continue
 
+        # Audit trail: log before deletion
+        audit.log(
+            book_id=book["book_id"],
+            action="reprocess",
+            actor="cli",
+            reason="; ".join(book["reasons"]),
+            before_state={"chapter_count": book["chapter_count"], "metrics": book["metrics"]},
+        )
+
         with get_pipeline_db(db_path) as conn:
-            # Delete chapters
             conn.execute("DELETE FROM chapters WHERE book_id = ?", (book["book_id"],))
-            # Delete book record
             conn.execute("DELETE FROM books WHERE id = ?", (book["book_id"],))
-            # Delete pipeline records
             conn.execute("DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)", (source_file,))
             conn.execute("DELETE FROM processing_pipelines WHERE source_path = ?", (source_file,))
             conn.commit()
 
-        # Compute content hash
+        # Compute content hash and re-queue
         hasher = hashlib.sha256()
         with open(source_file, "rb") as f:
             for chunk in iter(lambda: f.read(8192), b""):
                 hasher.update(chunk)
         content_hash = hasher.hexdigest()
 
-        # Re-queue
         new_id = repo.create(source_file, content_hash)
-        console.print(f"[green]Re-queued '{book['title']}' → {new_id[:8]}...[/green]")
+        if not as_json:
+            console.print(f"[green]Re-queued '{book['title']}' → {new_id[:8]}...[/green]")
         requeued += 1
-
-    console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
 
     if as_json:
         print(json_module.dumps({
-            "total": len(books),
+            "total": total,
             "flagged": len(flagged_books),
             "mode": "execute",
             "requeued": requeued,
             "skipped": skipped,
         }, indent=2))
+    else:
+        console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
 
 
 if __name__ == "__main__":
