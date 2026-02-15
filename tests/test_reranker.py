@@ -79,3 +79,9 @@ class TestReranker:
         results = self._make_results(3)
         reranked = rerank_results("query", results, top_n=3, enabled=False)
         assert reranked == results
+
+    def test_disabled_does_not_truncate(self):
+        """enabled=False returns all results, ignoring top_n."""
+        results = self._make_results(10)
+        reranked = rerank_results("query", results, top_n=3, enabled=False)
+        assert len(reranked) == 10

@@ -5,7 +5,6 @@ replacement for the local EmbeddingGenerator interface.
 """
 
 import logging
-from typing import Optional
 
 import numpy as np
 import openai

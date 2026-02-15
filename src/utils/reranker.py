@@ -44,8 +44,10 @@ def rerank_results(
     Returns:
         Reranked (or original) results, each with optional 'rerank_score'.
     """
-    if not results or not enabled:
-        return results[:top_n] if results else []
+    if not results:
+        return []
+    if not enabled:
+        return results
 
     documents = [r.get(content_key, "") for r in results]
 
