@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["agentic_pipeline*"]
+include = ["agentic_pipeline*", "src*"]
 
 [project.optional-dependencies]
 dev = [
