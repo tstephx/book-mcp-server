@@ -2,8 +2,10 @@
 """Pipeline Orchestrator - coordinates book processing."""
 
 import hashlib
+import logging
 import signal
 import sqlite3
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -276,7 +278,9 @@ class Orchestrator:
             self._transition(pipeline_id, PipelineState.APPROVED)
             self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
         else:
-            # Needs human review
+            # Needs human review — notify via macOS notification
+            book_name = Path(book_path).stem
+            self._notify_pending_approval(book_name, confidence)
             return {
                 "pipeline_id": pipeline_id,
                 "state": PipelineState.PENDING_APPROVAL.value,
@@ -290,6 +294,23 @@ class Orchestrator:
         result["book_type"] = profile.get("book_type")
         result["confidence"] = confidence
         return result
+
+    @staticmethod
+    def _notify_pending_approval(book_name: str, confidence: float):
+        """Send a macOS notification for books needing human approval."""
+        import sys
+        if sys.platform != "darwin":
+            return
+        try:
+            safe_name = book_name.replace('\\', '').replace('"', "'")
+            subprocess.Popen([
+                "osascript", "-e",
+                f'display notification "\\"{safe_name}\\" needs approval (confidence: {confidence:.0%})" '
+                f'with title "Agentic Pipeline" subtitle "Book Pending Approval" '
+                f'sound name "Purr"',
+            ])
+        except Exception as e:
+            logging.debug("Notification failed (non-critical): %s", e)
 
     def _complete_approved(self, pipeline_id: str) -> dict:
         """Complete an approved book by running embedding and marking complete.
