@@ -143,7 +143,7 @@ def test_low_confidence_needs_approval(config, sample_book):
 
 
 def test_validation_failure_rejects_book(config, sample_book):
-    """Books failing extraction quality checks are auto-rejected at VALIDATING."""
+    """Books failing extraction quality checks are rejected after retry with force_fallback."""
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
     from agentic_pipeline.db.pipelines import PipelineRepository
@@ -177,6 +177,7 @@ def test_validation_failure_rejects_book(config, sample_book):
         metrics={"chapter_count": 1, "total_words": 500},
     )
 
+    # Validation always fails (return_value), so both initial and retry fail -> rejected
     with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
         with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
             with patch("agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate", return_value=mock_validation):

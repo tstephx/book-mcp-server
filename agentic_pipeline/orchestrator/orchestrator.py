@@ -146,8 +146,13 @@ class Orchestrator:
         self.repo.update_book_profile(pipeline_id, profile_dict)
         return profile_dict
 
-    def _run_processing(self, book_path: str, book_id: Optional[str] = None) -> dict:
+    def _run_processing(self, book_path: str, book_id: Optional[str] = None, force_fallback: bool = False) -> dict:
         """Run book-ingestion processing via direct library call.
+
+        Args:
+            book_path: Path to the book file.
+            book_id: Optional pipeline ID to use as book ID.
+            force_fallback: If True, force LLM fallback processing.
 
         Returns:
             Dict with processing results including quality_score, confidence, etc.
@@ -155,6 +160,7 @@ class Orchestrator:
         result = self.processing_adapter.process_book(
             book_path=book_path,
             book_id=book_id,
+            force_fallback=force_fallback,
         )
 
         if not result.success:
@@ -274,20 +280,59 @@ class Orchestrator:
         )
 
         if not validation.passed:
-            reason = "; ".join(validation.reasons)
-            self.logger.error(pipeline_id, "ValidationFailed", reason)
-            self.logger.state_transition(pipeline_id, PipelineState.VALIDATING.value, PipelineState.REJECTED.value)
-            self.repo.update_state(
-                pipeline_id,
-                PipelineState.REJECTED,
-                error_details={"validation_reasons": validation.reasons, "metrics": validation.metrics},
-            )
-            return {
-                "pipeline_id": pipeline_id,
-                "state": PipelineState.REJECTED.value,
-                "reason": reason,
-                "metrics": validation.metrics,
-            }
+            # Check if we can retry with force_fallback
+            current = self.repo.get(pipeline_id)
+            retry_count = current.get("retry_count", 0) if current else 0
+
+            if retry_count == 0:
+                # First failure — retry with force_fallback
+                reason = "; ".join(validation.reasons)
+                self.logger.error(pipeline_id, "ValidationFailed", f"{reason}. Retrying with force_fallback")
+                self.repo.increment_retry_count(pipeline_id)
+
+                # Transition through NEEDS_RETRY back to PROCESSING
+                self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
+                self._transition(pipeline_id, PipelineState.PROCESSING)
+
+                try:
+                    processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=True)
+                except (ProcessingError, PipelineTimeoutError) as e:
+                    self.logger.error(pipeline_id, type(e).__name__, str(e))
+                    self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
+                    return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
+
+                # Store updated processing results
+                self.repo.update_processing_result(pipeline_id, {
+                    "quality_score": processing_result.get("quality_score"),
+                    "detection_confidence": processing_result.get("detection_confidence"),
+                    "detection_method": processing_result.get("detection_method"),
+                    "chapter_count": processing_result.get("chapter_count"),
+                    "word_count": processing_result.get("word_count"),
+                    "warnings": processing_result.get("warnings", []),
+                    "llm_fallback_used": processing_result.get("llm_fallback_used", False),
+                })
+
+                # Re-validate
+                self._transition(pipeline_id, PipelineState.VALIDATING)
+                validation = validator.validate(
+                    book_id=pipeline_id, db_path=str(self.config.db_path)
+                )
+
+            if not validation.passed:
+                reason = "; ".join(validation.reasons)
+                self.logger.error(pipeline_id, "ValidationFailed", reason)
+                self.logger.state_transition(pipeline_id, PipelineState.VALIDATING.value, PipelineState.REJECTED.value)
+                self.repo.update_state(
+                    pipeline_id,
+                    PipelineState.REJECTED,
+                    error_details={"validation_reasons": validation.reasons, "metrics": validation.metrics},
+                )
+                return {
+                    "pipeline_id": pipeline_id,
+                    "state": PipelineState.REJECTED.value,
+                    "reason": reason,
+                    "metrics": validation.metrics,
+                }
 
         # APPROVAL ROUTING - use processing result confidence
         confidence = processing_result.get("detection_confidence", 0)
