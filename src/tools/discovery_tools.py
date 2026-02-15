@@ -14,6 +14,7 @@ from ..utils.vector_store import find_top_k, cosine_similarity
 from ..utils.context_managers import embedding_model_context
 from ..utils.file_utils import read_chapter_content, get_chapter_excerpt
 from ..utils.cache import get_cache
+from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -37,63 +38,16 @@ def _get_context(content: str, position: int, max_chars: int = 200) -> str:
     return context
 
 
-def _load_embeddings_cached() -> tuple[np.ndarray, list[dict]] | None:
-    """Load embeddings matrix with caching
-
-    Returns cached embeddings if available, otherwise loads from database
-    and caches for subsequent calls.
+def _load_chunk_data() -> tuple[np.ndarray, list[dict]] | None:
+    """Load chunk embeddings from cache or database.
 
     Returns:
-        Tuple of (embeddings_matrix, chapter_metadata) or None if no embeddings
+        Tuple of (embeddings_matrix, chunk_metadata) or None if no embeddings
     """
-    cache = get_cache()
-    cached = cache.get_embeddings()
-
-    if cached:
-        return cached
-
-    # Load from database
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT
-                c.id, c.book_id, c.chapter_number, c.title as chapter_title,
-                c.embedding, c.file_path, c.word_count,
-                b.title as book_title, b.author
-            FROM chapters c
-            JOIN books b ON c.book_id = b.id
-            WHERE c.embedding IS NOT NULL
-            ORDER BY c.id
-        """)
-        rows = cursor.fetchall()
-
-    if not rows:
+    matrix, meta = load_chunk_embeddings()
+    if matrix is None:
         return None
-
-    # Convert embeddings from BLOB to numpy arrays
-    chapter_embeddings = []
-    chapter_metadata = []
-
-    for row in rows:
-        embedding = np.load(io.BytesIO(row['embedding']))
-        chapter_embeddings.append(embedding)
-        chapter_metadata.append({
-            'id': row['id'],
-            'book_id': row['book_id'],
-            'book_title': row['book_title'],
-            'author': row['author'],
-            'chapter_title': row['chapter_title'],
-            'chapter_number': row['chapter_number'],
-            'word_count': row['word_count'],
-            'file_path': row['file_path']
-        })
-
-    embeddings_matrix = np.vstack(chapter_embeddings)
-
-    # Store in cache
-    cache.set_embeddings(embeddings_matrix, chapter_metadata)
-
-    return embeddings_matrix, chapter_metadata
+    return matrix, meta
 
 
 def register_discovery_tools(mcp: "FastMCP") -> None:
@@ -138,10 +92,9 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
             # Get query embedding
             with embedding_model_context() as generator:
                 if chapter_id:
-                    # Get the chapter's embedding from database
                     chapter = execute_single("""
-                        SELECT c.id, c.book_id, c.chapter_number, c.title, c.embedding,
-                               b.title as book_title
+                        SELECT c.id, c.book_id, c.chapter_number, c.title,
+                               c.file_path, b.title as book_title
                         FROM chapters c
                         JOIN books b ON c.book_id = b.id
                         WHERE c.id = ?
@@ -150,53 +103,61 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
                     if not chapter:
                         return {"error": f"Chapter not found: {chapter_id}", "results": []}
 
-                    if not chapter['embedding']:
-                        return {"error": "Chapter has no embedding", "results": []}
+                    # Generate fresh embedding from chapter content
+                    try:
+                        content = read_chapter_content(chapter['file_path'])
+                        query_embedding = generator.generate(content[:8000])
+                    except Exception as e:
+                        return {"error": f"Could not read chapter: {e}", "results": []}
 
-                    query_embedding = np.load(io.BytesIO(chapter['embedding']))
                     source_book_id = chapter['book_id']
                     source_info = f"Chapter {chapter['chapter_number']}: {chapter['title']} from '{chapter['book_title']}'"
                 else:
-                    # Generate embedding for the text snippet
                     query_embedding = generator.generate(text_snippet)
                     source_info = f"Text: \"{text_snippet[:50]}...\""
 
-            # Load embeddings from cache or database
-            cached_data = _load_embeddings_cached()
+            # Load chunk embeddings
+            cached_data = _load_chunk_data()
             if not cached_data:
                 return {"message": "No embeddings found in database", "results": []}
 
-            embeddings_matrix, chapter_metadata = cached_data
+            embeddings_matrix, chunk_metadata = cached_data
 
             # Filter out same book if requested
             if exclude_same_book and source_book_id:
-                indices = [i for i, m in enumerate(chapter_metadata) if m['book_id'] != source_book_id]
+                indices = [i for i, m in enumerate(chunk_metadata) if m['book_id'] != source_book_id]
                 if not indices:
                     return {"message": "No other books found", "results": []}
                 embeddings_matrix = embeddings_matrix[indices]
-                chapter_metadata = [chapter_metadata[i] for i in indices]
+                chunk_metadata = [chunk_metadata[i] for i in indices]
 
-            # Find top K most similar
+            # Search at chunk level
             top_results = find_top_k(
                 query_embedding,
                 embeddings_matrix,
-                k=limit,
+                k=limit * 3,
                 min_similarity=0.2
             )
 
-            # Build response
-            results = []
+            chunk_results = []
             for idx, similarity in top_results:
-                metadata = chapter_metadata[idx]
+                meta = chunk_metadata[idx]
+                chunk_results.append({**meta, 'similarity': similarity})
+
+            # Aggregate to chapter level
+            chapter_results = best_chunk_per_chapter(chunk_results)[:limit]
+
+            results = []
+            for r in chapter_results:
                 results.append({
-                    'book_title': metadata['book_title'],
-                    'author': metadata['author'],
-                    'chapter_title': metadata['chapter_title'],
-                    'chapter_number': metadata['chapter_number'],
-                    'similarity': round(similarity, 3),
-                    'word_count': metadata['word_count'],
-                    'chapter_id': metadata['id'],
-                    'book_id': metadata['book_id']
+                    'book_title': r['book_title'],
+                    'author': r.get('author', ''),
+                    'chapter_title': r['chapter_title'],
+                    'chapter_number': r['chapter_number'],
+                    'similarity': round(r['similarity'], 3),
+                    'word_count': r.get('word_count', 0),
+                    'chapter_id': r['chapter_id'],
+                    'book_id': r['book_id']
                 })
 
             logger.info(f"Found {len(results)} related chapters for: {source_info}")
@@ -245,38 +206,40 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
             with embedding_model_context() as generator:
                 query_embedding = generator.generate(topic)
 
-            # Load embeddings from cache or database
-            cached_data = _load_embeddings_cached()
+            # Load chunk embeddings
+            cached_data = _load_chunk_data()
             if not cached_data:
                 return {"message": "No embeddings found in database", "results": []}
 
-            embeddings_matrix, chapter_metadata = cached_data
+            embeddings_matrix, chunk_metadata = cached_data
 
-            # Calculate similarities for all chapters
-            all_results = []
-            for i, metadata in enumerate(chapter_metadata):
+            # Calculate similarities for all chunks
+            chunk_results = []
+            for i, meta in enumerate(chunk_metadata):
                 similarity = cosine_similarity(query_embedding, embeddings_matrix[i])
-
                 if similarity >= min_similarity:
-                    result = {
-                        'book_id': metadata['book_id'],
-                        'book_title': metadata['book_title'],
-                        'author': metadata['author'],
-                        'chapter_id': metadata['id'],
-                        'chapter_title': metadata['chapter_title'],
-                        'chapter_number': metadata['chapter_number'],
-                        'similarity': round(float(similarity), 3),
-                        'word_count': metadata['word_count']
-                    }
+                    chunk_results.append({**meta, 'similarity': float(similarity)})
 
-                    # Add excerpt if requested
-                    if include_excerpts and metadata['file_path']:
-                        result['excerpt'] = get_chapter_excerpt(metadata['file_path'], max_chars=200)
+            # Aggregate to chapter level
+            chapter_results = best_chunk_per_chapter(chunk_results)
 
-                    all_results.append(result)
+            all_results = []
+            for r in chapter_results:
+                result = {
+                    'book_id': r['book_id'],
+                    'book_title': r['book_title'],
+                    'author': r.get('author', ''),
+                    'chapter_id': r['chapter_id'],
+                    'chapter_title': r['chapter_title'],
+                    'chapter_number': r['chapter_number'],
+                    'similarity': round(r['similarity'], 3),
+                    'word_count': r.get('word_count', 0)
+                }
 
-            # Sort by similarity (highest first)
-            all_results.sort(key=lambda x: x['similarity'], reverse=True)
+                if include_excerpts:
+                    result['excerpt'] = r.get('excerpt', '')[:200]
+
+                all_results.append(result)
 
             # Group by book
             books_coverage = {}
@@ -315,7 +278,7 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
                 "total_chapters": len(all_results),
                 "books_count": len(sorted_books),
                 "coverage_by_book": sorted_books,
-                "top_chapters": all_results[:10]  # Top 10 most relevant
+                "top_chapters": all_results[:10]
             }
 
         except Exception as e:

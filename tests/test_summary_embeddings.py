@@ -169,7 +169,7 @@ def test_generate_single_embedding(db_with_embedding_columns):
         assert 'UPDATE chapter_summaries' in call_args[0]
         params = call_args[1]
         assert isinstance(params[0], bytes)  # embedding BLOB
-        assert params[1] == 'test-model'
+        assert params[1] == 'text-embedding-3-small'
         assert params[2] == 'ch-1'
 
 

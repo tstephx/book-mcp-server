@@ -27,6 +27,7 @@ from ..utils.vector_store import find_top_k
 from ..utils.file_utils import read_chapter_content
 from ..utils.excerpt_utils import extract_relevant_excerpt
 from ..utils.cache import get_cache
+from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 import numpy as np
 import io
 
@@ -258,89 +259,52 @@ def _detect_project_type(goal: str) -> tuple[str, dict]:
 
 
 def _search_library_for_topics(search_terms: list, limit_per_term: int = 5) -> list:
-    """Search library for all topics, deduplicate results"""
+    """Search library for all topics using chunk-level search, deduplicate results"""
     all_results = []
     seen_chapters = set()
-    
+
     try:
-        cache = get_cache()
-        cached = cache.get_embeddings()
-        
+        embeddings_matrix, chunk_metadata = load_chunk_embeddings()
+        if embeddings_matrix is None:
+            return []
+
         with embedding_model_context() as generator:
-            # Load embeddings
-            if cached:
-                embeddings_matrix, chapter_metadata = cached
-            else:
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT c.id, c.chapter_number, c.title as chapter_title,
-                               c.embedding, c.file_path, c.word_count,
-                               b.id as book_id, b.title as book_title, b.author
-                        FROM chapters c
-                        JOIN books b ON c.book_id = b.id
-                        WHERE c.embedding IS NOT NULL
-                    """)
-                    rows = cursor.fetchall()
-                
-                if not rows:
-                    return []
-                
-                chapter_embeddings = []
-                chapter_metadata = []
-                
-                for row in rows:
-                    embedding = np.load(io.BytesIO(row['embedding']))
-                    chapter_embeddings.append(embedding)
-                    chapter_metadata.append({
-                        'id': row['id'],
-                        'book_id': row['book_id'],
-                        'book_title': row['book_title'],
-                        'author': row['author'],
-                        'chapter_title': row['chapter_title'],
-                        'chapter_number': row['chapter_number'],
-                        'file_path': row['file_path'],
-                        'word_count': row['word_count']
-                    })
-                
-                embeddings_matrix = np.vstack(chapter_embeddings)
-                cache.set_embeddings(embeddings_matrix, chapter_metadata)
-            
-            # Search for each term
             for term in search_terms:
                 query_embedding = generator.generate(term)
                 top_results = find_top_k(
                     query_embedding, embeddings_matrix,
-                    k=limit_per_term, min_similarity=0.25
+                    k=limit_per_term * 3, min_similarity=0.25
                 )
-                
+
+                chunk_results = []
                 for idx, similarity in top_results:
-                    metadata = chapter_metadata[idx]
-                    chapter_key = (metadata['book_id'], metadata['chapter_number'])
-                    
+                    meta = chunk_metadata[idx]
+                    chunk_results.append({**meta, 'similarity': similarity})
+
+                # Aggregate to chapter level
+                chapter_results = best_chunk_per_chapter(chunk_results)
+
+                for r in chapter_results[:limit_per_term]:
+                    chapter_key = (r['book_id'], r['chapter_number'])
                     if chapter_key not in seen_chapters:
                         seen_chapters.add(chapter_key)
-                        
-                        # Get excerpt
-                        try:
-                            content = read_chapter_content(metadata['file_path'])
-                            excerpt = extract_relevant_excerpt(
-                                query_embedding, content, generator, max_chars=400
-                            )
-                        except Exception:
-                            excerpt = ""
-                        
                         all_results.append({
-                            **metadata,
+                            'id': r['chapter_id'],
+                            'book_id': r['book_id'],
+                            'book_title': r['book_title'],
+                            'author': r.get('author', ''),
+                            'chapter_title': r['chapter_title'],
+                            'chapter_number': r['chapter_number'],
+                            'file_path': r.get('file_path', ''),
+                            'word_count': r.get('word_count', 0),
                             'search_term': term,
-                            'similarity': similarity,
-                            'excerpt': excerpt
+                            'similarity': r['similarity'],
+                            'excerpt': r.get('excerpt', '')
                         })
-            
-            # Sort by similarity
+
             all_results.sort(key=lambda x: x['similarity'], reverse=True)
             return all_results
-            
+
     except Exception as e:
         logger.error(f"Library search error: {e}", exc_info=True)
         return []
