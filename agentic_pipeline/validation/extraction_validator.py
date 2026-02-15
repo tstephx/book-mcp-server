@@ -153,6 +153,46 @@ def check_extraction_quality(
     )
 
 
+def find_flagged_books(db_path: str) -> tuple[int, list[dict]]:
+    """Scan all library books and return those failing quality checks.
+
+    Returns:
+        (total_book_count, list_of_flagged_book_dicts) where each dict has
+        keys: book_id, title, source_file, chapter_count, reasons, metrics.
+    """
+    with get_pipeline_db(db_path) as conn:
+        books = conn.execute("SELECT id, title, source_file FROM books").fetchall()
+
+        flagged = []
+        for book in books:
+            rows = conn.execute(
+                "SELECT title, word_count, content_hash FROM chapters "
+                "WHERE book_id = ? ORDER BY chapter_number",
+                (book["id"],),
+            ).fetchall()
+
+            chapter_count = len(rows)
+            word_counts = [r["word_count"] or 0 for r in rows]
+            titles = [r["title"] or "" for r in rows]
+            content_hashes = [r["content_hash"] or "" for r in rows]
+
+            validation = check_extraction_quality(
+                chapter_count, word_counts, titles, content_hashes
+            )
+
+            if not validation.passed:
+                flagged.append({
+                    "book_id": book["id"],
+                    "title": book["title"],
+                    "source_file": book["source_file"],
+                    "chapter_count": chapter_count,
+                    "reasons": validation.reasons,
+                    "metrics": validation.metrics,
+                })
+
+    return len(books), flagged
+
+
 # ---------------------------------------------------------------------------
 # DB-aware validator class
 # ---------------------------------------------------------------------------

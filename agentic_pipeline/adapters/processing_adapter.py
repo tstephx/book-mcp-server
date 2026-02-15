@@ -108,6 +108,7 @@ class ProcessingAdapter:
         author: Optional[str] = None,
         book_id: Optional[str] = None,
         save_to_storage: bool = True,
+        force_fallback: bool = False,
     ) -> ProcessingResult:
         """
         Process a book file and return structured results.
@@ -117,6 +118,7 @@ class ProcessingAdapter:
             title: Optional title override
             author: Optional author override
             book_id: Optional book ID (generated if not provided)
+            force_fallback: If True, force LLM fallback processing
 
         Returns:
             ProcessingResult with processing details
@@ -130,6 +132,7 @@ class ProcessingAdapter:
                 author=author,
                 book_id=book_id,
                 save_to_storage=save_to_storage,
+                force_fallback=force_fallback,
             )
 
             if not result.success:

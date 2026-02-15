@@ -56,6 +56,7 @@ class LibraryCache:
         self._lock = threading.RLock()
         self._chapters: dict[str, CachedChapter] = {}
         self._embeddings: Optional[CachedEmbeddings] = None
+        self._chunk_embeddings: Optional[CachedEmbeddings] = None
         self._summary_embeddings: Optional[CachedEmbeddings] = None
 
         # Stats
@@ -111,6 +112,45 @@ class LibraryCache:
             if self._embeddings is not None:
                 logger.info("Invalidating embeddings cache")
                 self._embeddings = None
+
+    # ─────────────────────────────────────────────────────────────
+    # Tier 1a: Chunk Embeddings Cache (separate from chapter embeddings)
+    # ─────────────────────────────────────────────────────────────
+
+    def get_chunk_embeddings(self) -> Optional[tuple[np.ndarray, list[dict]]]:
+        """Get cached chunk embeddings matrix and metadata"""
+        if not self.enabled:
+            return None
+
+        with self._lock:
+            if self._chunk_embeddings is not None:
+                self._hits += 1
+                logger.debug("Chunk embeddings cache hit")
+                return self._chunk_embeddings.matrix, self._chunk_embeddings.metadata
+
+            self._misses += 1
+            return None
+
+    def set_chunk_embeddings(self, matrix: np.ndarray, metadata: list[dict]) -> None:
+        """Cache chunk embeddings matrix and metadata"""
+        if not self.enabled:
+            return
+
+        with self._lock:
+            self._chunk_embeddings = CachedEmbeddings(
+                matrix=matrix,
+                metadata=metadata,
+                loaded_at=time()
+            )
+            logger.info(f"Cached chunk embeddings: {matrix.shape[0]} chunks, "
+                       f"{matrix.nbytes / 1024 / 1024:.1f} MB")
+
+    def invalidate_chunk_embeddings(self) -> None:
+        """Invalidate chunk embeddings cache"""
+        with self._lock:
+            if self._chunk_embeddings is not None:
+                logger.info("Invalidating chunk embeddings cache")
+                self._chunk_embeddings = None
 
     # ─────────────────────────────────────────────────────────────
     # Tier 1b: Summary Embeddings Cache
@@ -282,13 +322,16 @@ class LibraryCache:
             embeddings_memory = (
                 self._embeddings.matrix.nbytes if self._embeddings else 0
             )
+            chunk_embeddings_memory = (
+                self._chunk_embeddings.matrix.nbytes if self._chunk_embeddings else 0
+            )
             summary_embeddings_memory = (
                 self._summary_embeddings.matrix.nbytes if self._summary_embeddings else 0
             )
 
             total_requests = self._hits + self._misses
             hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0
-            total_memory = chapter_memory + embeddings_memory + summary_embeddings_memory
+            total_memory = chapter_memory + embeddings_memory + chunk_embeddings_memory + summary_embeddings_memory
 
             return {
                 "enabled": self.enabled,
@@ -296,6 +339,10 @@ class LibraryCache:
                 "embeddings_loaded": self._embeddings is not None,
                 "embeddings_chapters": (
                     self._embeddings.matrix.shape[0] if self._embeddings else 0
+                ),
+                "chunk_embeddings_loaded": self._chunk_embeddings is not None,
+                "chunk_embeddings_count": (
+                    self._chunk_embeddings.matrix.shape[0] if self._chunk_embeddings else 0
                 ),
                 "summary_embeddings_loaded": self._summary_embeddings is not None,
                 "summary_embeddings_count": (
@@ -316,6 +363,7 @@ class LibraryCache:
         with self._lock:
             self._chapters.clear()
             self._embeddings = None
+            self._chunk_embeddings = None
             self._summary_embeddings = None
             self._hits = 0
             self._misses = 0

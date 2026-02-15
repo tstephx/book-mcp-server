@@ -33,7 +33,7 @@ def load_chunk_embeddings(
         cache = get_cache()
 
     if cache is not None:
-        cached = cache.get_embeddings()
+        cached = cache.get_chunk_embeddings()
         if cached:
             return cached
 
@@ -84,7 +84,7 @@ def load_chunk_embeddings(
     matrix = np.vstack(embeddings)
 
     if cache is not None:
-        cache.set_embeddings(matrix, metadata)
+        cache.set_chunk_embeddings(matrix, metadata)
 
     logger.info(f"Loaded {len(metadata)} chunk embeddings from DB")
     return matrix, metadata

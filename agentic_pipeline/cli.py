@@ -950,5 +950,113 @@ def embed_library_cmd(dry_run: bool, batch_size: int):
     console.print(table)
 
 
+@main.command("reprocess")
+@click.option("--flagged", is_flag=True, help="Reprocess books that fail quality checks")
+@click.option("--execute", is_flag=True, help="Actually reprocess (default is dry run)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def reprocess(flagged: bool, execute: bool, as_json: bool):
+    """Re-queue books that fail extraction quality checks."""
+    import hashlib
+    import json as json_module
+    from .db.config import get_db_path
+    from .db.connection import get_pipeline_db
+    from .db.pipelines import PipelineRepository
+    from .audit.trail import AuditTrail
+    from .validation import find_flagged_books
+
+    if not flagged:
+        console.print("[red]Error: specify --flagged to reprocess books failing quality checks.[/red]")
+        return
+
+    db_path = get_db_path()
+    total, flagged_books = find_flagged_books(db_path)
+
+    if as_json and not execute:
+        print(json_module.dumps({
+            "total": total,
+            "flagged": len(flagged_books),
+            "mode": "dry_run",
+            "books": flagged_books,
+        }, indent=2))
+        return
+
+    if not flagged_books:
+        console.print("[green]All books pass quality checks. Nothing to reprocess.[/green]")
+        return
+
+    if not execute:
+        console.print("\n[bold yellow]*** DRY RUN ***[/bold yellow]")
+        console.print(f"[bold]Found {len(flagged_books)} book(s) failing quality checks.[/bold]\n")
+
+        table = Table(title="Books to Reprocess")
+        table.add_column("Title", max_width=45)
+        table.add_column("Ch", justify="right")
+        table.add_column("Issues")
+
+        for book in flagged_books:
+            table.add_row(
+                (book["title"] or "?")[:45],
+                str(book["chapter_count"]),
+                "; ".join(book["reasons"][:2]) + ("..." if len(book["reasons"]) > 2 else ""),
+            )
+
+        console.print(table)
+        console.print("\n[dim]Run with --execute to reprocess these books.[/dim]")
+        return
+
+    # Execute mode: delete and re-queue
+    repo = PipelineRepository(db_path)
+    audit = AuditTrail(db_path)
+    requeued = 0
+    skipped = 0
+
+    for book in flagged_books:
+        source_file = book["source_file"]
+        if not source_file or not Path(source_file).exists():
+            if not as_json:
+                console.print(f"[yellow]Skipping '{book['title']}': source file not found ({source_file})[/yellow]")
+            skipped += 1
+            continue
+
+        # Audit trail: log before deletion
+        audit.log(
+            book_id=book["book_id"],
+            action="reprocess",
+            actor="cli",
+            reason="; ".join(book["reasons"]),
+            before_state={"chapter_count": book["chapter_count"], "metrics": book["metrics"]},
+        )
+
+        with get_pipeline_db(db_path) as conn:
+            conn.execute("DELETE FROM chapters WHERE book_id = ?", (book["book_id"],))
+            conn.execute("DELETE FROM books WHERE id = ?", (book["book_id"],))
+            conn.execute("DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)", (source_file,))
+            conn.execute("DELETE FROM processing_pipelines WHERE source_path = ?", (source_file,))
+            conn.commit()
+
+        # Compute content hash and re-queue
+        hasher = hashlib.sha256()
+        with open(source_file, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hasher.update(chunk)
+        content_hash = hasher.hexdigest()
+
+        new_id = repo.create(source_file, content_hash)
+        if not as_json:
+            console.print(f"[green]Re-queued '{book['title']}' → {new_id[:8]}...[/green]")
+        requeued += 1
+
+    if as_json:
+        print(json_module.dumps({
+            "total": total,
+            "flagged": len(flagged_books),
+            "mode": "execute",
+            "requeued": requeued,
+            "skipped": skipped,
+        }, indent=2))
+    else:
+        console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
+
+
 if __name__ == "__main__":
     main()

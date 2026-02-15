@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 _generator: Optional[OpenAIEmbeddingGenerator] = None
 
 
+def _truncate(text: str, max_len: int) -> str:
+    """Truncate text at word boundary."""
+    if len(text) <= max_len:
+        return text
+    truncated = text[:max_len].rsplit(" ", 1)[0]
+    return truncated + "..."
+
+
 def _get_generator() -> OpenAIEmbeddingGenerator:
     global _generator
     if _generator is None:
@@ -112,7 +120,7 @@ def register_semantic_search_tools(mcp):
                     "chapter_number": r["chapter_number"],
                     "similarity": r.get("similarity", 0),
                     "rerank_score": r.get("rerank_score"),
-                    "excerpt": r["chunk_content"][:500],
+                    "excerpt": _truncate(r["chunk_content"], 500),
                 })
 
             return {
