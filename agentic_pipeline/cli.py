@@ -905,5 +905,50 @@ def audit_quality(as_json: bool):
     console.print(table)
 
 
+@main.command("chunk-library")
+@click.option("--dry-run", is_flag=True, help="Preview without making changes")
+def chunk_library_cmd(dry_run: bool):
+    """Generate chunks for all unchunked chapters in the library."""
+    from .db.config import get_db_path
+    from .library.migration import chunk_all_books
+
+    db_path = str(get_db_path())
+    action = "Would chunk" if dry_run else "Chunking"
+    console.print(f"[blue]{action} library at {db_path}[/blue]")
+
+    result = chunk_all_books(db_path, dry_run=dry_run)
+
+    table = Table(title="Chunk Library" + (" (dry run)" if dry_run else ""))
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Books", str(result["books"]))
+    table.add_row("Chapters", str(result["chapters"]))
+    table.add_row("Chunks created", str(result["chunks_created"]))
+    console.print(table)
+
+
+@main.command("embed-library")
+@click.option("--dry-run", is_flag=True, help="Preview without making changes")
+@click.option("--batch-size", default=100, help="Chunks per API call")
+def embed_library_cmd(dry_run: bool, batch_size: int):
+    """Generate OpenAI embeddings for all unembedded chunks."""
+    from .db.config import get_db_path
+    from .library.migration import embed_all_chunks
+
+    db_path = str(get_db_path())
+    action = "Would embed" if dry_run else "Embedding"
+    console.print(f"[blue]{action} library at {db_path}[/blue]")
+
+    result = embed_all_chunks(db_path, dry_run=dry_run, batch_size=batch_size)
+
+    table = Table(title="Embed Library" + (" (dry run)" if dry_run else ""))
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Total chunks", str(result["total_chunks"]))
+    table.add_row("Needs embedding", str(result.get("needs_embedding", 0)))
+    table.add_row("Chunks embedded", str(result["chunks_embedded"]))
+    console.print(table)
+
+
 if __name__ == "__main__":
     main()
