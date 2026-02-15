@@ -6,8 +6,11 @@ import logging
 import signal
 import sqlite3
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
@@ -298,11 +301,10 @@ class Orchestrator:
     @staticmethod
     def _notify_pending_approval(book_name: str, confidence: float):
         """Send a macOS notification for books needing human approval."""
-        import sys
         if sys.platform != "darwin":
             return
         try:
-            safe_name = book_name.replace('\\', '').replace('"', "'")
+            safe_name = book_name.replace('\\', '').replace('"', "'").replace("'", "\u2019")
             subprocess.Popen([
                 "osascript", "-e",
                 f'display notification "\\"{safe_name}\\" needs approval (confidence: {confidence:.0%})" '
@@ -310,7 +312,7 @@ class Orchestrator:
                 f'sound name "Purr"',
             ])
         except Exception as e:
-            logging.debug("Notification failed (non-critical): %s", e)
+            logger.debug("Notification failed (non-critical): %s", e)
 
     def _complete_approved(self, pipeline_id: str) -> dict:
         """Complete an approved book by running embedding and marking complete.
