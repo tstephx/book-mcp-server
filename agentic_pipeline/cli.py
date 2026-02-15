@@ -905,5 +905,130 @@ def audit_quality(as_json: bool):
     console.print(table)
 
 
+@main.command("reprocess")
+@click.option("--flagged", is_flag=True, help="Reprocess books that fail quality checks")
+@click.option("--execute", is_flag=True, help="Actually reprocess (default is dry run)")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def reprocess(flagged: bool, execute: bool, as_json: bool):
+    """Re-queue books that fail extraction quality checks."""
+    import hashlib
+    import json as json_module
+    from .db.config import get_db_path
+    from .db.connection import get_pipeline_db
+    from .validation import check_extraction_quality
+    from .db.pipelines import PipelineRepository
+
+    if not flagged:
+        console.print("[red]Error: specify --flagged to reprocess books failing quality checks.[/red]")
+        return
+
+    db_path = get_db_path()
+
+    # Find flagged books
+    with get_pipeline_db(db_path) as conn:
+        books = conn.execute("SELECT id, title, source_file FROM books").fetchall()
+
+        flagged_books = []
+        for book in books:
+            rows = conn.execute(
+                "SELECT title, word_count, content_hash FROM chapters WHERE book_id = ? ORDER BY chapter_number",
+                (book["id"],),
+            ).fetchall()
+
+            chapter_count = len(rows)
+            word_counts = [r["word_count"] or 0 for r in rows]
+            titles = [r["title"] or "" for r in rows]
+            content_hashes = [r["content_hash"] or "" for r in rows]
+
+            validation = check_extraction_quality(chapter_count, word_counts, titles, content_hashes)
+
+            if not validation.passed:
+                flagged_books.append({
+                    "book_id": book["id"],
+                    "title": book["title"],
+                    "source_file": book["source_file"],
+                    "chapter_count": chapter_count,
+                    "reasons": validation.reasons,
+                })
+
+    if as_json and not execute:
+        print(json_module.dumps({
+            "total": len(books),
+            "flagged": len(flagged_books),
+            "mode": "dry_run",
+            "books": flagged_books,
+        }, indent=2))
+        return
+
+    if not flagged_books:
+        console.print("[green]All books pass quality checks. Nothing to reprocess.[/green]")
+        return
+
+    if not execute:
+        console.print("\n[bold yellow]*** DRY RUN ***[/bold yellow]")
+        console.print(f"[bold]Found {len(flagged_books)} book(s) failing quality checks.[/bold]\n")
+
+        table = Table(title="Books to Reprocess")
+        table.add_column("Title", max_width=45)
+        table.add_column("Ch", justify="right")
+        table.add_column("Issues")
+
+        for book in flagged_books:
+            table.add_row(
+                (book["title"] or "?")[:45],
+                str(book["chapter_count"]),
+                "; ".join(book["reasons"][:2]) + ("..." if len(book["reasons"]) > 2 else ""),
+            )
+
+        console.print(table)
+        console.print("\n[dim]Run with --execute to reprocess these books.[/dim]")
+        return
+
+    # Execute mode: delete and re-queue
+    repo = PipelineRepository(db_path)
+    requeued = 0
+    skipped = 0
+
+    for book in flagged_books:
+        source_file = book["source_file"]
+        if not source_file or not Path(source_file).exists():
+            console.print(f"[yellow]Skipping '{book['title']}': source file not found ({source_file})[/yellow]")
+            skipped += 1
+            continue
+
+        with get_pipeline_db(db_path) as conn:
+            # Delete chapters
+            conn.execute("DELETE FROM chapters WHERE book_id = ?", (book["book_id"],))
+            # Delete book record
+            conn.execute("DELETE FROM books WHERE id = ?", (book["book_id"],))
+            # Delete pipeline records
+            conn.execute("DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)", (source_file,))
+            conn.execute("DELETE FROM processing_pipelines WHERE source_path = ?", (source_file,))
+            conn.commit()
+
+        # Compute content hash
+        hasher = hashlib.sha256()
+        with open(source_file, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                hasher.update(chunk)
+        content_hash = hasher.hexdigest()
+
+        # Re-queue
+        new_id = repo.create(source_file, content_hash)
+        console.print(f"[green]Re-queued '{book['title']}' → {new_id[:8]}...[/green]")
+        requeued += 1
+
+    console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
+
+    if as_json:
+        print(json_module.dumps({
+            "total": len(books),
+            "flagged": len(flagged_books),
+            "mode": "execute",
+            "requeued": requeued,
+            "skipped": skipped,
+        }, indent=2))
+
+
 if __name__ == "__main__":
     main()
