@@ -283,6 +283,7 @@ class Orchestrator:
             # Check if we can retry with force_fallback
             current = self.repo.get(pipeline_id)
             retry_count = current.get("retry_count", 0) if current else 0
+            first_attempt = {"reasons": validation.reasons, "metrics": validation.metrics}
 
             if retry_count == 0:
                 # First failure — retry with force_fallback
@@ -297,9 +298,18 @@ class Orchestrator:
                 try:
                     processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=True)
                 except (ProcessingError, PipelineTimeoutError) as e:
+                    # Retry processing failed — reject directly (max 1 retry)
                     self.logger.error(pipeline_id, type(e).__name__, str(e))
-                    self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
-                    return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
+                    self.logger.state_transition(pipeline_id, PipelineState.PROCESSING.value, PipelineState.REJECTED.value)
+                    self.repo.update_state(
+                        pipeline_id,
+                        PipelineState.REJECTED,
+                        error_details={
+                            "first_attempt": first_attempt,
+                            "retry_error": str(e),
+                        },
+                    )
+                    return {"pipeline_id": pipeline_id, "state": PipelineState.REJECTED.value, "error": str(e)}
 
                 # Store updated processing results
                 self.repo.update_processing_result(pipeline_id, {
@@ -325,7 +335,11 @@ class Orchestrator:
                 self.repo.update_state(
                     pipeline_id,
                     PipelineState.REJECTED,
-                    error_details={"validation_reasons": validation.reasons, "metrics": validation.metrics},
+                    error_details={
+                        "validation_reasons": validation.reasons,
+                        "metrics": validation.metrics,
+                        "first_attempt": first_attempt,
+                    },
                 )
                 return {
                     "pipeline_id": pipeline_id,
