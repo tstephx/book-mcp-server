@@ -144,19 +144,31 @@ def register_hybrid_search_tools(mcp):
 
             # Optional diversity re-ranking via MMR
             if diverse and len(fused) > 1:
-                # Build chapter-level metadata with 'id' key for MMR compat
-                chapter_meta_for_mmr = [
-                    {**m, "id": m["chunk_id"]}
-                    for m in chunk_metadata
-                ]
-                fused = maximal_marginal_relevance(
-                    fused,
-                    embeddings_matrix,
-                    chapter_meta_for_mmr,
-                    query_embedding,
-                    lambda_param=0.7,
-                    top_k=limit
-                )
+                # Build chapter-level embeddings from best chunk per chapter
+                chapter_emb_list = []
+                chapter_meta_for_mmr = []
+                chunk_id_to_idx = {m["chunk_id"]: i for i, m in enumerate(chunk_metadata)}
+                for ch_id in content_map:
+                    # Find best chunk for this chapter (already tracked by _best_chunk_per_chapter)
+                    for cr in chunk_results:
+                        if cr["chapter_id"] == ch_id:
+                            cidx = chunk_id_to_idx.get(cr["chunk_id"])
+                            if cidx is not None:
+                                chapter_emb_list.append(embeddings_matrix[cidx])
+                                chapter_meta_for_mmr.append({"id": ch_id})
+                                break
+                if chapter_emb_list:
+                    chapter_emb_matrix = np.vstack(chapter_emb_list)
+                    fused = maximal_marginal_relevance(
+                        fused,
+                        chapter_emb_matrix,
+                        chapter_meta_for_mmr,
+                        query_embedding,
+                        lambda_param=0.7,
+                        top_k=limit
+                    )
+                else:
+                    fused = fused[:limit]
             else:
                 fused = fused[:limit]
 
