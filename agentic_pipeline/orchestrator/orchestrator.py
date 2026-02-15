@@ -9,8 +9,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
@@ -26,6 +24,8 @@ from agentic_pipeline.orchestrator.errors import (
 from agentic_pipeline.agents.classifier import ClassifierAgent
 from agentic_pipeline.pipeline.strategy import StrategySelector
 from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
