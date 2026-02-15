@@ -15,7 +15,8 @@ from book_ingestion import (
     ProcessingMode,
     PipelineResult,
 )
-from book_ingestion.embeddings import EmbeddingGenerator
+from src.utils.chunker import chunk_chapter
+from src.utils.openai_embeddings import OpenAIEmbeddingGenerator
 
 from agentic_pipeline.adapters.llm_fallback_adapter import LLMFallbackAdapter
 from agentic_pipeline.db.connection import get_pipeline_db
@@ -46,6 +47,8 @@ class EmbeddingResult:
 
     success: bool
     chapters_processed: int
+    chunks_created: int = 0
+    chunks_embedded: int = 0
     error: Optional[str] = None
 
 
@@ -95,7 +98,7 @@ class ProcessingAdapter:
         )
 
         # Lazy-loaded embedding generator
-        self._embedding_generator: Optional[EmbeddingGenerator] = None
+        self._embedding_generator: Optional[OpenAIEmbeddingGenerator] = None
 
     def process_book(
         self,
@@ -177,44 +180,50 @@ class ProcessingAdapter:
     def generate_embeddings(
         self,
         book_id: Optional[str] = None,
-        batch_size: int = 32,
+        batch_size: int = 100,
     ) -> EmbeddingResult:
         """
-        Generate embeddings for book chapters using direct SQL.
+        Chunk chapters and generate OpenAI embeddings for each chunk.
 
-        If book_id is provided, generates embeddings only for that book.
-        Otherwise, generates embeddings for all chapters without embeddings.
+        If book_id is provided, processes only that book's chapters.
+        Otherwise, processes all chapters that don't yet have chunks.
 
         Args:
-            book_id: Optional book ID to limit embedding generation
-            batch_size: Number of chapters to process at once
+            book_id: Optional book ID to limit processing
+            batch_size: Number of chunks per OpenAI API call
 
         Returns:
             EmbeddingResult with generation details
         """
         import hashlib
         import io
-        from datetime import datetime, timezone
 
         import numpy as np
 
         try:
             # Lazy-load embedding generator
             if self._embedding_generator is None:
-                self._embedding_generator = EmbeddingGenerator()
+                self._embedding_generator = OpenAIEmbeddingGenerator()
 
             with get_pipeline_db(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
+                # Find chapters that need chunking (no chunks exist yet)
                 if book_id:
                     cursor.execute(
-                        "SELECT id, file_path FROM chapters "
-                        "WHERE book_id = ? AND embedding IS NULL",
+                        """SELECT c.id, c.book_id, c.file_path FROM chapters c
+                        WHERE c.book_id = ?
+                        AND NOT EXISTS (
+                            SELECT 1 FROM chunks k WHERE k.chapter_id = c.id
+                        )""",
                         (book_id,),
                     )
                 else:
                     cursor.execute(
-                        "SELECT id, file_path FROM chapters WHERE embedding IS NULL"
+                        """SELECT c.id, c.book_id, c.file_path FROM chapters c
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM chunks k WHERE k.chapter_id = c.id
+                        )"""
                     )
 
                 chapters = cursor.fetchall()
@@ -222,72 +231,90 @@ class ProcessingAdapter:
                 if not chapters:
                     return EmbeddingResult(success=True, chapters_processed=0)
 
-                logger.info(f"Generating embeddings for {len(chapters)} chapters")
+                logger.info(f"Chunking and embedding {len(chapters)} chapters")
                 books_dir = self.db_path.parent / "books"
-                processed = 0
+                chapters_processed = 0
 
-                for i in range(0, len(chapters), batch_size):
-                    batch = chapters[i : i + batch_size]
-                    texts = []
-                    valid = []
+                # Phase 1: Chunk all chapters and insert rows
+                all_chunk_rows = []
 
-                    for ch in batch:
-                        try:
-                            content = self._read_chapter_content(
-                                ch["file_path"], books_dir
-                            )
-                            if content.strip():
-                                texts.append(content)
-                                valid.append(ch)
-                        except Exception as e:
-                            logger.warning(f"Cannot read chapter {ch['id']}: {e}")
-
-                    if not texts:
-                        continue
-
-                    embeddings = self._embedding_generator.generate_batch(
-                        texts, batch_size=batch_size
-                    )
-
-                    now = datetime.now(timezone.utc).isoformat()
-
-                    for ch, content, emb in zip(valid, texts, embeddings):
-                        emb_blob = io.BytesIO()
-                        np.save(emb_blob, emb)
-                        content_hash = hashlib.sha256(content.encode()).hexdigest()
-                        file_mtime = self._get_file_mtime(
+                for ch in chapters:
+                    try:
+                        content = self._read_chapter_content(
                             ch["file_path"], books_dir
                         )
+                        if not content.strip():
+                            continue
 
-                        cursor.execute(
-                            """
-                            UPDATE chapters
-                            SET embedding = ?, embedding_model = ?, content_hash = ?,
-                                file_mtime = ?, embedding_updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (
-                                emb_blob.getvalue(),
-                                "all-MiniLM-L6-v2",
-                                content_hash,
-                                file_mtime,
-                                now,
+                        chunks = chunk_chapter(content)
+                        for chunk in chunks:
+                            chunk_id = f"{ch['id']}:{chunk['chunk_index']}"
+                            content_hash = hashlib.sha256(
+                                chunk["content"].encode()
+                            ).hexdigest()
+                            all_chunk_rows.append((
+                                chunk_id,
                                 ch["id"],
-                            ),
+                                ch["book_id"],
+                                chunk["chunk_index"],
+                                chunk["content"],
+                                chunk["word_count"],
+                                content_hash,
+                            ))
+
+                        chapters_processed += 1
+
+                    except Exception as e:
+                        logger.warning(f"Cannot chunk chapter {ch['id']}: {e}")
+
+                if not all_chunk_rows:
+                    return EmbeddingResult(
+                        success=True, chapters_processed=chapters_processed
+                    )
+
+                # Insert chunk rows
+                cursor.executemany(
+                    """INSERT OR REPLACE INTO chunks
+                    (id, chapter_id, book_id, chunk_index, content, word_count, content_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    all_chunk_rows,
+                )
+                total_chunks_created = len(all_chunk_rows)
+                conn.commit()
+
+                # Phase 2: Embed chunks in batches
+                chunk_texts = [row[4] for row in all_chunk_rows]
+                chunk_ids = [row[0] for row in all_chunk_rows]
+                chunks_embedded = 0
+
+                for i in range(0, len(chunk_texts), batch_size):
+                    batch_texts = chunk_texts[i : i + batch_size]
+                    batch_ids = chunk_ids[i : i + batch_size]
+
+                    embeddings = self._embedding_generator.generate_batch(batch_texts)
+
+                    for cid, emb in zip(batch_ids, embeddings):
+                        buf = io.BytesIO()
+                        np.save(buf, emb)
+                        cursor.execute(
+                            """UPDATE chunks SET embedding = ?, embedding_model = ?
+                            WHERE id = ?""",
+                            (buf.getvalue(), "text-embedding-3-small", cid),
                         )
-                        processed += 1
+                        chunks_embedded += 1
 
                     conn.commit()
 
-                return EmbeddingResult(success=True, chapters_processed=processed)
+                logger.info(
+                    f"Embedded {chunks_embedded} chunks from {chapters_processed} chapters"
+                )
+                return EmbeddingResult(
+                    success=True,
+                    chapters_processed=chapters_processed,
+                    chunks_created=total_chunks_created,
+                    chunks_embedded=chunks_embedded,
+                )
 
-        except ImportError as e:
-            logger.warning(f"Embedding dependencies not available: {e}")
-            return EmbeddingResult(
-                success=False,
-                chapters_processed=0,
-                error=f"Embedding dependencies not available: {e}",
-            )
         except Exception as e:
             logger.error(f"Embedding generation failed: {e}")
             return EmbeddingResult(
