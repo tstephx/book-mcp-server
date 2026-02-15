@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
+from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
@@ -194,6 +195,29 @@ class Orchestrator:
             "llm_fallback_used": result.llm_fallback_used,
         }
 
+    def _cleanup_book_data(self, book_id: str) -> None:
+        """Delete existing book/chapter data before retry processing."""
+        try:
+            with get_pipeline_db(self.config.db_path) as conn:
+                ch_ids = [r[0] for r in conn.execute(
+                    "SELECT id FROM chapters WHERE book_id = ?", (book_id,)
+                ).fetchall()]
+                if ch_ids:
+                    placeholders = ",".join("?" * len(ch_ids))
+                    for table in ("chapters_fts", "chapter_summaries", "chunks"):
+                        try:
+                            conn.execute(
+                                f"DELETE FROM {table} WHERE chapter_id IN ({placeholders})",
+                                ch_ids,
+                            )
+                        except Exception:
+                            pass
+                    conn.execute("DELETE FROM chapters WHERE book_id = ?", (book_id,))
+                conn.execute("DELETE FROM books WHERE id = ?", (book_id,))
+                conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Tables may not exist in test environments
+
     def _run_embedding(self, book_id: Optional[str] = None) -> dict:
         """Run embedding generation via direct library call.
 
@@ -294,6 +318,9 @@ class Orchestrator:
                 reason = "; ".join(validation.reasons)
                 self.logger.error(pipeline_id, "ValidationFailed", f"{reason}. Retrying with force_fallback")
                 self.repo.increment_retry_count(pipeline_id)
+
+                # Clean up data from first attempt before retry
+                self._cleanup_book_data(pipeline_id)
 
                 # Transition through NEEDS_RETRY back to PROCESSING
                 self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
