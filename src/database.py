@@ -216,6 +216,29 @@ def ensure_library_schema() -> None:
             )
         """)
 
+        # --- Chunks for sub-chapter retrieval ---
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chunks (
+                id TEXT PRIMARY KEY,
+                chapter_id TEXT NOT NULL,
+                book_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                word_count INTEGER NOT NULL,
+                embedding BLOB,
+                embedding_model TEXT,
+                content_hash TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chapter_id) REFERENCES chapters(id)
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chunks_chapter ON chunks(chapter_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chunks_book ON chunks(book_id)"
+        )
+
         # --- Tracking columns on chapters (owned by book-ingestion, but we add columns) ---
         if _add_column_if_missing(cursor, "chapters", "content_hash", "TEXT"):
             created.append("chapters.content_hash")

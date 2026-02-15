@@ -213,6 +213,23 @@ MIGRATIONS = [
         checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
+
+    # Chunks for sub-chapter retrieval (embedding quality overhaul)
+    """
+    CREATE TABLE IF NOT EXISTS chunks (
+        id TEXT PRIMARY KEY,
+        chapter_id TEXT NOT NULL,
+        book_id TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        word_count INTEGER NOT NULL,
+        embedding BLOB,
+        embedding_model TEXT,
+        content_hash TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (chapter_id) REFERENCES chapters(id)
+    )
+    """,
 ]
 
 INDEXES = [
@@ -225,6 +242,8 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_audit_actor ON approval_audit(actor)",
     "CREATE INDEX IF NOT EXISTS idx_audit_session ON approval_audit(session_id)",
     "CREATE INDEX IF NOT EXISTS idx_feedback_category ON autonomy_feedback(feedback_category)",
+    "CREATE INDEX IF NOT EXISTS idx_chunks_chapter ON chunks(chapter_id)",
+    "CREATE INDEX IF NOT EXISTS idx_chunks_book ON chunks(book_id)",
 ]
 
 DEFAULT_RETENTION = [
