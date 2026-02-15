@@ -24,6 +24,7 @@ from agentic_pipeline.orchestrator.errors import (
 from agentic_pipeline.agents.classifier import ClassifierAgent
 from agentic_pipeline.pipeline.strategy import StrategySelector
 from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
+from agentic_pipeline.validation import ExtractionValidator
 
 logger = logging.getLogger(__name__)
 
@@ -267,7 +268,26 @@ class Orchestrator:
 
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
-        # Validation now uses processing result quality metrics
+        validator = ExtractionValidator()
+        validation = validator.validate(
+            book_id=pipeline_id, db_path=str(self.config.db_path)
+        )
+
+        if not validation.passed:
+            reason = "; ".join(validation.reasons)
+            self.logger.error(pipeline_id, "ValidationFailed", reason)
+            self.logger.state_transition(pipeline_id, PipelineState.VALIDATING.value, PipelineState.REJECTED.value)
+            self.repo.update_state(
+                pipeline_id,
+                PipelineState.REJECTED,
+                error_details={"validation_reasons": validation.reasons, "metrics": validation.metrics},
+            )
+            return {
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.REJECTED.value,
+                "reason": reason,
+                "metrics": validation.metrics,
+            }
 
         # APPROVAL ROUTING - use processing result confidence
         confidence = processing_result.get("detection_confidence", 0)
