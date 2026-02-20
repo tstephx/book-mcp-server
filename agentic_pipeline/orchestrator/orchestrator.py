@@ -512,48 +512,61 @@ class Orchestrator:
 
         self.logger.worker_started()
 
+        # Recover orphaned books left in processing state from a previous crash
+        recovered = self.repo.reset_stale_processing()
+        if recovered:
+            self.logger.error("worker", "StartupRecovery", f"Reset {recovered} orphaned processing books to detected")
+
         while not self.shutdown_requested:
-            # Priority 1: Complete approved books
-            approved = self.repo.find_by_state(PipelineState.APPROVED, limit=1)
-            if approved:
-                try:
-                    self._complete_approved(approved[0]["id"])
-                except Exception as e:
-                    self.logger.error(approved[0]["id"], type(e).__name__, str(e))
-                    self.repo.update_state(approved[0]["id"], PipelineState.NEEDS_RETRY)
-                continue
-
-            # Priority 2: Process new books
-            pending = self.repo.find_by_state(PipelineState.DETECTED, limit=1)
-            if pending:
-                try:
-                    self._process_book(
-                        pending[0]["id"],
-                        pending[0]["source_path"],
-                        pending[0]["content_hash"],
-                    )
-                except Exception as e:
-                    self.logger.error(pending[0]["id"], type(e).__name__, str(e))
-                    self.repo.update_state(pending[0]["id"], PipelineState.NEEDS_RETRY)
-                continue
-
-            # Priority 3: Retry failed
-            retryable = self.repo.find_by_state(PipelineState.NEEDS_RETRY, limit=1)
-            if retryable:
-                try:
-                    self._retry_one(retryable[0])
-                except Exception as e:
-                    self.logger.error(retryable[0]["id"], type(e).__name__, str(e))
-                continue
-
-            # Priority 4: Scan watch directory for new books
-            if self.config.watch_dir:
-                detected = self._scan_watch_dir()
-                if detected > 0:
-                    self.logger.state_transition("watch", "scanning", f"detected:{detected}")
+            try:
+                # Priority 1: Complete approved books
+                approved = self.repo.find_by_state(PipelineState.APPROVED, limit=1)
+                if approved:
+                    try:
+                        self._complete_approved(approved[0]["id"])
+                    except Exception as e:
+                        self.logger.error(approved[0]["id"], type(e).__name__, str(e))
+                        self.repo.update_state(approved[0]["id"], PipelineState.NEEDS_RETRY)
                     continue
 
-            time.sleep(self.config.worker_poll_interval)
+                # Priority 2: Process new books
+                pending = self.repo.find_by_state(PipelineState.DETECTED, limit=1)
+                if pending:
+                    try:
+                        self._process_book(
+                            pending[0]["id"],
+                            pending[0]["source_path"],
+                            pending[0]["content_hash"],
+                        )
+                    except Exception as e:
+                        self.logger.error(pending[0]["id"], type(e).__name__, str(e))
+                        self.repo.update_state(pending[0]["id"], PipelineState.NEEDS_RETRY)
+                    continue
+
+                # Priority 3: Retry failed
+                retryable = self.repo.find_by_state(PipelineState.NEEDS_RETRY, limit=1)
+                if retryable:
+                    try:
+                        self._retry_one(retryable[0])
+                    except Exception as e:
+                        self.logger.error(retryable[0]["id"], type(e).__name__, str(e))
+                    continue
+
+                # Priority 4: Scan watch directory for new books
+                if self.config.watch_dir:
+                    detected = self._scan_watch_dir()
+                    if detected > 0:
+                        self.logger.state_transition("watch", "scanning", f"detected:{detected}")
+                        continue
+
+                time.sleep(self.config.worker_poll_interval)
+
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e):
+                    self.logger.error("worker", "DatabaseLocked", "DB locked, retrying in 5s")
+                    time.sleep(5)
+                else:
+                    raise
 
         self.logger.worker_stopped()
 

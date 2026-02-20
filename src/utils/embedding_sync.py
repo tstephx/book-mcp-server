@@ -277,7 +277,7 @@ def update_embeddings_incremental(
                         WHERE id = ?
                     """, (
                         embedding_bytes,
-                        'text-embedding-3-small',
+                        'text-embedding-3-large',
                         content_hash,
                         file_mtime,
                         now,

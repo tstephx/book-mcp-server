@@ -303,7 +303,7 @@ class ProcessingAdapter:
                         cursor.execute(
                             """UPDATE chunks SET embedding = ?, embedding_model = ?
                             WHERE id = ?""",
-                            (buf.getvalue(), "text-embedding-3-small", cid),
+                            (buf.getvalue(), "text-embedding-3-large", cid),
                         )
                         chunks_embedded += 1
 

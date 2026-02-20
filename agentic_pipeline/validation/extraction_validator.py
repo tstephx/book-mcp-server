@@ -124,9 +124,12 @@ def check_extraction_quality(
         )
 
     # --- Check 6: Duplicate chapters by content_hash ---
-    hash_counts = Counter(content_hashes)
+    # Exclude NULL/empty hashes — chapters without a hash can't be compared
+    known_hashes = [h for h in content_hashes if h]
+    hash_counts = Counter(known_hashes)
     duplicate_count = sum(c - 1 for c in hash_counts.values() if c > 1)
-    dup_ratio = duplicate_count / chapter_count if chapter_count > 0 else 0.0
+    comparable_count = len(known_hashes) if known_hashes else chapter_count
+    dup_ratio = duplicate_count / comparable_count if comparable_count > 0 else 0.0
     metrics["duplicate_ratio"] = dup_ratio
     if dup_ratio > MAX_DUPLICATE_RATIO:
         reasons.append(

@@ -15,7 +15,7 @@ _encoding = None
 def _get_encoding():
     global _encoding
     if _encoding is None:
-        _encoding = tiktoken.encoding_for_model("text-embedding-3-small")
+        _encoding = tiktoken.encoding_for_model("text-embedding-3-large")
     return _encoding
 
 

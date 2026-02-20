@@ -18,7 +18,7 @@ class OpenAIProvider(LLMProvider):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-4.1-mini",
     ):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.model = model

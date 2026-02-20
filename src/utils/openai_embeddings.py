@@ -12,9 +12,9 @@ import tiktoken
 
 logger = logging.getLogger(__name__)
 
-MODEL = "text-embedding-3-small"
-DIMENSIONS = 1536
-MAX_TOKENS = 8191  # text-embedding-3-small limit
+MODEL = "text-embedding-3-large"
+DIMENSIONS = 3072
+MAX_TOKENS = 8191  # text-embedding-3-large limit
 
 # Lazy-loaded tokenizer
 _encoding = None
@@ -28,7 +28,7 @@ def _get_encoding():
 
 
 class OpenAIEmbeddingGenerator:
-    """Generate embeddings using OpenAI text-embedding-3-small.
+    """Generate embeddings using OpenAI text-embedding-3-large.
 
     Matches the interface of the local EmbeddingGenerator:
     generate(text) -> ndarray, generate_batch(texts) -> ndarray.

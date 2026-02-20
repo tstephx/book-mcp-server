@@ -1,11 +1,31 @@
-# Claude Project Context
+# CLAUDE.md — book-mcp-server
 <!-- project-name: book-mcp-server -->
 
 **DO NOT scan directories on startup.** This project is well-documented below.
 
----
+## What This Is
+Two MCP servers + a CLI pipeline in one repo:
+- **Book library** — read-only search/read/learning tools for Claude Desktop
+- **Agentic pipeline** — book processing, approval, autonomy management
+- **CLI** — human operator commands (`agentic-pipeline`)
 
-This is the **Agentic Book Processing Pipeline** - an AI-powered system that automatically processes, classifies, and ingests books into a searchable knowledge library.
+## Canonical Entry Points (do not guess)
+
+| Component | Entry point | What it does |
+|-----------|-------------|-------------|
+| **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
+| **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: init, health, worker, approve, escape-hatch. |
+| **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
+
+## Environment Variables
+
+| Component | DB env var | Books dir env var | Notes |
+|-----------|-----------|-------------------|-------|
+| Pipeline (agentic-pipeline) | `AGENTIC_PIPELINE_DB` | `WATCH_DIR`, `PROCESSED_DIR` | Worker + state machine |
+| MCP server (Claude Desktop) | `BOOK_DB_PATH` | `BOOKS_DIR` | Read/search tools |
+| Both | — | — | Shared DB: `~/_Projects/book-ingestion-python/data/library.db` |
+| Embeddings | `OPENAI_API_KEY` | — | Required for semantic search + pipeline embedding |
 
 ## Quick Start
 
@@ -13,81 +33,23 @@ This is the **Agentic Book Processing Pipeline** - an AI-powered system that aut
 # Activate environment
 source .venv/bin/activate
 
-# Run tests (use python -m pytest, not bare pytest)
-python -m pytest tests/ -v
+# Run book-library MCP server (stdio, for Claude Desktop)
+python server.py
 
-# Initialize database
+# Run agentic-pipeline MCP server
+python agentic_mcp_server.py
+
+# CLI: initialize database
 agentic-pipeline init
 
-# Check pipeline health
+# CLI: check health
 agentic-pipeline health
 
-# Check autonomy status
-agentic-pipeline autonomy status
-
-# Run worker with directory watching + auto-archive
+# CLI: run worker with directory watching + auto-archive
 agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
-```
 
-## Project Structure
-
-```
-src/
-├── tools/
-│   ├── hybrid_search_tool.py  # Hybrid search MCP tool (RRF + MMR)
-│   └── semantic_search_tool.py # Semantic search MCP tool
-├── utils/
-│   ├── embedding_loader.py    # Shared embedding loading (used by search tools)
-│   ├── hybrid_search.py       # RRF fusion + MMR diversity algorithms
-│   ├── cache.py               # Two-tier cache (embeddings, summary embeddings, chapters)
-│   ├── summaries.py           # Chapter summaries + summary embedding generation
-│   └── ...
-├── server.py                  # MCP server + inline tools
-└── ...
-
-migrations/
-├── add_summary_embeddings.py  # Adds embedding column to chapter_summaries
-
-agentic_pipeline/
-├── agents/                 # AI-powered components
-│   ├── classifier.py       # Book type classification
-│   ├── validator.py        # Quality validation
-│   └── providers/          # LLM providers (OpenAI, Anthropic)
-├── adapters/               # External system adapters
-│   ├── processing_adapter.py  # Wraps book-ingestion library
-│   └── llm_fallback_adapter.py # LLM fallback for low confidence
-├── pipeline/               # State machine & orchestration
-│   ├── states.py           # Pipeline states enum
-│   ├── strategy.py         # Strategy selection
-│   └── transitions.py      # State transitions
-├── approval/               # Approval queue & actions
-│   ├── queue.py            # ApprovalQueue
-│   └── actions.py          # approve/reject/rollback + inline embedding
-├── autonomy/               # Phase 5: Graduated trust
-│   ├── config.py           # AutonomyConfig (modes, escape hatch)
-│   ├── metrics.py          # MetricsCollector
-│   ├── calibration.py      # CalibrationEngine (thresholds)
-│   └── spot_check.py       # SpotCheckManager
-├── health/                 # Phase 4: Production monitoring
-│   ├── monitor.py          # HealthMonitor
-│   └── stuck_detector.py   # StuckDetector
-├── batch/                  # Phase 4: Bulk operations
-│   ├── filters.py          # BatchFilter
-│   └── operations.py       # BatchOperations
-├── audit/                  # Phase 4: Audit trail
-│   └── trail.py            # AuditTrail
-├── library/                # Library status dashboard
-│   └── status.py           # LibraryStatus
-├── db/                     # Database layer
-│   ├── connection.py       # get_pipeline_db() shared context manager
-│   ├── migrations.py       # Schema definitions (WAL mode enabled)
-│   ├── pipelines.py        # PipelineRepository
-│   └── config.py           # DB path configuration
-├── orchestrator/           # Main orchestrator (package)
-│   └── orchestrator.py     # Orchestrator class
-├── cli.py                  # Click CLI commands
-├── mcp_server.py           # MCP tools for Claude
-└── config.py               # OrchestratorConfig
+# Tests (use python -m pytest, not bare pytest)
+python -m pytest tests/ -v
 ```
 
 ## Key Concepts
@@ -95,34 +57,50 @@ agentic_pipeline/
 ### Pipeline States
 Books flow through: `DETECTED` → `HASHING` → `CLASSIFYING` → `SELECTING_STRATEGY` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `APPROVED` → `EMBEDDING` → `COMPLETE`
 
-High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and auto-approve. Approval (single or batch) runs embedding inline — no separate worker needed.
+High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and auto-approve. Approval runs embedding inline — no separate worker needed.
 
 ### Autonomy Modes
-- **supervised** - All books require human approval (default)
-- **partial** - Auto-approve high-confidence known types
-- **confident** - Per-type calibrated thresholds
+- **supervised** — All books require human approval (default)
+- **partial** — Auto-approve high-confidence known types
+- **confident** — Per-type calibrated thresholds
 
 ### File Watcher
-The worker can watch a directory for new `.epub`/`.pdf` files and automatically queue them:
 ```bash
 agentic-pipeline worker --watch-dir /path/to/books/
-# Or via env var: WATCH_DIR=/path/to/books agentic-pipeline worker
 ```
-Scans run as the lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
+Scans run as lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
 
 ### Auto-Archive
-After a book completes the pipeline, the source file can be automatically moved to a processed directory:
 ```bash
 agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
-# Or via env var: PROCESSED_DIR=/path/to/books/processed
 ```
-Files in `processed_dir` are excluded from watch scans. Name collisions are handled with counter suffixes (`book_1.epub`, `book_2.epub`). Archive failures are logged but don't affect pipeline state.
+Files in `processed_dir` are excluded from watch scans. Name collisions handled with counter suffixes. Archive failures logged but don't affect pipeline state.
 
 ### Escape Hatch
-One command reverts to fully supervised mode:
 ```bash
 agentic-pipeline escape-hatch "reason"
 ```
+One command reverts to fully supervised mode.
+
+## Tuning Knobs
+
+| Knob | File | Symbol | Env override | Default |
+|------|------|--------|-------------|---------|
+| Auto-approve threshold | `agentic_pipeline/config.py` | `confidence_threshold` | `CONFIDENCE_THRESHOLD` | 0.7 |
+| Processing timeout | `agentic_pipeline/config.py` | `processing_timeout` | `PROCESSING_TIMEOUT_SECONDS` | 600s |
+| Embedding timeout | `agentic_pipeline/config.py` | `embedding_timeout` | `EMBEDDING_TIMEOUT_SECONDS` | 300s |
+| Worker poll interval | `agentic_pipeline/config.py` | `worker_poll_interval` | `WORKER_POLL_INTERVAL_SECONDS` | 5s |
+| Max retries | `agentic_pipeline/config.py` | `max_retry_attempts` | `MAX_RETRY_ATTEMPTS` | 3 |
+
+## If Something Breaks
+
+| Symptom | Check |
+|---------|-------|
+| Pipeline stuck | `agentic-pipeline health` + stuck detector output |
+| Watcher not picking files | Confirm `WATCH_DIR` + file extension (.epub/.pdf) + `PROCESSED_DIR` exclusion |
+| Claude Desktop not seeing new books | Confirm embeddings generated, server restarted, `BOOK_DB_PATH` matches |
+| Embedding failures | Check `OPENAI_API_KEY` is set in environment |
+| DB locked | Only one writer at a time; check for zombie worker processes |
 
 ## Common Tasks
 
@@ -131,70 +109,34 @@ agentic-pipeline escape-hatch "reason"
 2. Implement in appropriate module
 3. Add CLI command if user-facing
 4. Add MCP tool if Claude should use it
-5. Run `pytest tests/ -v` to verify
+5. Run `python -m pytest tests/ -v`
 
 ### Database Changes
 1. Add migration to `agentic_pipeline/db/migrations.py` in `MIGRATIONS` list
 2. Write test in `tests/test_*_migrations.py`
 3. Existing DBs auto-migrate on `run_migrations()`
 
-### CLI Commands
-Commands are in `agentic_pipeline/cli.py` using Click:
-```python
-@main.command()
-@click.option("--flag", is_flag=True)
-def my_command(flag: bool):
-    """Command description."""
-    pass
-```
+### Adding CLI Commands
+Commands in `agentic_pipeline/cli.py` using Click.
 
-### MCP Tools
-Tools are in `agentic_pipeline/mcp_server.py`:
-```python
-def my_tool(arg: str) -> dict:
-    """Tool description for Claude."""
-    return {"result": "value"}
-```
+### Adding MCP Tools
+Pipeline tools in `agentic_pipeline/mcp_server.py`. Library tools in `src/tools/*.py`.
 
 ## Testing
 
 ```bash
-# All tests (use python -m pytest, not bare pytest)
-python -m pytest tests/ -v
-
-# Specific phase
-python -m pytest tests/test_phase5*.py -v
-
-# Single file
-python -m pytest tests/test_autonomy_config.py -v
-
-# With coverage
-python -m pytest tests/ --cov=agentic_pipeline
+python -m pytest tests/ -v                          # All tests
+python -m pytest tests/test_phase5*.py -v            # Specific phase
+python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 ```
 
-## Environment
-
-- Python 3.12+
-- Virtual env at `.venv/`
-- Database at `~/_Projects/book-ingestion-python/data/library.db` (shared by pipeline + MCP server)
-- Override with `AGENTIC_PIPELINE_DB` env var
-
 ## Architecture Decisions
+1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row)
+2. **Inline embedding** — `approve_book()` runs full APPROVED → EMBEDDING → COMPLETE flow
+3. **ProcessingAdapter** — wraps `book-ingestion` as library (lazy-imported)
+4. **Hybrid Search** — RRF combines FTS5 keyword + semantic vector; optional MMR for diversity
 
-1. **SQLite + WAL mode** - Single-file database with concurrent read/write support; all `agentic_pipeline/` connections go through `get_pipeline_db()` context manager (`timeout=10`, `row_factory=sqlite3.Row`)
-2. **Inline embedding** - `approve_book()` runs the full APPROVED → EMBEDDING → COMPLETE flow; no separate worker needed
-3. **ProcessingAdapter** - Wraps `book-ingestion` as a library (not subprocess); lazy-imported in approval to avoid hard dependency
-4. **Click CLI** - Standard Python CLI framework
-5. **Rich** - Terminal formatting and tables
-6. **TDD** - Tests written before implementation
-7. **Immutable Audit** - All decisions logged permanently
-8. **Hybrid Search** - Reciprocal Rank Fusion (RRF) combines FTS5 keyword + semantic vector search; optional Maximal Marginal Relevance (MMR) for diversity. Shared embedding loading via `src/utils/embedding_loader.py`
-
-## Using the Book Library
-
-Once books are processed, they're available via MCP tools in Claude Desktop.
-
-### Key Capabilities
+## Book Library Tools (Claude Desktop)
 
 | Category | Tools |
 |----------|-------|
@@ -206,7 +148,9 @@ Once books are processed, they're available via MCP tools in Claude Desktop.
 | **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress` |
 | **Export** | `export_chapter`, `export_book`, `generate_flashcards` |
 
-### MCP Client Config
+Example: "Search my books for Kubernetes content". See `docs/USER-GUIDE.md` for full usage.
+
+## MCP Client Config
 
 Add to `.mcp.json` in any project that needs the book library:
 
@@ -226,38 +170,8 @@ Add to `.mcp.json` in any project that needs the book library:
 }
 ```
 
-**Critical notes:**
-- Command must use the **venv python** (has mcp, fastmcp, openai deps)
-- Env vars are `BOOK_DB_PATH` and `BOOKS_DIR` (see `src/config.py`)
-- Do NOT use `uv` (not installed) or `BOOK_LIBRARY_DB`/`LIBRARY_PATH` (wrong names)
-
-### Example Queries to Claude
-
-- "Search my books for Kubernetes content"
-- "Create a learning path for DevOps"
-- "Compare how my books explain microservices"
-- "Generate flashcards from the Docker chapter"
-
-See `docs/USER-GUIDE.md` for comprehensive usage documentation.
-
-## Documentation
-
-- `README.md` - User-facing overview
-- `DESIGN.md` - Technical architecture
-- `docs/USER-GUIDE.md` - **Comprehensive usage guide**
-- `docs/PHASE4-PRODUCTION-HARDENING-COMPLETE.md` - Phase 4 features
-- `docs/PHASE5-CONFIDENT-AUTONOMY-COMPLETE.md` - Phase 5 features
-- `docs/plans/` - Design documents and implementation plans
+**Critical:** Command must use the **venv python** (has mcp, fastmcp, openai deps). Env vars are `BOOK_DB_PATH` and `BOOKS_DIR` (NOT `BOOK_LIBRARY_DB`/`LIBRARY_PATH`). Do NOT use `uv`.
 
 ---
 
-## Memory Integration
-
-This project uses claude-innit for persistent context:
-- `get_context(project="book-mcp-server")` - Load project memory
-- `remember(content, category="project", project="book-mcp-server")` - Save decisions
-- `save_session(summary, project="book-mcp-server")` - End-of-session summary
-
----
-
-*Last updated: 2026-02-11 (auto-archive processed books)*
+*Last updated: 2026-02-18*

@@ -390,6 +390,25 @@ class PipelineRepository:
             conn.commit()
             return new_id
 
+    def reset_stale_processing(self) -> int:
+        """Reset books stuck in processing state (orphaned by a previous crash).
+
+        Any book in 'processing' state with a NULL heartbeat was never actively
+        worked on by this worker instance — safe to reset to 'detected'.
+
+        Returns:
+            Number of books reset.
+        """
+        with get_pipeline_db(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE processing_pipelines
+                SET state = ?, retry_count = 0
+                WHERE state = ? AND last_heartbeat IS NULL
+            """, (PipelineState.DETECTED.value, PipelineState.PROCESSING.value))
+            conn.commit()
+            return cursor.rowcount
+
     def get_queue_by_priority(self) -> dict[int, int]:
         """Get count of queued items by priority."""
         with get_pipeline_db(self.db_path) as conn:
