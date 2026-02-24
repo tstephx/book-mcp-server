@@ -21,6 +21,7 @@ Main tool for creating project-based learning guides.
 |-----------|------|---------|-------------|
 | `goal` | string | required | What you want to build or achieve |
 | `depth` | string | "comprehensive" | Level of detail: "quick", "comprehensive", "deep" |
+| `include_concepts` | bool | true | Include concept briefs section in the guide |
 | `save_to_file` | bool | false | Save the guide to a markdown file |
 | `output_path` | string | "" | Custom path for saved file |
 
@@ -28,7 +29,8 @@ Main tool for creating project-based learning guides.
 ```python
 {
     "goal": "Your stated goal",
-    "project_type": "Detected project category",
+    "project_type": "Detected project category (human-readable name)",
+    "detected_type": "internal_key",  # e.g. "vps", "web_app", "data_pipeline"
     "phases": [
         {"name": "Phase Name", "topics": [...], "chapters_found": 5}
     ],
@@ -40,6 +42,7 @@ Main tool for creating project-based learning guides.
     "books_found": 8,
     "chapters_found": 45,
     "reading_list": [...],  # Top 10 chapters
+    "concept_briefs": [...],  # Key concepts explained (if include_concepts=True)
     "guide": "# Full markdown guide...",
     "file_path": "/path/if/saved.md"
 }
@@ -78,6 +81,7 @@ View available project templates and example goals.
         },
         ...
     ],
+    "custom_goals": ["Build a VPS on Hetzner...", ...],  # Alias of example_goals
     "usage_tip": "Use generate_learning_path('your goal') - auto-detects template"
 }
 ```
@@ -86,12 +90,12 @@ View available project templates and example goals.
 
 | Type | Description | Phases |
 |------|-------------|--------|
-| **VPS** | Server infrastructure, hosting | Foundation → Security → Web → Docker → Deploy → Automation |
+| **VPS** | Server infrastructure, hosting | Foundation → Security → Web Infrastructure → Containerization → Deploy → Automation |
 | **Web App** | Full-stack web applications | Architecture → Backend → Frontend → DevOps |
-| **Data Pipeline** | ETL, analytics, reporting | Data Foundations → Processing → Storage → Analysis → Automation |
-| **ML Project** | Machine learning, AI, LLMs | ML Foundations → Data Prep → Modeling → Deep Learning → Deployment |
-| **Automation** | Scripts, bots, workflows | Scripting → File Ops → API Integration → Infrastructure → Scheduling |
-| **MCP Server** | Claude tools, MCP development | MCP Fundamentals → Backend → Data Layer → Integration → Deployment |
+| **Data Pipeline** | ETL, analytics, reporting | Data Foundations → Data Processing → Storage → Analysis → Automation |
+| **ML Project** | Machine learning, AI, LLMs | ML Foundations → Data Preparation → Modeling → Deep Learning → Deployment |
+| **Automation** | Scripts, bots, workflows | Scripting Basics → File Operations → API Integration → Infrastructure → Scheduling |
+| **MCP Server** | Claude tools, MCP development | MCP Fundamentals → Backend Development → Data Layer → Integration → Deployment |
 
 ## How It Works
 
