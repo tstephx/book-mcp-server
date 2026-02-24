@@ -44,3 +44,25 @@ def test_is_terminal_state():
 
     assert not is_terminal_state(PipelineState.PROCESSING)
     assert not is_terminal_state(PipelineState.PENDING_APPROVAL)
+
+
+def test_pipeline_state_has_failed():
+    from agentic_pipeline.pipeline.states import PipelineState
+    assert hasattr(PipelineState, "FAILED")
+    assert PipelineState.FAILED.value == "failed"
+
+
+def test_failed_is_terminal():
+    from agentic_pipeline.pipeline.states import PipelineState, is_terminal_state
+    assert is_terminal_state(PipelineState.FAILED)
+
+
+def test_needs_retry_can_transition_to_failed():
+    from agentic_pipeline.pipeline.states import PipelineState, can_transition
+    assert can_transition(PipelineState.NEEDS_RETRY, PipelineState.FAILED)
+
+
+def test_failed_has_no_outgoing_transitions():
+    from agentic_pipeline.pipeline.states import PipelineState, can_transition
+    for state in PipelineState:
+        assert not can_transition(PipelineState.FAILED, state)

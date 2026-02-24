@@ -20,6 +20,7 @@ class PipelineState(Enum):
     COMPLETE = "complete"
     REJECTED = "rejected"
     ARCHIVED = "archived"
+    FAILED = "failed"
 
 
 # Valid state transitions
@@ -32,12 +33,13 @@ TRANSITIONS = {
     PipelineState.PROCESSING: {PipelineState.VALIDATING, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.VALIDATING: {PipelineState.PENDING_APPROVAL, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.PENDING_APPROVAL: {PipelineState.APPROVED, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
-    PipelineState.NEEDS_RETRY: {PipelineState.HASHING, PipelineState.PROCESSING, PipelineState.REJECTED},
+    PipelineState.NEEDS_RETRY: {PipelineState.HASHING, PipelineState.PROCESSING, PipelineState.REJECTED, PipelineState.FAILED},
     PipelineState.APPROVED: {PipelineState.EMBEDDING, PipelineState.NEEDS_RETRY},
     PipelineState.EMBEDDING: {PipelineState.COMPLETE, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books
     PipelineState.REJECTED: {PipelineState.ARCHIVED},
     PipelineState.ARCHIVED: set(),  # Terminal
+    PipelineState.FAILED: set(),  # Terminal
 }
 
 TERMINAL_STATES = {
@@ -45,6 +47,7 @@ TERMINAL_STATES = {
     PipelineState.REJECTED,
     PipelineState.ARCHIVED,
     PipelineState.DUPLICATE,
+    PipelineState.FAILED,
 }
 
 
