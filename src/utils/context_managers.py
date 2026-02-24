@@ -17,7 +17,7 @@ def embedding_model_context() -> Generator:
     """Manage embedding model lifecycle.
 
     Yields an OpenAIEmbeddingGenerator that calls the OpenAI
-    text-embedding-3-small API (1536-dim).
+    text-embedding-3-large API (3072-dim).
 
     Usage:
         with embedding_model_context() as generator:
