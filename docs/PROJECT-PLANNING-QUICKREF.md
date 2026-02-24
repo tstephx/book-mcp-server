@@ -91,7 +91,7 @@ generate_wireframe_brief("Build a customer portal", audience="executive")
 generate_implementation_plan(
     "Build a VPS on Hetzner",
     team_size=1,
-    start_date="2025-01-15"
+    start_date="2026-03-01"
 )
 ```
 
@@ -152,7 +152,7 @@ analyze_project(
 |------|------|--------|----------|
 | `overview` | 2 sec | Analysis only | Quick assessment |
 | `quick` | 5 sec | BRD + Plan | Essential docs |
-| `full` | 10 sec | All 4 artifacts | Complete package |
+| `full` | 10 sec | All 3 artifacts | Complete package |
 
 ### generate_brd styles
 

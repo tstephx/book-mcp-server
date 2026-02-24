@@ -19,8 +19,8 @@ from .utils.logging import logger
 from .tools.book_tools import register_book_tools
 from .tools.chapter_tools import register_chapter_tools
 from .tools.search_tools import register_search_tools
-from .tools.semantic_search_tool import register_semantic_search_tools
-from .tools.hybrid_search_tool import register_hybrid_search_tools
+from .tools.semantic_search_tools import register_semantic_search_tools
+from .tools.hybrid_search_tools import register_hybrid_search_tools
 from .tools.discovery_tools import register_discovery_tools
 from .tools.reading_tools import register_reading_tools
 from .tools.analytics_tools import register_analytics_tools

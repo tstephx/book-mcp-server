@@ -7,10 +7,10 @@ import numpy as np
 
 def test_semantic_search_uses_chunks():
     """semantic_search should call load_chunk_embeddings, not load_chapter_embeddings."""
-    with patch("src.tools.semantic_search_tool.load_chunk_embeddings") as mock_chunks, \
-         patch("src.tools.semantic_search_tool._get_generator") as mock_get_gen, \
-         patch("src.tools.semantic_search_tool.rerank_results") as mock_rerank, \
-         patch("src.tools.semantic_search_tool.find_top_k") as mock_topk:
+    with patch("src.tools.semantic_search_tools.load_chunk_embeddings") as mock_chunks, \
+         patch("src.tools.semantic_search_tools._get_generator") as mock_get_gen, \
+         patch("src.tools.semantic_search_tools.rerank_results") as mock_rerank, \
+         patch("src.tools.semantic_search_tools.find_top_k") as mock_topk:
 
         mock_gen = MagicMock()
         mock_gen.generate.return_value = np.zeros(1536)
@@ -34,7 +34,7 @@ def test_semantic_search_uses_chunks():
              "chunk_content": "text", "similarity": 0.9},
         ]
 
-        from src.tools.semantic_search_tool import register_semantic_search_tools
+        from src.tools.semantic_search_toolss import register_semantic_search_tools
         mcp = MagicMock()
         captured = {}
 
