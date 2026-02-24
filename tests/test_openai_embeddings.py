@@ -64,6 +64,37 @@ class TestOpenAIEmbeddingGenerator:
         assert client.embeddings.create.call_count == 2
         assert result.shape == (10, 1536)
 
+    def test_large_token_batch_splits(self):
+        """Batches exceeding MAX_BATCH_TOKENS are split even if item count is under max_batch_size."""
+        import tiktoken
+        from src.utils.openai_embeddings import MAX_BATCH_TOKENS, MODEL
+
+        enc = tiktoken.encoding_for_model(MODEL)
+        # Build a text that is exactly 1000 tokens when re-encoded
+        token_ids = list(range(1000))
+        long_text = enc.decode(token_ids)
+        actual_tokens = len(enc.encode(long_text))
+        # Scale to produce > MAX_BATCH_TOKENS total
+        count = (MAX_BATCH_TOKENS // actual_tokens) + 10
+        texts = [long_text] * count
+
+        # Each API call returns one embedding per input text
+        def make_response(n):
+            r = MagicMock()
+            r.data = [MagicMock(embedding=[0.1] * 1536) for _ in range(n)]
+            return r
+
+        with patch("src.utils.openai_embeddings.openai") as mock_openai:
+            client = mock_openai.OpenAI.return_value
+            client.embeddings.create.side_effect = lambda model, input: make_response(len(input))
+
+            gen = OpenAIEmbeddingGenerator(max_batch_size=2048)  # item limit won't trigger
+            result = gen.generate_batch(texts)
+
+        # Should have split into at least 2 API calls
+        assert client.embeddings.create.call_count >= 2
+        assert result.shape == (count, 1536)
+
     def test_dimension_property(self):
         """Dimension reports 3072 (text-embedding-3-large)."""
         with patch("src.utils.openai_embeddings.openai") as mock_openai:

@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 MODEL = "text-embedding-3-large"
 DIMENSIONS = 3072
-MAX_TOKENS = 8191  # text-embedding-3-large limit
+MAX_TOKENS = 8191  # text-embedding-3-large per-text token limit
+MAX_BATCH_TOKENS = 250_000  # OpenAI allows 300k; use 250k as safety margin
 
 # Lazy-loaded tokenizer
 _encoding = None
@@ -65,18 +66,32 @@ class OpenAIEmbeddingGenerator:
             raise ValueError("Cannot generate embeddings for empty list")
 
         all_embeddings: list[np.ndarray] = []
+        enc = _get_encoding()
 
-        for i in range(0, len(texts), self._max_batch_size):
-            batch = [self._truncate(t) for t in texts[i : i + self._max_batch_size]]
-            response = self._client.embeddings.create(
-                model=MODEL,
-                input=batch,
-            )
-            batch_embeddings = [
-                np.array(item.embedding, dtype=np.float32)
-                for item in response.data
-            ]
-            all_embeddings.extend(batch_embeddings)
+        current_batch: list[str] = []
+        current_tokens = 0
+
+        def _flush(batch: list[str]) -> list[np.ndarray]:
+            response = self._client.embeddings.create(model=MODEL, input=batch)
+            return [np.array(item.embedding, dtype=np.float32) for item in response.data]
+
+        for text in texts:
+            truncated = self._truncate(text)
+            token_count = len(enc.encode(truncated))
+
+            needs_token_flush = current_tokens + token_count > MAX_BATCH_TOKENS
+            needs_size_flush = len(current_batch) >= self._max_batch_size
+
+            if current_batch and (needs_token_flush or needs_size_flush):
+                all_embeddings.extend(_flush(current_batch))
+                current_batch = []
+                current_tokens = 0
+
+            current_batch.append(truncated)
+            current_tokens += token_count
+
+        if current_batch:
+            all_embeddings.extend(_flush(current_batch))
 
         return np.vstack(all_embeddings)
 
