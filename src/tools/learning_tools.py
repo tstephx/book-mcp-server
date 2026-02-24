@@ -342,13 +342,14 @@ def _build_markdown_content(concept: str, depth: str, config: dict,
         lines.append("")
     
     # Source Chapters
-    lines.append("## Source Chapters")
-    lines.append("")
-    lines.append("*Deeper reading from your library:*")
-    lines.append("")
-    for s in sources[:5]:
-        lines.append(f"- **{s['book_title']}** — Chapter {s['chapter_number']}: {s['chapter_title']} ({s['similarity']:.0%} relevant)")
-    lines.append("")
+    if sources:
+        lines.append("## Source Chapters")
+        lines.append("")
+        lines.append("*Deeper reading from your library:*")
+        lines.append("")
+        for s in sources[:5]:
+            lines.append(f"- **{s['book_title']}** — Chapter {s['chapter_number']}: {s['chapter_title']} ({s['similarity']:.0%} relevant)")
+        lines.append("")
     
     return "\n".join(lines)
 
@@ -402,7 +403,8 @@ def _build_conversational_content(concept: str, depth: str, config: dict,
     
     # Close with sources
     parts.append("")
-    parts.append(f"This is based on what I found in your library, primarily from '{sources[0]['book_title']}' if you want to dig deeper.")
+    if sources:
+        parts.append(f"This is based on what I found in your library, primarily from '{sources[0]['book_title']}' if you want to dig deeper.")
     
     return "\n".join(parts)
 
