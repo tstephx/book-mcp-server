@@ -124,6 +124,11 @@ Commands in `agentic_pipeline/cli.py` using Click.
 ### Adding MCP Tools
 Pipeline tools in `agentic_pipeline/mcp_server.py`. Library tools in `src/tools/*.py`.
 
+### Architecture Decisions
+Major decisions are recorded in `docs/decisions/` as numbered ADRs. When making
+a significant architectural choice, add an ADR. When in-progress design docs exist,
+they live in `docs/active/` and move to `docs/archive/` when complete.
+
 ## Testing
 
 ```bash
