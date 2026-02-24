@@ -292,7 +292,7 @@ This data drives threshold decisions. If 90%+ confidence is actually 93% accurat
 One command reverts to fully supervised mode:
 
 ```bash
-agentic-pipeline escape-hatch --reason "Unusual errors detected"
+agentic-pipeline escape-hatch "Unusual errors detected"
 ```
 
 This exists because:

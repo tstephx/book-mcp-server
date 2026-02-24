@@ -60,10 +60,8 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | Tool | Description |
 |------|-------------|
 | `teach_concept` | Explain technical concepts with business analogies |
-| `learning_path` | Create personalized learning paths from your books |
-| `create_study_guide` | Generate study guide from a chapter |
-| `generate_flashcards` | Create flashcard questions from content |
-| `extract_key_concepts` | Pull out key definitions and concepts |
+| `generate_learning_path` | Create personalized learning paths from your books |
+| `create_study_guide` | Generate study guide from a chapter (includes flashcards and key concepts) |
 
 ### Project Planning Tools
 
@@ -79,16 +77,16 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | `mark_as_read` | Track which chapters you've completed |
 | `get_reading_progress` | See read/unread status for a book |
 | `add_bookmark` | Save bookmarks with notes |
-| `list_bookmarks` | List all bookmarks in a book |
-| `export_chapter` | Export chapter as clean markdown |
-| `export_book` | Export entire book as markdown |
+| `get_bookmarks` | List all bookmarks in a book |
+| `export_chapter_to_markdown` | Export chapter as clean markdown |
 
 ### Library Management Tools
 
 | Tool | Description |
 |------|-------------|
 | `get_library_statistics` | Comprehensive stats (books, chapters, words, topics) |
-| `book_analysis` | Per-book analysis with reading time estimates |
+| `find_duplicate_coverage` | Identify topics covered redundantly across books |
+| `get_author_insights` | Per-author analysis across your library |
 | `refresh_embeddings` | Update embeddings for changed chapters |
 | `get_cache_stats` | Monitor caching performance |
 | `clear_cache` | Clear cached data |
@@ -245,7 +243,7 @@ agentic-pipeline autonomy enable partial
 agentic-pipeline autonomy enable confident
 
 # Emergency revert to supervised mode
-agentic-pipeline autonomy escape-hatch
+agentic-pipeline escape-hatch "reason"
 ```
 
 ### Monitoring
@@ -314,7 +312,7 @@ agentic-pipeline health --json
 Semantic search finds conceptually related content even without exact keywords. Start broad, then narrow down.
 
 ### 2. Create Learning Paths
-Don't just read randomly - use `learning_path()` to create structured plans based on YOUR books.
+Don't just read randomly - use `generate_learning_path()` to create structured plans based on YOUR books.
 
 ### 3. Cross-Reference Books
 Use `cross_book_comparison()` to get multiple perspectives on complex topics.

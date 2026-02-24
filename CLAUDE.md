@@ -156,12 +156,12 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 | Category | Tools |
 |----------|-------|
 | **Search** | `semantic_search`, `text_search`, `hybrid_search`, `search_all_books` |
-| **Discovery** | `topic_coverage`, `cross_book_comparison`, `find_related_content` |
+| **Discovery** | `get_topic_coverage`, `cross_book_comparison`, `find_related_content` |
 | **Reading** | `get_chapter`, `get_book_info`, `list_books` |
-| **Learning** | `teach_concept`, `learning_path`, `create_study_guide` |
+| **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
 | **Planning** | `generate_project_learning_path`, `create_implementation_plan` |
-| **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress` |
-| **Export** | `export_chapter`, `export_book`, `generate_flashcards` |
+| **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress`, `get_bookmarks` |
+| **Export** | `export_chapter_to_markdown` |
 
 Example: "Search my books for Kubernetes content". See `docs/USER-GUIDE.md` for full usage.
 
