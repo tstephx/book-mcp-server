@@ -28,7 +28,8 @@ class Config:
     # Search limits
     MAX_SEARCH_RESULTS: int = int(os.getenv("MAX_SEARCH_RESULTS", "10"))
     MAX_CHAPTER_SIZE: int = int(os.getenv("MAX_CHAPTER_SIZE", "100000"))  # 100KB
-    DEFAULT_CHAPTER_TOKENS: int = int(os.getenv("DEFAULT_CHAPTER_TOKENS", "8000"))    
+    DEFAULT_CHAPTER_TOKENS: int = int(os.getenv("DEFAULT_CHAPTER_TOKENS", "8000"))  # default token budget per chapter
+
     # Features
     ENABLE_LOGGING: bool = os.getenv("ENABLE_LOGGING", "true").lower() == "true"
     ENABLE_CACHING: bool = os.getenv("ENABLE_CACHING", "false").lower() == "true"

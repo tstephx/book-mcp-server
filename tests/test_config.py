@@ -66,12 +66,9 @@ def test_default_chapter_tokens_exists():
     assert hasattr(Config, 'DEFAULT_CHAPTER_TOKENS')
     assert Config.DEFAULT_CHAPTER_TOKENS == 8000
 
-def test_default_chapter_tokens_env_override():
-    import os
-    from importlib import reload
+def test_default_chapter_tokens_env_override(monkeypatch):
+    import importlib
     import src.config as config_module
-    os.environ['DEFAULT_CHAPTER_TOKENS'] = '4000'
-    reload(config_module)
+    monkeypatch.setenv("DEFAULT_CHAPTER_TOKENS", "4000")
+    importlib.reload(config_module)
     assert config_module.Config.DEFAULT_CHAPTER_TOKENS == 4000
-    del os.environ['DEFAULT_CHAPTER_TOKENS']
-    reload(config_module)
