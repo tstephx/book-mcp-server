@@ -1,6 +1,5 @@
 """Tests for ProcessingAdapter.generate_embeddings() chunking + OpenAI embedding."""
 
-import io
 import sqlite3
 import sys
 from pathlib import Path
@@ -12,7 +11,19 @@ import pytest
 
 from agentic_pipeline.db.migrations import run_migrations
 
-# Mock book_ingestion (and submodules) before importing processing_adapter
+# Build mock book_ingestion modules.  These are installed into sys.modules
+# before importing processing_adapter so that the module-level
+# "from book_ingestion import ..." resolves to our mocks.
+#
+# We use assignment (not setdefault) so we win even when
+# test_processing_adapter.py was collected first and already populated
+# sys.modules with the real book_ingestion package.
+#
+# Critically we do NOT reload agentic_pipeline.adapters.processing_adapter —
+# reloading would create new class objects (ProcessingResult, etc.) and break
+# isinstance() checks in test_processing_adapter.py.  Instead we patch the
+# already-imported module's attributes directly so @patch decorators can find
+# and replace the correct names.
 _mock_bi = ModuleType("book_ingestion")
 _mock_bi.BookIngestionApp = MagicMock()
 _mock_bi.ProcessingMode = MagicMock()
@@ -23,17 +34,42 @@ _mock_bi_ports_llm.LLMFallbackPort = MagicMock()
 _mock_bi_ports_llm.LLMFallbackRequest = MagicMock()
 _mock_bi_ports_llm.LLMFallbackResponse = MagicMock()
 _mock_bi.ports = _mock_bi_ports
-for mod_name, mod in [
-    ("book_ingestion", _mock_bi),
-    ("book_ingestion.ports", _mock_bi_ports),
-    ("book_ingestion.ports.llm_fallback", _mock_bi_ports_llm),
-]:
-    sys.modules.setdefault(mod_name, mod)
 
-from agentic_pipeline.adapters.processing_adapter import (
+_BI_MODULE_NAMES = [
+    "book_ingestion",
+    "book_ingestion.ports",
+    "book_ingestion.ports.llm_fallback",
+]
+_BI_MOCKS = [_mock_bi, _mock_bi_ports, _mock_bi_ports_llm]
+_original_bi_modules: dict = {}
+
+for _mod_name, _mod in zip(_BI_MODULE_NAMES, _BI_MOCKS):
+    _original_bi_modules[_mod_name] = sys.modules.get(_mod_name)
+    sys.modules[_mod_name] = _mod
+
+# Import (or retrieve already-cached) processing_adapter without reloading it.
+# The @patch decorators in each test target names inside this module's
+# namespace, which is sufficient — the module was already imported with
+# whatever book_ingestion was present, but chunk_chapter and
+# OpenAIEmbeddingGenerator come from src.utils.* and are correctly patched.
+import agentic_pipeline.adapters.processing_adapter as _pa_module  # noqa: E402
+
+from agentic_pipeline.adapters.processing_adapter import (  # noqa: E402
     ProcessingAdapter,
     EmbeddingResult,
 )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _restore_bi_modules():
+    """After all tests in this module run, restore sys.modules to original state."""
+    yield
+    for mod_name in _BI_MODULE_NAMES:
+        original = _original_bi_modules.get(mod_name)
+        if original is None:
+            sys.modules.pop(mod_name, None)
+        else:
+            sys.modules[mod_name] = original
 
 
 def _create_test_db(tmp_path: Path) -> Path:
