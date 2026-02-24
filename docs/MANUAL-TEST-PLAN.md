@@ -287,7 +287,7 @@ Deeper checks on high-value tools where output correctness matters.
 
 ### list_books
 Run: `list_books()`
-- [ ] Returns at least 180 books (library has 185)
+- [ ] Returns at least 170 books (library had 173 as of 2026-02-11; count grows over time)
 - [ ] Each book has `id`, `title`, `author`, `word_count` fields
 - [ ] `word_count` values are integers > 0
 - [ ] Books are sorted alphabetically by title

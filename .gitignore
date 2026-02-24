@@ -26,6 +26,7 @@ build/
 *.db
 *.sqlite
 processing_log*.txt
+data/
 
 # OS
 .DS_Store

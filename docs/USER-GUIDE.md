@@ -14,10 +14,12 @@ Add to your Claude Desktop config:
 {
   "mcpServers": {
     "book-library": {
-      "command": "python",
+      "command": "/path/to/book-mcp-server/.venv/bin/python",
       "args": ["/path/to/book-mcp-server/server.py"],
       "env": {
-        "BOOK_DB_PATH": "/path/to/book-ingestion-python/data/library.db"
+        "BOOK_DB_PATH": "/path/to/library.db",
+        "BOOKS_DIR": "/path/to/books",
+        "OPENAI_API_KEY": "sk-..."
       }
     }
   }
@@ -373,10 +375,8 @@ agentic-pipeline retry
 ```
 
 ### Search Not Finding Content
-```bash
-# Refresh embeddings
-python -c "from src.tools.maintenance import refresh_embeddings; refresh_embeddings(force=True)"
-```
+
+Ask Claude: "refresh embeddings" — this calls the `refresh_embeddings` MCP tool directly.
 
 ### Claude Not Connecting
 1. Check Claude Desktop config JSON syntax

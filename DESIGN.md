@@ -1,5 +1,9 @@
 # Agentic Pipeline: Design Decisions & Rationale
 
+> **Status:** All phases complete (Phase 1–5). Embeddings use OpenAI `text-embedding-3-small` (migrated from sentence-transformers). This document reflects the original design rationale and remains accurate for architecture decisions.
+
+---
+
 This document explains the architectural choices behind the agentic book processing pipeline—what we chose, what we didn't choose, and why.
 
 ---
