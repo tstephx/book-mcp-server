@@ -319,6 +319,11 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             book_id = validate_book_id(book_id)
             chapter_number = validate_chapter_number(chapter_number)
 
+            # Apply server-side default if caller did not specify
+            if max_tokens is None:
+                from src.config import Config
+                max_tokens = Config.DEFAULT_CHAPTER_TOKENS
+
             # Get chapter info from database
             chapter = execute_single("""
                 SELECT title, file_path, word_count
@@ -461,6 +466,11 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             # Validate inputs
             book_id = validate_book_id(book_id)
             chapter_number = validate_chapter_number(chapter_number)
+
+            # Apply server-side default if caller did not specify
+            if max_tokens is None:
+                from src.config import Config
+                max_tokens = Config.DEFAULT_CHAPTER_TOKENS
             if section_number < 1:
                 return "Error: section_number must be >= 1"
 
