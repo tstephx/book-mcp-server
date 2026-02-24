@@ -79,6 +79,25 @@ def test_orchestrator_idempotency_skips_in_progress(db_path, config):
     assert "in progress" in result["reason"].lower()
 
 
+def test_orchestrator_idempotency_skips_failed(db_path, config):
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    # Create a permanently failed pipeline
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "hash123")
+    transition_to(repo, pid, PipelineState.FAILED)
+
+    orchestrator = Orchestrator(config)
+
+    with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
+        result = orchestrator.process_one("/book.epub")
+
+    assert result["skipped"] == True
+    assert "permanently failed" in result["reason"].lower()
+
+
 def test_orchestrator_classifies_book(db_path, config):
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType

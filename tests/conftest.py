@@ -56,6 +56,11 @@ _PATHS_TO_STATE = {
         PipelineState.REJECTED,
     ],
     PipelineState.DUPLICATE: [PipelineState.HASHING, PipelineState.DUPLICATE],
+    PipelineState.FAILED: [
+        PipelineState.HASHING, PipelineState.CLASSIFYING,
+        PipelineState.SELECTING_STRATEGY, PipelineState.PROCESSING,
+        PipelineState.NEEDS_RETRY, PipelineState.FAILED,
+    ],
 }
 
 

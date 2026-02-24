@@ -75,6 +75,9 @@ class Orchestrator:
         if state not in TERMINAL_STATES:
             return {"skipped": True, "reason": "Already in progress", "pipeline_id": existing["id"]}
 
+        if state == PipelineState.FAILED:
+            return {"skipped": True, "reason": "Permanently failed (max retries exhausted)", "pipeline_id": existing["id"]}
+
         # Terminal but not complete (rejected, archived) - allow reprocessing
         return None
 
@@ -329,18 +332,18 @@ class Orchestrator:
                 try:
                     processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=True)
                 except (ProcessingError, PipelineTimeoutError) as e:
-                    # Retry processing failed — reject directly (max 1 retry)
+                    # Retry processing failed — permanently failed (processing error, not content rejection)
                     self.logger.error(pipeline_id, type(e).__name__, str(e))
-                    self.logger.state_transition(pipeline_id, PipelineState.PROCESSING.value, PipelineState.REJECTED.value)
+                    self.logger.state_transition(pipeline_id, PipelineState.PROCESSING.value, PipelineState.FAILED.value)
                     self.repo.update_state(
                         pipeline_id,
-                        PipelineState.REJECTED,
+                        PipelineState.FAILED,
                         error_details={
                             "initial_validation": initial_validation,
                             "retry_error": str(e),
                         },
                     )
-                    return {"pipeline_id": pipeline_id, "state": PipelineState.REJECTED.value, "error": str(e)}
+                    return {"pipeline_id": pipeline_id, "state": PipelineState.FAILED.value, "error": str(e)}
 
                 # Store updated processing results
                 self._store_processing_result(pipeline_id, processing_result)

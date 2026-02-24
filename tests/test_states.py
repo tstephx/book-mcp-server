@@ -10,7 +10,7 @@ def test_pipeline_state_enum_has_required_states():
         "DETECTED", "HASHING", "DUPLICATE", "CLASSIFYING",
         "SELECTING_STRATEGY", "PROCESSING", "VALIDATING",
         "PENDING_APPROVAL", "NEEDS_RETRY", "APPROVED",
-        "EMBEDDING", "COMPLETE", "REJECTED", "ARCHIVED"
+        "EMBEDDING", "COMPLETE", "REJECTED", "ARCHIVED", "FAILED"
     ]
 
     for state in required:
