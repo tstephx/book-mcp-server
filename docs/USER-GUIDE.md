@@ -41,7 +41,7 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | `search_titles` | Simple keyword search in titles/authors | "python docker" |
 | `search_all_books` | Search entire library grouped by book | "async programming" |
 | `topic_coverage` | Find which books cover a topic | "machine learning" |
-| `cross_book_comparison` | Compare how books approach a topic | "API design" |
+| `extract_code_examples` | Extract code samples from a book | "API design" |
 | `find_related_content` | Find thematically similar chapters | "microservices" |
 
 ### Reading & Navigation Tools
@@ -145,8 +145,8 @@ semantic_search("container orchestration", limit=5, min_similarity=0.5)
 > "How do my different books explain microservices architecture? Compare them."
 
 **What happens:**
-1. `cross_book_comparison("microservices")` analyzes multiple books
-2. Creates side-by-side comparison of approaches
+1. `find_related_content` finds thematically related chapters across books
+2. `get_topic_coverage("microservices")` shows which books cover it
 3. Synthesizes different perspectives
 
 ### Study a Chapter
@@ -315,13 +315,13 @@ Semantic search finds conceptually related content even without exact keywords. 
 Don't just read randomly - use `generate_learning_path()` to create structured plans based on YOUR books.
 
 ### 3. Cross-Reference Books
-Use `cross_book_comparison()` to get multiple perspectives on complex topics.
+Use `get_topic_coverage()` and `find_related_content()` to get multiple perspectives on complex topics.
 
 ### 4. Track Progress
 Use `mark_as_read()` and `add_bookmark()` to track your learning journey.
 
 ### 5. Export for Reference
-Use `export_chapter()` to create personal reference documents from key chapters.
+Use `export_chapter_to_markdown()` to create personal reference documents from key chapters.
 
 ### 6. Ask Claude Naturally
 You don't need to know tool names. Just ask:

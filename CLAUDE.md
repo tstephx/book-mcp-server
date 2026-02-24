@@ -156,7 +156,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 | Category | Tools |
 |----------|-------|
 | **Search** | `semantic_search`, `text_search`, `hybrid_search`, `search_all_books` |
-| **Discovery** | `get_topic_coverage`, `cross_book_comparison`, `find_related_content` |
+| **Discovery** | `get_topic_coverage`, `find_related_content`, `extract_code_examples` |
 | **Reading** | `get_chapter`, `get_book_info`, `list_books` |
 | **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
 | **Planning** | `generate_project_learning_path`, `create_implementation_plan` |
