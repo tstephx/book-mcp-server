@@ -10,7 +10,7 @@ VALID_UUID_2 = "922e5dd7-defd-421e-92a4-dedc6bf87275"
 
 def test_resolve_book_id_passes_valid_uuid_through():
     """A valid UUID bypasses DB lookup entirely."""
-    with patch("src.utils.validators.execute_query") as mock_db:
+    with patch("src.database.execute_query") as mock_db:
         result = resolve_book_id(VALID_UUID)
     assert result == VALID_UUID
     mock_db.assert_not_called()
@@ -18,7 +18,7 @@ def test_resolve_book_id_passes_valid_uuid_through():
 
 def test_resolve_book_id_slug_resolves_to_uuid():
     """A slug is converted to spaces and matched against book titles."""
-    with patch("src.utils.validators.execute_query") as mock_query:
+    with patch("src.database.execute_query") as mock_query:
         mock_query.return_value = [
             {"id": VALID_UUID, "title": "Agentic Design Patterns A Hands On Guide"}
         ]
@@ -28,7 +28,7 @@ def test_resolve_book_id_slug_resolves_to_uuid():
 
 def test_resolve_book_id_slug_single_match_returns_uuid():
     """Single fuzzy match returns that book's UUID."""
-    with patch("src.utils.validators.execute_query") as mock_query:
+    with patch("src.database.execute_query") as mock_query:
         mock_query.return_value = [
             {"id": VALID_UUID_2, "title": "Arduino Programming Essentials"}
         ]
@@ -38,7 +38,7 @@ def test_resolve_book_id_slug_single_match_returns_uuid():
 
 def test_resolve_book_id_no_match_raises_with_suggestions():
     """No match raises ValidationError with did-you-mean suggestions."""
-    with patch("src.utils.validators.execute_query") as mock_query:
+    with patch("src.database.execute_query") as mock_query:
         # First call (exact match): returns empty
         # Second call (broad search for suggestions): returns candidates
         mock_query.side_effect = [
@@ -56,7 +56,7 @@ def test_resolve_book_id_no_match_raises_with_suggestions():
 
 def test_resolve_book_id_no_match_no_suggestions_raises_plain_error():
     """No match and no suggestions raises a plain invalid-ID error."""
-    with patch("src.utils.validators.execute_query") as mock_query:
+    with patch("src.database.execute_query") as mock_query:
         mock_query.side_effect = [[], []]  # no matches at all
         with pytest.raises(ValidationError) as exc_info:
             resolve_book_id("completely-unknown-slug")
@@ -69,9 +69,29 @@ def test_resolve_book_id_empty_raises():
         resolve_book_id("")
 
 
+def test_resolve_book_id_whitespace_only_raises():
+    """Whitespace-only string raises — must not match every book via '%%'."""
+    with pytest.raises(ValidationError):
+        resolve_book_id("   ")
+
+
+def test_resolve_book_id_too_long_raises():
+    """Slug over 200 characters raises immediately."""
+    with pytest.raises(ValidationError):
+        resolve_book_id("a-" * 101)  # 202 chars
+
+
+def test_resolve_book_id_percent_in_slug_does_not_wildcard_match():
+    """A % in the slug must not act as a SQL wildcard — no match should be returned."""
+    with patch("src.database.execute_query") as mock_query:
+        mock_query.side_effect = [[], []]  # no matches
+        with pytest.raises(ValidationError):
+            resolve_book_id("100%-proven-guide")
+
+
 def test_resolve_book_id_multiple_matches_returns_first():
     """Multiple matches returns the first (highest relevance) result."""
-    with patch("src.utils.validators.execute_query") as mock_query:
+    with patch("src.database.execute_query") as mock_query:
         mock_query.return_value = [
             {"id": VALID_UUID, "title": "Docker Deep Dive"},
             {"id": VALID_UUID_2, "title": "Docker Networking Guide"},
