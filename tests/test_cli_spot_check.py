@@ -31,8 +31,17 @@ def _patch_db(db_path):
 
 
 def _patch_candidates(candidates):
+    """Patch the sampled list used by the interactive review path."""
     return patch(
         "agentic_pipeline.autonomy.spot_check.SpotCheckManager.select_for_review",
+        return_value=candidates,
+    )
+
+
+def _patch_all_unreviewed(candidates):
+    """Patch the full unsampled list used by --list."""
+    return patch(
+        "agentic_pipeline.autonomy.spot_check.SpotCheckManager.get_all_unreviewed",
         return_value=candidates,
     )
 
@@ -59,7 +68,7 @@ MOCK_BOOK = {
 
 
 def test_spot_check_no_candidates(runner, db_path):
-    """When no auto-approved books exist, prints a friendly message."""
+    """When no auto-approved books exist, interactive mode prints a friendly message."""
     with _patch_db(db_path), _patch_candidates([]):
         result = runner.invoke(main, ["spot-check"])
 
@@ -69,16 +78,30 @@ def test_spot_check_no_candidates(runner, db_path):
 
 def test_spot_check_list_no_candidates(runner, db_path):
     """--list with no candidates prints a friendly message."""
-    with _patch_db(db_path), _patch_candidates([]):
+    with _patch_db(db_path), _patch_all_unreviewed([]):
         result = runner.invoke(main, ["spot-check", "--list"])
 
     assert result.exit_code == 0
     assert "No spot-checks pending" in result.output
 
 
+def test_spot_check_list_shows_full_unsampled_count(runner, db_path):
+    """--list uses the full unsampled list, not the 10% sample."""
+    # 10 books in the full list — if sampling were applied, fewer would show
+    all_books = [
+        dict(MOCK_BOOK, book_id=f"abc12345-0000-0000-0000-00000000000{i}")
+        for i in range(10)
+    ]
+    with _patch_db(db_path), _patch_all_unreviewed(all_books), _patch_title("Test Book"):
+        result = runner.invoke(main, ["spot-check", "--list"])
+
+    assert result.exit_code == 0
+    assert "10 books" in result.output
+
+
 def test_spot_check_list_shows_table(runner, db_path):
-    """--list with candidates shows a table."""
-    with _patch_db(db_path), _patch_candidates([MOCK_BOOK]), _patch_title("Test Book Title"):
+    """--list with candidates shows a table with title and type."""
+    with _patch_db(db_path), _patch_all_unreviewed([MOCK_BOOK]), _patch_title("Test Book Title"):
         result = runner.invoke(main, ["spot-check", "--list"])
 
     assert result.exit_code == 0

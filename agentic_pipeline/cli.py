@@ -778,30 +778,27 @@ def spot_check(list_pending: bool, days: int, reviewer: str):
     that haven't been spot-checked yet, then walks through each one asking
     whether the classification and quality look correct.
     """
-    import json
     from .db.config import get_db_path
     from .autonomy import SpotCheckManager
-    from .db.connection import get_pipeline_db
 
     db_path = get_db_path()
     manager = SpotCheckManager(db_path)
 
-    candidates = manager.select_for_review(days=days)
-
-    if not candidates:
-        console.print("[green]No spot-checks pending.[/green]")
-        console.print(f"  (No un-reviewed auto-approvals in the last {days} days)")
-        return
-
     if list_pending:
-        console.print(f"\n[bold]Pending Spot-Checks ({len(candidates)} books)[/bold]\n")
+        # Show the full unsampled list so users see an accurate count
+        all_unreviewed = manager.get_all_unreviewed(days=days)
+        if not all_unreviewed:
+            console.print("[green]No spot-checks pending.[/green]")
+            console.print(f"  (No un-reviewed auto-approvals in the last {days} days)")
+            return
+        console.print(f"\n[bold]Pending Spot-Checks ({len(all_unreviewed)} books)[/bold]\n")
         table = Table(show_header=True, header_style="bold")
         table.add_column("Book ID", style="dim")
         table.add_column("Type")
         table.add_column("Confidence")
         table.add_column("Approved")
         table.add_column("Title")
-        for book in candidates:
+        for book in all_unreviewed:
             title = _get_book_title(db_path, book["book_id"])
             table.add_row(
                 book["book_id"][:8] + "...",
@@ -813,7 +810,13 @@ def spot_check(list_pending: bool, days: int, reviewer: str):
         console.print(table)
         return
 
-    # Interactive review
+    # Interactive review — use sampled subset
+    candidates = manager.select_for_review(days=days)
+    if not candidates:
+        console.print("[green]No spot-checks pending.[/green]")
+        console.print(f"  (No un-reviewed auto-approvals in the last {days} days)")
+        return
+
     console.print(f"\n[bold]Spot-Check Review[/bold] — {len(candidates)} book(s) to review")
     console.print("  [y] correct  [n] incorrect  [s] skip  [q] quit\n")
 
@@ -876,7 +879,7 @@ def spot_check(list_pending: bool, days: int, reviewer: str):
     _print_spot_check_summary(reviewed, correct)
 
 
-def _get_book_title(db_path, book_id: str) -> str:
+def _get_book_title(db_path: Path, book_id: str) -> str:
     """Look up a book's title from its processing_result JSON."""
     from .db.connection import get_pipeline_db
     import json

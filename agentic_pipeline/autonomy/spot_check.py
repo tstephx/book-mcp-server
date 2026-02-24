@@ -15,6 +15,23 @@ class SpotCheckManager:
         self.db_path = str(db_path)
         self.sample_rate = sample_rate
 
+    def get_all_unreviewed(self, days: int = 7) -> list[dict]:
+        """Return all auto-approved books not yet spot-checked (no sampling)."""
+        with get_pipeline_db(self.db_path) as conn:
+            cursor = conn.cursor()
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cursor.execute("""
+                SELECT f.book_id, f.original_book_type, f.original_confidence, f.created_at
+                FROM autonomy_feedback f
+                LEFT JOIN spot_checks s ON f.book_id = s.book_id
+                WHERE f.original_decision = 'auto_approved'
+                AND f.human_decision = 'approved'
+                AND f.created_at > ?
+                AND s.id IS NULL
+                ORDER BY f.created_at DESC
+            """, (cutoff,))
+            return [dict(row) for row in cursor.fetchall()]
+
     def select_for_review(self, days: int = 7) -> list[dict]:
         """Select auto-approved books for spot-check review."""
         with get_pipeline_db(self.db_path) as conn:
