@@ -155,13 +155,14 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 
 | Category | Tools |
 |----------|-------|
-| **Search** | `semantic_search`, `text_search`, `hybrid_search`, `search_all_books` |
+| **Search** | `semantic_search`, `hybrid_search`, `text_search`, `search_titles`, `search_all_books` |
 | **Discovery** | `get_topic_coverage`, `find_related_content`, `extract_code_examples` |
-| **Reading** | `get_chapter`, `get_book_info`, `list_books` |
+| **Reading** | `list_books`, `get_book_info`, `get_table_of_contents`, `get_chapter`, `get_section`, `list_sections` |
 | **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
-| **Planning** | `generate_learning_path`, `create_implementation_plan` |
-| **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress`, `get_bookmarks` |
+| **Planning** | `generate_implementation_plan`, `generate_brd`, `analyze_project`, `generate_wireframe_brief` |
+| **Progress** | `mark_as_reading`, `mark_as_read`, `get_reading_progress`, `add_bookmark`, `get_bookmarks`, `remove_bookmark` |
 | **Export** | `export_chapter_to_markdown` |
+| **Library** | `library_status`, `get_library_statistics`, `audit_chapter_quality`, `get_summary`, `summarize_book`, `refresh_embeddings`, `generate_summary_embeddings` |
 
 Example: "Search my books for Kubernetes content". See `docs/USER-GUIDE.md` for full usage.
 
