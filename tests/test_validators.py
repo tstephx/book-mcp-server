@@ -87,7 +87,8 @@ def test_get_book_info_accepts_slug(tmp_path):
          patch("src.tools.book_tools.execute_query") as mock_chapters:
         mock_db.return_value = {
             "id": VALID_UUID, "title": "Docker Deep Dive", "author": "Nigel Poulton",
-            "word_count": 50000, "added_date": "2024-01-01"
+            "word_count": 50000, "added_date": "2024-01-01", "processing_status": "complete",
+            "file_path": None, "language": "en", "description": None
         }
         mock_chapters.return_value = []
         from src.tools.book_tools import register_book_tools

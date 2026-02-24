@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from ..config import Config
 from ..database import execute_single, DatabaseError
-from ..utils.validators import validate_book_id, validate_chapter_number, ValidationError
+from ..utils.validators import resolve_book_id, validate_chapter_number, ValidationError
 from ..utils.logging import logger
 
 if TYPE_CHECKING:
@@ -317,7 +317,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Validate inputs
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
             chapter_number = validate_chapter_number(chapter_number)
 
             # Apply server-side default if caller did not specify
@@ -465,7 +465,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Validate inputs
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
             chapter_number = validate_chapter_number(chapter_number)
 
             # Apply server-side default if caller did not specify
@@ -614,7 +614,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Validate inputs
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
             chapter_number = validate_chapter_number(chapter_number)
 
             # Get chapter info from database

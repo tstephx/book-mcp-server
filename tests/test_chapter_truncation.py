@@ -34,7 +34,7 @@ def test_get_section_truncates_by_default(tmp_path):
 
     with patch("src.tools.chapter_tools.execute_single") as mock_db, \
          patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.validate_book_id", return_value="bookid123"), \
+         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
          patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
 
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
@@ -59,7 +59,7 @@ def test_get_section_explicit_max_tokens_overrides_default(tmp_path):
 
     with patch("src.tools.chapter_tools.execute_single") as mock_db, \
          patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.validate_book_id", return_value="bookid123"), \
+         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
          patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
 
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
@@ -81,7 +81,7 @@ def test_get_chapter_truncates_by_default(tmp_path):
 
     with patch("src.tools.chapter_tools.execute_single") as mock_db, \
          patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.validate_book_id", return_value="bookid123"), \
+         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
          patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
 
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
@@ -106,7 +106,7 @@ def test_get_chapter_explicit_max_tokens_overrides_default(tmp_path):
 
     with patch("src.tools.chapter_tools.execute_single") as mock_db, \
          patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.validate_book_id", return_value="bookid123"), \
+         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
          patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
 
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}

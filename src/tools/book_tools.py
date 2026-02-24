@@ -6,7 +6,7 @@ Modular tool registration following MCP best practices
 from typing import TYPE_CHECKING
 
 from ..database import execute_query, execute_single, DatabaseError
-from ..utils.validators import validate_book_id, ValidationError
+from ..utils.validators import resolve_book_id, ValidationError
 from ..utils.logging import logger
 
 if TYPE_CHECKING:
@@ -66,7 +66,7 @@ def register_book_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Validate input
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
             
             # Get book info
             book = execute_single("SELECT * FROM books WHERE id = ?", (book_id,))
@@ -140,7 +140,7 @@ def register_book_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Validate input
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
             
             # Get book
             book = execute_single("SELECT title, author FROM books WHERE id = ?", (book_id,))
