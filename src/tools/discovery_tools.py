@@ -176,7 +176,8 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
     def get_topic_coverage(
         topic: str,
         min_similarity: float = 0.3,
-        include_excerpts: bool = True
+        include_excerpts: bool = True,
+        limit: int = 20,
     ) -> dict:
         """Get comprehensive coverage of a topic across all books
 
@@ -187,6 +188,8 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
             topic: Topic to search for (e.g., "async programming", "docker networking")
             min_similarity: Minimum similarity threshold (0.0-1.0, default: 0.3)
             include_excerpts: Include text excerpts showing coverage (default: True)
+            limit: Maximum number of books to return (default: 20). Results are sorted
+                   by average similarity, so highest-relevance books are returned first.
 
         Returns:
             Dictionary with all chapters covering the topic, grouped by book
@@ -270,6 +273,7 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
                 key=lambda x: x['avg_similarity'],
                 reverse=True
             )
+            sorted_books = sorted_books[:max(1, limit)]
 
             logger.info(f"Topic '{topic}' covered in {len(sorted_books)} books, {len(all_results)} chapters")
 
