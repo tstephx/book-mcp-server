@@ -323,3 +323,33 @@ def test_worker_scans_watch_dir(db_path, config, tmp_path):
     # The new book should have been detected and processed
     pipelines = repo.find_by_state(PipelineState.COMPLETE)
     assert len(pipelines) >= 1
+
+
+def test_retry_one_uses_failed_not_rejected_on_max_retries():
+    """_retry_one transitions to FAILED (not REJECTED) when max retries exceeded."""
+    from unittest.mock import MagicMock
+    from agentic_pipeline.orchestrator.orchestrator import Orchestrator
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    config = MagicMock()
+    config.max_retry_attempts = 2
+    config.autonomy_mode = "supervised"
+
+    repo = MagicMock()
+    logger = MagicMock()
+
+    orch = Orchestrator.__new__(Orchestrator)
+    orch.config = config
+    orch.repo = repo
+    orch.logger = logger
+
+    book = {"id": "book-1", "retry_count": 2, "source_path": "/tmp/x.epub", "content_hash": "abc"}
+    result = orch._retry_one(book)
+
+    assert result["state"] == PipelineState.FAILED.value
+    assert result["reason"] == "max_retries_exceeded"
+    repo.update_state.assert_called_once_with(
+        "book-1",
+        PipelineState.FAILED,
+        error_details={"reason": "max_retries_exceeded"},
+    )

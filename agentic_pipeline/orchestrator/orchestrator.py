@@ -443,12 +443,12 @@ class Orchestrator:
             )
             self.repo.update_state(
                 book["id"],
-                PipelineState.REJECTED,
+                PipelineState.FAILED,
                 error_details={"reason": "max_retries_exceeded"},
             )
             return {
                 "pipeline_id": book["id"],
-                "state": PipelineState.REJECTED.value,
+                "state": PipelineState.FAILED.value,
                 "reason": "max_retries_exceeded",
             }
 
