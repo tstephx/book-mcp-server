@@ -37,6 +37,7 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | Tool | Description | Example Query |
 |------|-------------|---------------|
 | `semantic_search` | AI-powered concept matching using embeddings | "error handling patterns" |
+| `hybrid_search` | RRF fusion of keyword + semantic search | "dependency injection" |
 | `text_search` | Fast keyword/phrase search (FTS5) | `"dependency injection"` |
 | `search_titles` | Simple keyword search in titles/authors | "python docker" |
 | `search_all_books` | Search entire library grouped by book | "async programming" |
@@ -68,26 +69,41 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | Tool | Description |
 |------|-------------|
 | `generate_learning_path` | Learning plan for VPS, web apps, ML projects |
-| `create_implementation_plan` | PM-ready plans with phases, risks, gates |
+| `list_project_templates` | View available project templates and example goals |
+| `generate_implementation_plan` | PM-ready plans with phases, risks, gates |
+| `generate_brd` | Business requirements document from a project goal |
+| `generate_wireframe_brief` | Architecture brief / wireframe outline |
+| `analyze_project` | Project complexity and recommendation analysis |
+| `list_implementation_templates` | View available implementation templates |
+| `get_phase_prompts` | Per-phase prompts for a given project goal |
+| `list_architecture_templates` | View available architecture templates |
 
 ### Reading Progress Tools
 
 | Tool | Description |
 |------|-------------|
-| `mark_as_read` | Track which chapters you've completed |
+| `mark_as_reading` | Mark a chapter as currently reading |
+| `mark_as_read` | Mark a chapter as completed |
 | `get_reading_progress` | See read/unread status for a book |
 | `add_bookmark` | Save bookmarks with notes |
 | `get_bookmarks` | List all bookmarks in a book |
+| `remove_bookmark` | Remove a bookmark by ID |
 | `export_chapter_to_markdown` | Export chapter as clean markdown |
 
 ### Library Management Tools
 
 | Tool | Description |
 |------|-------------|
+| `library_status` | Full library overview with pipeline summary |
 | `get_library_statistics` | Comprehensive stats (books, chapters, words, topics) |
+| `get_library_stats` | Aggregate statistics snapshot |
 | `find_duplicate_coverage` | Identify topics covered redundantly across books |
 | `get_author_insights` | Per-author analysis across your library |
+| `audit_chapter_quality` | Audit chapter quality by severity (all/warning/bad) |
+| `get_summary` | Get extractive summary for a chapter |
+| `summarize_book` | Generate summaries for an entire book |
 | `refresh_embeddings` | Update embeddings for changed chapters |
+| `generate_summary_embeddings` | Generate embeddings for chapter summaries |
 | `get_cache_stats` | Monitor caching performance |
 | `clear_cache` | Clear cached data |
 
@@ -135,8 +151,8 @@ semantic_search("container orchestration", limit=5, min_similarity=0.5)
 > "I want to set up a VPS. Create a learning path and implementation plan."
 
 **What happens:**
-1. `generate_project_learning_path("vps")` creates 5-8 phase learning plan
-2. `create_implementation_plan("vps", "personal")` creates PM-ready plan
+1. `generate_learning_path("Build a VPS on Hetzner")` creates a phased learning plan
+2. `generate_implementation_plan("Build a VPS on Hetzner")` creates a PM-ready plan
 3. Pulls relevant content from your DevOps/Linux books
 
 ### Compare Perspectives
@@ -156,8 +172,7 @@ semantic_search("container orchestration", limit=5, min_similarity=0.5)
 
 **What happens:**
 1. Finds the relevant chapter via search
-2. `generate_flashcards()` creates study questions
-3. `create_study_guide()` creates structured summary
+2. `create_study_guide()` creates structured summary with flashcards and key concepts
 
 ### Research a Topic
 
@@ -214,7 +229,6 @@ agentic-pipeline retry
 
 # Check stuck pipelines
 agentic-pipeline stuck
-agentic-pipeline stuck --recover
 ```
 
 ### Batch Operations
