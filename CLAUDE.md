@@ -130,6 +130,21 @@ python -m pytest tests/test_phase5*.py -v            # Specific phase
 python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 ```
 
+## Embeddings
+
+**Model:** OpenAI `text-embedding-3-small` (1536 dims). Requires `OPENAI_API_KEY`.
+
+**How embeddings are generated:**
+- **Pipeline path** — `approve_book()` runs inline: `APPROVED → EMBEDDING → COMPLETE`. No separate worker.
+- **Manual refresh** — Ask Claude `"refresh embeddings"` (calls `refresh_embeddings` MCP tool), or run `python -m pytest tests/test_openai_embeddings.py` to verify.
+- **Summary embeddings** — separate from chapter embeddings; call `generate_summary_embeddings` MCP tool.
+
+**Where they live:** `chapters.embedding` column (BLOB, numpy float32 array). Indexed via cosine similarity at query time — no separate vector store.
+
+**Troubleshooting:**
+- Semantic search returns nothing → check `OPENAI_API_KEY` is set; run `refresh_embeddings`
+- New book not searchable → confirm pipeline reached `COMPLETE` state; embeddings generated at approval time
+
 ## Architecture Decisions
 1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row)
 2. **Inline embedding** — `approve_book()` runs full APPROVED → EMBEDDING → COMPLETE flow
@@ -158,7 +173,7 @@ Add to `.mcp.json` in any project that needs the book library:
 {
   "mcpServers": {
     "book-library": {
-      "command": "/Users/taylorstephens/_Projects/book-mcp-server/venv/bin/python",
+      "command": "/Users/taylorstephens/_Projects/book-mcp-server/.venv/bin/python",
       "args": ["/Users/taylorstephens/_Projects/book-mcp-server/server.py"],
       "env": {
         "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db",
@@ -174,4 +189,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-02-18*
+*Last updated: 2026-02-23*
