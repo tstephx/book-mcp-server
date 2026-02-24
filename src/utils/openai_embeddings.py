@@ -40,27 +40,31 @@ class OpenAIEmbeddingGenerator:
         self._max_batch_size = max_batch_size
 
     @staticmethod
-    def _truncate(text: str) -> str:
-        """Truncate text to stay within the model's token limit."""
+    def _truncate(text: str) -> tuple[str, int]:
+        """Truncate text to stay within the model's token limit.
+
+        Returns (truncated_text, token_count) to avoid re-encoding in callers.
+        """
         enc = _get_encoding()
         tokens = enc.encode(text)
         if len(tokens) <= MAX_TOKENS:
-            return text
+            return text, len(tokens)
         logger.warning(f"Truncating text from {len(tokens)} to {MAX_TOKENS} tokens")
-        return enc.decode(tokens[:MAX_TOKENS])
+        return enc.decode(tokens[:MAX_TOKENS]), MAX_TOKENS
 
     def generate(self, text: str) -> np.ndarray:
         """Generate embedding for a single text."""
         if not text or not text.strip():
             raise ValueError("Cannot generate embedding for empty text")
 
+        truncated, _ = self._truncate(text)
         response = self._client.embeddings.create(
             model=MODEL,
-            input=[self._truncate(text)],
+            input=[truncated],
         )
         return np.array(response.data[0].embedding, dtype=np.float32)
 
-    def generate_batch(self, texts: list[str], batch_size: int = 0) -> np.ndarray:
+    def generate_batch(self, texts: list[str]) -> np.ndarray:
         """Generate embeddings for multiple texts."""
         if not texts:
             raise ValueError("Cannot generate embeddings for empty list")
@@ -76,8 +80,7 @@ class OpenAIEmbeddingGenerator:
             return [np.array(item.embedding, dtype=np.float32) for item in response.data]
 
         for text in texts:
-            truncated = self._truncate(text)
-            token_count = len(enc.encode(truncated))
+            truncated, token_count = self._truncate(text)
 
             needs_token_flush = current_tokens + token_count > MAX_BATCH_TOKENS
             needs_size_flush = len(current_batch) >= self._max_batch_size

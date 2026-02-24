@@ -74,6 +74,7 @@ class TestOpenAIEmbeddingGenerator:
         token_ids = list(range(1000))
         long_text = enc.decode(token_ids)
         actual_tokens = len(enc.encode(long_text))
+        assert actual_tokens > 0, "tiktoken produced 0 tokens — test data is invalid"
         # Scale to produce > MAX_BATCH_TOKENS total
         count = (MAX_BATCH_TOKENS // actual_tokens) + 10
         texts = [long_text] * count
