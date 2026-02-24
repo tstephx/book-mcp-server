@@ -15,7 +15,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-------------|-------------|
 | **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
 | **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
-| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: init, health, worker, approve, escape-hatch. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 20+ commands for pipeline management, approval, autonomy, library maintenance. See `docs/USER-GUIDE.md#cli-commands`. |
 | **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
 
 ## Environment Variables
@@ -161,7 +161,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 | **Discovery** | `get_topic_coverage`, `find_related_content`, `extract_code_examples` |
 | **Reading** | `list_books`, `get_book_info`, `get_table_of_contents`, `get_chapter`, `get_section`, `list_sections` |
 | **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
-| **Planning** | `generate_implementation_plan`, `generate_brd`, `analyze_project`, `generate_wireframe_brief` |
+| **Planning** | `generate_project_learning_path`, `list_project_templates`, `generate_implementation_plan`, `list_implementation_templates`, `get_phase_prompts`, `generate_brd`, `generate_wireframe_brief`, `list_architecture_templates`, `analyze_project` |
 | **Progress** | `mark_as_reading`, `mark_as_read`, `get_reading_progress`, `add_bookmark`, `get_bookmarks`, `remove_bookmark` |
 | **Export** | `export_chapter_to_markdown` |
 | **Library** | `library_status`, `get_library_statistics`, `audit_chapter_quality`, `get_summary`, `summarize_book`, `refresh_embeddings`, `generate_summary_embeddings` |
@@ -176,8 +176,8 @@ Add to `.mcp.json` in any project that needs the book library:
 {
   "mcpServers": {
     "book-library": {
-      "command": "/Users/taylorstephens/_Projects/book-mcp-server/.venv/bin/python",
-      "args": ["/Users/taylorstephens/_Projects/book-mcp-server/server.py"],
+      "command": "/Users/taylorstephens/Dev/_Projects/book-mcp-server/.venv/bin/python",
+      "args": ["/Users/taylorstephens/Dev/_Projects/book-mcp-server/server.py"],
       "env": {
         "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db",
         "BOOKS_DIR": "/Users/taylorstephens/_Projects/book-ingestion-python/data/books",
