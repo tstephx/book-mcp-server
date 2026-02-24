@@ -321,7 +321,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
             # Apply server-side default if caller did not specify
             if max_tokens is None:
-                from src.config import Config
+
                 max_tokens = Config.DEFAULT_CHAPTER_TOKENS
 
             # Get chapter info from database
@@ -469,7 +469,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
             # Apply server-side default if caller did not specify
             if max_tokens is None:
-                from src.config import Config
+
                 max_tokens = Config.DEFAULT_CHAPTER_TOKENS
             if section_number < 1:
                 return "Error: section_number must be >= 1"
