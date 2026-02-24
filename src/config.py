@@ -28,7 +28,7 @@ class Config:
     # Search limits
     MAX_SEARCH_RESULTS: int = int(os.getenv("MAX_SEARCH_RESULTS", "10"))
     MAX_CHAPTER_SIZE: int = int(os.getenv("MAX_CHAPTER_SIZE", "100000"))  # 100KB
-    
+    DEFAULT_CHAPTER_TOKENS: int = int(os.getenv("DEFAULT_CHAPTER_TOKENS", "8000"))    
     # Features
     ENABLE_LOGGING: bool = os.getenv("ENABLE_LOGGING", "true").lower() == "true"
     ENABLE_CACHING: bool = os.getenv("ENABLE_CACHING", "false").lower() == "true"
@@ -69,7 +69,7 @@ Paths:
 Limits:
   Max search results: {cls.MAX_SEARCH_RESULTS}
   Max chapter size: {cls.MAX_CHAPTER_SIZE} bytes
-
+  Default chapter tokens: {cls.DEFAULT_CHAPTER_TOKENS}
 Features:
   Logging: {cls.ENABLE_LOGGING}
   Caching: {cls.ENABLE_CACHING}

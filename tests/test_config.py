@@ -59,3 +59,19 @@ def test_config_watch_dir_not_set_in_env(monkeypatch):
     monkeypatch.delenv("WATCH_DIR", raising=False)
     config = OrchestratorConfig.from_env()
     assert config.watch_dir is None
+
+
+def test_default_chapter_tokens_exists():
+    from src.config import Config
+    assert hasattr(Config, 'DEFAULT_CHAPTER_TOKENS')
+    assert Config.DEFAULT_CHAPTER_TOKENS == 8000
+
+def test_default_chapter_tokens_env_override():
+    import os
+    from importlib import reload
+    import src.config as config_module
+    os.environ['DEFAULT_CHAPTER_TOKENS'] = '4000'
+    reload(config_module)
+    assert config_module.Config.DEFAULT_CHAPTER_TOKENS == 4000
+    del os.environ['DEFAULT_CHAPTER_TOKENS']
+    reload(config_module)
