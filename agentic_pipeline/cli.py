@@ -393,6 +393,7 @@ def health(as_json: bool):
     console.print(f"  Queued:     {report['queued']} (waiting)")
     console.print(f"  Completed:  {report['completed_24h']} (last 24h)")
     console.print(f"  Failed:     {report['failed']} (needs_retry)")
+    console.print(f"  Perm. failed: {report.get('permanently_failed', 0)} (max retries exhausted)")
     console.print("-" * 35)
 
     if report['alerts']:

@@ -90,3 +90,21 @@ def test_alerts_queue_backup(db_path):
     report = monitor.get_health()
 
     assert any(a["type"] == "queue_backup" for a in report["alerts"])
+
+
+def test_health_report_has_permanently_failed_count(db_path):
+    """get_health() returns a 'permanently_failed' count distinct from 'failed'."""
+    from agentic_pipeline.health import HealthMonitor
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "hash-abc")
+    repo.update_state(pid, PipelineState.NEEDS_RETRY)
+    repo.update_state(pid, PipelineState.FAILED)
+
+    monitor = HealthMonitor(db_path)
+    report = monitor.get_health()
+
+    assert "permanently_failed" in report
+    assert report["permanently_failed"] == 1

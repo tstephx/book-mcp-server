@@ -60,6 +60,13 @@ class HealthMonitor:
             """, (PipelineState.NEEDS_RETRY.value,))
             failed = cursor.fetchone()[0]
 
+            # Count permanently failed (max retries exhausted)
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+            """, (PipelineState.FAILED.value,))
+            permanently_failed = cursor.fetchone()[0]
+
             # Count completed in last 24h
             cursor.execute("""
                 SELECT COUNT(*) FROM processing_pipelines
@@ -88,6 +95,7 @@ class HealthMonitor:
             "active": active,
             "queued": queued,
             "failed": failed,
+            "permanently_failed": permanently_failed,
             "completed_24h": completed_24h,
             "stuck": [],  # Will be populated by stuck detector
             "queue_by_priority": queue_by_priority,
