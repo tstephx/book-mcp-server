@@ -914,46 +914,33 @@ def register_project_planning_tools(mcp):
         save_to_file: bool = False,
         output_path: str = ""
     ) -> dict:
-        """Generate a project-based learning path from your book library
-        
-        Analyzes your goal, searches your book library for relevant content,
-        and creates a phased learning guide with reading recommendations,
-        time estimates, and implementation checklists.
-        
-        Works with both specific and ambiguous goals:
-        - "Build a VPS on Hetzner to host my portfolio and apps"
-        - "Create a data pipeline for analyzing CSV files"
-        - "Learn enough Docker to deploy my Python app"
-        - "Build an MCP server for my notes"
-        
+        """Generate a phased implementation plan for a project goal.
+
+        Creates a PM-ready timeline with phases, objectives, decisions, risks,
+        and actionable prompts. Optionally saves artifacts to markdown files.
+
         Args:
-            goal: What you want to build or achieve. Be as specific or vague as you like.
-            depth: Level of detail in the guide:
-                   - "quick": Essential reading only, minimal phases
-                   - "comprehensive": Full learning path with all phases (default)
-                   - "deep": Exhaustive coverage with advanced topics
-            include_concepts: If True (default), includes concept briefs with business
-                   analogies for key topics in each phase using teach_concept logic.
-            save_to_file: If True, saves the guide to a markdown file
-            output_path: Custom path for saved file (optional)
-                   
+            goal: What you want to build or achieve.
+            team_size: Number of people working on the project (default: 1).
+            start_date: Project start date in YYYY-MM-DD format (default: today).
+            include_prompts: If True (default), includes actionable prompts per phase.
+            save_to_file: If True, saves the plan to a markdown file.
+            output_path: Custom path for saved file (optional).
+
         Returns:
             Dictionary with:
             - goal: Your stated goal
             - project_type: Detected project category
-            - phases: Learning phases with topics
-            - time_estimate: Hours for learning and implementation
-            - books_found: Number of relevant books
-            - chapters_found: Number of relevant chapters
-            - reading_list: Top chapters to read
-            - concept_briefs: Key concepts with explanations (if include_concepts=True)
-            - guide: Full markdown learning guide
+            - plan: Full markdown implementation plan
+            - timeline: Phase timeline visualization
+            - phases: Phase breakdown with dates and objectives
+            - success_criteria: Measurable success criteria
+            - prompts: Actionable prompts by phase (if include_prompts=True)
             - file_path: Path if saved to file
-            
+
         Examples:
-            generate_learning_path("Build a VPS to host my portfolio")
-            generate_learning_path("Create a Python data pipeline", depth="quick")
-            generate_learning_path("Learn Docker for deployment", include_concepts=True)
+            generate_implementation_plan("Build a VPS to host my portfolio")
+            generate_implementation_plan("Build a web app", team_size=3, start_date="2026-03-01")
         """
         try:
             logger.info(f"Generating implementation plan for: {goal}")

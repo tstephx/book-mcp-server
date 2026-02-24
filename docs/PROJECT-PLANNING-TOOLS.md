@@ -26,6 +26,8 @@ analyze_project("Build a data pipeline", mode="full", save_artifacts=True)
 | `generate_wireframe_brief` | Architecture diagram + components |
 | `generate_implementation_plan` | Phased timeline with prompts |
 | `get_phase_prompts` | Actionable next steps |
+| `list_implementation_templates` | View available implementation templates |
+| `list_architecture_templates` | View available architecture templates |
 
 ---
 
@@ -70,7 +72,7 @@ analyze_project(
 Business Requirements Document with objectives, scope, requirements, and risks.
 
 ```python
-generate_brd(goal, template_style="standard")
+generate_brd(goal, template_style="standard", business_context="", include_technical=True, save_to_file=False, output_path="")
 ```
 
 **Styles:**
@@ -88,7 +90,7 @@ generate_brd(goal, template_style="standard")
 Architecture overview with Mermaid diagram, components, and tech decisions.
 
 ```python
-generate_wireframe_brief(goal, audience="stakeholder")
+generate_wireframe_brief(goal, audience="stakeholder", include_diagram=True, custom_components=None, save_to_file=False, output_path="")
 ```
 
 **Audiences:**
@@ -106,7 +108,7 @@ generate_wireframe_brief(goal, audience="stakeholder")
 Phased timeline with objectives, decisions, risks, and prompts.
 
 ```python
-generate_implementation_plan(goal, team_size=1, start_date="2025-01-15")
+generate_implementation_plan(goal, team_size=1, start_date="", include_prompts=True, save_to_file=False, output_path="")
 ```
 
 **Includes:**
@@ -222,6 +224,6 @@ graph TB
 
 | Metric | Value |
 |--------|-------|
-| Tools | 8 |
+| Tools | 7 |
 | Project Templates | 5 |
 | Architecture Templates | 5 |
