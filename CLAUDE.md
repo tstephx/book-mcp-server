@@ -48,6 +48,8 @@ agentic-pipeline health
 # CLI: run worker with directory watching + auto-archive
 agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
 
+# CLI: full command reference — see docs/USER-GUIDE.md#cli-commands
+
 # Tests (use python -m pytest, not bare pytest)
 python -m pytest tests/ -v
 ```

@@ -212,52 +212,143 @@ Resources provide automatic context injection:
 
 ## CLI Commands
 
+### Setup & Info
+
+```bash
+# Show version
+agentic-pipeline version
+
+# Initialize the database (run once)
+agentic-pipeline init
+```
+
 ### Pipeline Management
 
 ```bash
-# Check pipeline health
-agentic-pipeline health
-
-# See pending approvals
-agentic-pipeline pending
-
-# Process a new book
+# Process a single book
 agentic-pipeline process /path/to/book.epub
 
-# Retry failed books
+# Show status of a specific pipeline
+agentic-pipeline status <pipeline_id>
+
+# Retry books in NEEDS_RETRY state
 agentic-pipeline retry
+agentic-pipeline retry --max-attempts 5
+
+# Reprocess a book through the full pipeline (archives old record, creates new)
+agentic-pipeline reingest <book_id>
+
+# Check pipeline health
+agentic-pipeline health
+agentic-pipeline health --json
 
 # Check stuck pipelines
 agentic-pipeline stuck
+agentic-pipeline stuck --recover
+```
+
+### Approval
+
+```bash
+# See books pending approval
+agentic-pipeline pending
+
+# Approve a book (triggers embedding inline)
+agentic-pipeline approve <pipeline_id>
+
+# Reject a book
+agentic-pipeline reject <pipeline_id> --reason "Too short"
+agentic-pipeline reject <pipeline_id> --reason "Poor quality" --retry
 ```
 
 ### Batch Operations
 
 ```bash
-# Dry-run batch approval (high confidence books)
+# Dry-run batch approval
 agentic-pipeline batch-approve --min-confidence 0.9
 
-# Execute batch approval
-agentic-pipeline batch-approve --min-confidence 0.9 --execute
+# Execute batch approval (filtered by type and confidence)
+agentic-pipeline batch-approve --min-confidence 0.9 --book-type technical_tutorial --execute
 
-# Batch reject low-quality
-agentic-pipeline batch-reject --max-confidence 0.5 -r "Low quality" --execute
+# Batch reject low-quality books
+agentic-pipeline batch-reject --max-confidence 0.5 --reason "Low quality" --execute
 ```
 
 ### Autonomy Management
 
 ```bash
-# Check current autonomy mode
+# Check current autonomy mode and 30-day metrics
 agentic-pipeline autonomy status
 
-# Enable partial autonomy (auto-approve high confidence)
+# Enable partial autonomy (auto-approve high confidence books)
 agentic-pipeline autonomy enable partial
 
-# Enable confident autonomy (auto-approve + skip validation)
+# Enable confident autonomy (calibrated per-type thresholds)
 agentic-pipeline autonomy enable confident
 
-# Emergency revert to supervised mode
-agentic-pipeline escape-hatch "reason"
+# Disable autonomy (revert to supervised without escape hatch)
+agentic-pipeline autonomy disable
+
+# Resume autonomy after escape hatch
+agentic-pipeline autonomy resume
+
+# Emergency revert to supervised mode (sets escape hatch flag)
+agentic-pipeline escape-hatch "Unusual errors detected"
+```
+
+### Spot-Check Reviews
+
+```bash
+# List books selected for spot-check review
+agentic-pipeline spot-check --list
+```
+
+### Library Maintenance
+
+```bash
+# Show combined library + pipeline status dashboard
+agentic-pipeline library-status
+agentic-pipeline library-status --json
+
+# Register legacy books that have no pipeline record
+agentic-pipeline backfill --dry-run
+agentic-pipeline backfill --execute
+
+# Check library books for quality issues (missing chapters, embeddings)
+agentic-pipeline validate
+agentic-pipeline validate --json
+
+# Audit extraction quality (flags books with poor chapter extraction)
+agentic-pipeline audit-quality
+agentic-pipeline audit-quality --json
+
+# Generate chunks for all unchunked chapters
+agentic-pipeline chunk-library --dry-run
+agentic-pipeline chunk-library
+
+# Generate OpenAI embeddings for all unembedded chunks
+agentic-pipeline embed-library --dry-run
+agentic-pipeline embed-library --batch-size 50
+
+# Re-queue books that fail quality checks (deletes and reprocesses)
+agentic-pipeline reprocess --flagged
+agentic-pipeline reprocess --flagged --execute
+```
+
+### Inspection & Audit
+
+```bash
+# View audit trail
+agentic-pipeline audit --last 50
+agentic-pipeline audit --actor human:cli --action approve
+agentic-pipeline audit --book-id <id>
+
+# List available processing strategies
+agentic-pipeline strategies
+
+# Test-classify book text (pass text or a file path)
+agentic-pipeline classify --text "Chapter 1: Introduction to Docker..."
+agentic-pipeline classify --text /path/to/sample.txt --provider anthropic
 ```
 
 ### Monitoring
