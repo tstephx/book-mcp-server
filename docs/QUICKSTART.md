@@ -8,6 +8,12 @@ Connect your book library to Claude Desktop in a few minutes.
 
 ```bash
 cd /path/to/book-mcp-server
+./setup.sh         # creates .venv and installs dependencies
+```
+
+Or manually:
+
+```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -36,6 +42,10 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json` and add:
 ```
 
 **Required:** Use the `.venv/bin/python` path (not bare `python`). `OPENAI_API_KEY` is needed for semantic search.
+
+`BOOK_DB_PATH` and `BOOKS_DIR` come from your `book-ingestion-python` setup — typically:
+- `BOOK_DB_PATH`: `~/_Projects/book-ingestion-python/data/library.db`
+- `BOOKS_DIR`: `~/_Projects/book-ingestion-python/data/books`
 
 ---
 
@@ -75,7 +85,9 @@ pip install -e .
 
 **Check Claude's MCP logs:**
 ```bash
+# Try both locations depending on your Claude Desktop version
 tail -f ~/Library/Logs/Claude/mcp*.log
+tail -f ~/Library/Application\ Support/Claude/logs/mcp*.log
 ```
 
 ---
