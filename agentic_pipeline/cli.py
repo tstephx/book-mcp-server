@@ -268,6 +268,8 @@ def retry(max_attempts: int):
             console.print(f"  [green]{pid}...: Complete[/green]")
         elif state == "rejected":
             console.print(f"  [red]{pid}...: Rejected ({result.get('reason')})[/red]")
+        elif state == "failed":
+            console.print(f"  [red]{pid}...: Permanently failed ({result.get('reason')})[/red]")
         else:
             console.print(f"  [yellow]{pid}...: {state}[/yellow]")
 

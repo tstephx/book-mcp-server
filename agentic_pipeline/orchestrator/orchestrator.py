@@ -72,13 +72,13 @@ class Orchestrator:
         if state == PipelineState.COMPLETE:
             return {"skipped": True, "reason": "Already processed", "pipeline_id": existing["id"]}
 
-        if state not in TERMINAL_STATES:
-            return {"skipped": True, "reason": "Already in progress", "pipeline_id": existing["id"]}
-
         if state == PipelineState.FAILED:
             return {"skipped": True, "reason": "Permanently failed (max retries exhausted)", "pipeline_id": existing["id"]}
 
-        # Terminal but not complete (rejected, archived) - allow reprocessing
+        if state not in TERMINAL_STATES:
+            return {"skipped": True, "reason": "Already in progress", "pipeline_id": existing["id"]}
+
+        # Terminal but not complete or failed (rejected, archived) - allow reprocessing
         return None
 
     def _extract_sample(self, book_path: str, max_chars: int = 40000) -> str:

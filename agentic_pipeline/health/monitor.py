@@ -118,7 +118,7 @@ class HealthMonitor:
             "status": status,
         }
 
-    def _generate_alerts(self, queued: int, failed: int, permanently_failed: int, completed_24h: int) -> list[dict]:
+    def _generate_alerts(self, queued: int, failed_24h: int, permanently_failed_24h: int, completed_24h: int) -> list[dict]:
         """Generate alerts based on current state."""
         alerts = []
 
@@ -130,9 +130,9 @@ class HealthMonitor:
             })
 
         # Check failure rate (includes permanently_failed — terminal failures are worst-case)
-        total_recent = completed_24h + failed + permanently_failed
+        total_recent = completed_24h + failed_24h + permanently_failed_24h
         if total_recent > 10:  # Only check if enough data
-            failure_rate = (failed + permanently_failed) / total_recent
+            failure_rate = (failed_24h + permanently_failed_24h) / total_recent
             if failure_rate > self.alert_failure_rate:
                 alerts.append({
                     "type": "high_failure_rate",
