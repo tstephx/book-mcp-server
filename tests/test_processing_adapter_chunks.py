@@ -52,7 +52,7 @@ for _mod_name, _mod in zip(_BI_MODULE_NAMES, _BI_MOCKS):
 # namespace, which is sufficient — the module was already imported with
 # whatever book_ingestion was present, but chunk_chapter and
 # OpenAIEmbeddingGenerator come from src.utils.* and are correctly patched.
-import agentic_pipeline.adapters.processing_adapter as _pa_module  # noqa: E402
+import agentic_pipeline.adapters.processing_adapter  # noqa: F401, E402
 
 from agentic_pipeline.adapters.processing_adapter import (  # noqa: E402
     ProcessingAdapter,

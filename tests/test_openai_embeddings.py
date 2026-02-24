@@ -67,6 +67,5 @@ class TestOpenAIEmbeddingGenerator:
     def test_dimension_property(self):
         """Dimension reports 3072 (text-embedding-3-large)."""
         with patch("src.utils.openai_embeddings.openai") as mock_openai:
-            mock_openai.OpenAI.return_value = MagicMock()
             gen = OpenAIEmbeddingGenerator()
         assert gen.dimension == 3072

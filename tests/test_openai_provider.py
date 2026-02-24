@@ -9,7 +9,8 @@ from unittest.mock import Mock, patch
 def test_openai_provider_has_correct_name():
     from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
 
-    provider = OpenAIProvider(api_key="test-key")
+    with patch("agentic_pipeline.agents.providers.openai_provider.OpenAI"):
+        provider = OpenAIProvider(api_key="test-key")
     assert provider.name == "openai"
 
 
@@ -24,7 +25,8 @@ def test_openai_provider_default_model():
 def test_openai_provider_custom_model():
     from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
 
-    provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
+    with patch("agentic_pipeline.agents.providers.openai_provider.OpenAI"):
+        provider = OpenAIProvider(api_key="test-key", model="gpt-4o")
     assert provider.model == "gpt-4o"
 
 
@@ -32,7 +34,8 @@ def test_openai_provider_parses_valid_response():
     from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
     from agentic_pipeline.agents.classifier_types import BookType
 
-    provider = OpenAIProvider(api_key="test-key")
+    with patch("agentic_pipeline.agents.providers.openai_provider.OpenAI"):
+        provider = OpenAIProvider(api_key="test-key")
 
     mock_response = Mock()
     mock_response.choices = [Mock()]
@@ -55,7 +58,8 @@ def test_openai_provider_parses_valid_response():
 def test_openai_provider_handles_malformed_json():
     from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
 
-    provider = OpenAIProvider(api_key="test-key")
+    with patch("agentic_pipeline.agents.providers.openai_provider.OpenAI"):
+        provider = OpenAIProvider(api_key="test-key")
 
     mock_response = Mock()
     mock_response.choices = [Mock()]
