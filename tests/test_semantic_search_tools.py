@@ -34,7 +34,7 @@ def test_semantic_search_uses_chunks():
              "chunk_content": "text", "similarity": 0.9},
         ]
 
-        from src.tools.semantic_search_toolss import register_semantic_search_tools
+        from src.tools.semantic_search_tools import register_semantic_search_tools
         mcp = MagicMock()
         captured = {}
 

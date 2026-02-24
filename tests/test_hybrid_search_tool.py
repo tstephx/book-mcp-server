@@ -300,7 +300,7 @@ def test_hybrid_search_uses_chunks():
              "chunk_content": "text", "rerank_score": 0.9},
         ]
 
-        from src.tools.hybrid_search_toolss import register_hybrid_search_tools
+        from src.tools.hybrid_search_tools import register_hybrid_search_tools
         mcp = MagicMock()
         captured = {}
 
