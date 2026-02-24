@@ -132,7 +132,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 
 ## Embeddings
 
-**Model:** OpenAI `text-embedding-3-small` (1536 dims). Requires `OPENAI_API_KEY`.
+**Model:** OpenAI `text-embedding-3-large` (3072 dims). Requires `OPENAI_API_KEY`.
 
 **How embeddings are generated:**
 - **Pipeline path** — `approve_book()` runs inline: `APPROVED → EMBEDDING → COMPLETE`. No separate worker.
@@ -159,7 +159,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 | **Discovery** | `get_topic_coverage`, `find_related_content`, `extract_code_examples` |
 | **Reading** | `get_chapter`, `get_book_info`, `list_books` |
 | **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
-| **Planning** | `generate_project_learning_path`, `create_implementation_plan` |
+| **Planning** | `generate_learning_path`, `create_implementation_plan` |
 | **Progress** | `mark_as_read`, `add_bookmark`, `get_reading_progress`, `get_bookmarks` |
 | **Export** | `export_chapter_to_markdown` |
 

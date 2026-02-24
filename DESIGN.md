@@ -1,6 +1,6 @@
 # Agentic Pipeline: Design Decisions & Rationale
 
-> **Status:** All phases complete (Phase 1–5). Embeddings use OpenAI `text-embedding-3-small` (migrated from sentence-transformers). This document reflects the original design rationale and remains accurate for architecture decisions.
+> **Status:** All phases complete (Phase 1–5). Embeddings use OpenAI `text-embedding-3-large` (migrated from sentence-transformers). This document reflects the original design rationale and remains accurate for architecture decisions.
 
 ---
 

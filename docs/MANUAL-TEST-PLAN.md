@@ -109,7 +109,7 @@ list_sections(book_id=BOOK_ID, chapter_number=CH_NUM) — returns dict with sect
 **Search (5)**
 
 ```
-search_books(query="docker") — returns dict with book and chapter matches
+search_titles(query="docker") — returns dict with book and chapter matches
 semantic_search(query="docker containers", limit=3) — returns dict with similarity-ranked results
 hybrid_search(query="docker containers", limit=5) — returns dict with RRF-fused results
 text_search(query="docker", limit=5) — returns dict with FTS5 keyword matches

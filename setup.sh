@@ -22,16 +22,16 @@ python3 -m venv .venv
 echo "🔧 Activating virtual environment..."
 source .venv/bin/activate
 
-# Install FastMCP
-echo "📥 Installing FastMCP..."
+# Install dependencies
+echo "📥 Installing dependencies..."
 pip install --upgrade pip
-pip install fastmcp
+pip install -e .
 
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "📝 Next steps:"
-echo "1. Test the server: python -m src.server"
-echo "2. Configure Claude Desktop (see QUICKSTART.md)"
+echo "1. Test the server: python server.py"
+echo "2. Configure Claude Desktop (see docs/QUICKSTART.md)"
 echo "3. Restart Claude Desktop"
 echo ""

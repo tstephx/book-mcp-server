@@ -164,7 +164,7 @@ The project learning tools complement existing tools:
 
 ## Technical Details
 
-- Uses same embedding model as `semantic_search` (OpenAI `text-embedding-3-small`)
+- Uses same embedding model as `semantic_search` (OpenAI `text-embedding-3-large`)
 - Searches with multiple terms per project type for comprehensive coverage
 - Deduplicates chapters across search terms
 - Groups results by phase using topic matching

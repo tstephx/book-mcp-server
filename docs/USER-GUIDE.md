@@ -40,7 +40,7 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 | `text_search` | Fast keyword/phrase search (FTS5) | `"dependency injection"` |
 | `search_titles` | Simple keyword search in titles/authors | "python docker" |
 | `search_all_books` | Search entire library grouped by book | "async programming" |
-| `topic_coverage` | Find which books cover a topic | "machine learning" |
+| `get_topic_coverage` | Find which books cover a topic | "machine learning" |
 | `extract_code_examples` | Extract code samples from a book | "API design" |
 | `find_related_content` | Find thematically similar chapters | "microservices" |
 
@@ -67,7 +67,7 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 
 | Tool | Description |
 |------|-------------|
-| `generate_project_learning_path` | Learning plan for VPS, web apps, ML projects |
+| `generate_learning_path` | Learning plan for VPS, web apps, ML projects |
 | `create_implementation_plan` | PM-ready plans with phases, risks, gates |
 
 ### Reading Progress Tools
@@ -166,7 +166,7 @@ semantic_search("container orchestration", limit=5, min_similarity=0.5)
 
 **What happens:**
 1. `semantic_search("error handling Python")` finds relevant sections
-2. `topic_coverage("error handling")` shows which books cover it
+2. `get_topic_coverage("error handling")` shows which books cover it
 3. Synthesizes findings across your library
 
 ---
