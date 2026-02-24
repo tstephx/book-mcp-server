@@ -276,14 +276,16 @@ def register_discovery_tools(mcp: "FastMCP") -> None:
             )
             sorted_books = sorted_books[:limit]
 
-            logger.info(f"Topic '{topic}' covered in {len(sorted_books)} books, {len(all_results)} chapters")
+            returned_chapters = [c for b in sorted_books for c in b['chapters']]
+            logger.info(f"Topic '{topic}' covered in {len(sorted_books)} books, {len(returned_chapters)} chapters (of {len(all_results)} matched)")
 
             return {
                 "topic": topic,
-                "total_chapters": len(all_results),
+                "total_chapters_matched": len(all_results),
+                "total_chapters": len(returned_chapters),
                 "books_count": len(sorted_books),
                 "coverage_by_book": sorted_books,
-                "top_chapters": all_results[:10]
+                "top_chapters": returned_chapters[:10]
             }
 
         except Exception as e:

@@ -311,8 +311,9 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
         Args:
             book_id: The unique ID of the book
             chapter_number: The chapter number to retrieve (1-indexed)
-            max_tokens: Optional maximum tokens to return. If content exceeds this,
-                       it will be truncated with a note. Uses ~4 chars/token estimate.
+            max_tokens: Maximum tokens to return. Defaults to Config.DEFAULT_CHAPTER_TOKENS
+                       (8000) if not specified. If content exceeds this, it will be
+                       truncated with a note. Uses ~4 chars/token estimate.
         """
         try:
             # Validate inputs
@@ -459,8 +460,8 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             book_id: The unique ID of the book
             chapter_number: The chapter number (1-indexed)
             section_number: The section number within the chapter (1-indexed)
-            max_tokens: Optional maximum tokens to return. If content exceeds this,
-                       it will be truncated with a note.
+            max_tokens: Maximum tokens to return. Defaults to Config.DEFAULT_CHAPTER_TOKENS
+                       (8000) if not specified. If content exceeds this, it will be truncated with a note.
         """
         try:
             # Validate inputs
