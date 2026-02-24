@@ -156,3 +156,50 @@ def test_permanently_failed_counted_in_failure_rate_alert(db_path):
     report = monitor.get_health()
 
     assert any(a["type"] == "high_failure_rate" for a in report["alerts"])
+
+
+def test_failure_rate_uses_consistent_time_window(db_path):
+    """All-time permanently_failed should not distort 24h failure rate.
+
+    A book that permanently failed long ago (not in the 24h window) must not
+    inflate the failure rate for recent activity.
+    """
+    import sqlite3
+    from agentic_pipeline.health import HealthMonitor
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+
+    # Create 15 completed books (recent)
+    for i in range(15):
+        pid = repo.create(f"/book{i}.epub", f"hash{i}")
+        repo.update_state(pid, PipelineState.HASHING)
+        repo.update_state(pid, PipelineState.CLASSIFYING)
+        repo.update_state(pid, PipelineState.SELECTING_STRATEGY)
+        repo.update_state(pid, PipelineState.PROCESSING)
+        repo.update_state(pid, PipelineState.VALIDATING)
+        repo.update_state(pid, PipelineState.PENDING_APPROVAL)
+        repo.update_state(pid, PipelineState.APPROVED)
+        repo.update_state(pid, PipelineState.EMBEDDING)
+        repo.update_state(pid, PipelineState.COMPLETE)
+
+    # Create 4 permanently failed books, then backdate them to 48h ago.
+    # If counted all-time: (4)/(15+4) = 21% > 20% → alert would fire incorrectly.
+    # If time-windowed: 0 recent failures / 15 recent = 0% → no alert.
+    for i in range(4):
+        pid = repo.create(f"/old_fail{i}.epub", f"oldhash{i}")
+        repo.update_state(pid, PipelineState.NEEDS_RETRY)
+        repo.update_state(pid, PipelineState.FAILED)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "UPDATE processing_pipelines SET updated_at = datetime('now', '-48 hours') WHERE state = 'failed'",
+    )
+    conn.commit()
+    conn.close()
+
+    monitor = HealthMonitor(db_path, alert_failure_rate=0.20)
+    report = monitor.get_health()
+
+    # Old failures outside the 24h window must not trigger a high_failure_rate alert
+    assert not any(a["type"] == "high_failure_rate" for a in report["alerts"])

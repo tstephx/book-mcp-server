@@ -60,7 +60,7 @@ class HealthMonitor:
             """, (PipelineState.NEEDS_RETRY.value,))
             failed = cursor.fetchone()[0]
 
-            # Count permanently failed (max retries exhausted)
+            # Count permanently failed (max retries exhausted) — all-time for reporting
             cursor.execute("""
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
@@ -75,11 +75,26 @@ class HealthMonitor:
             """, (PipelineState.COMPLETE.value,))
             completed_24h = cursor.fetchone()[0]
 
+            # 24h-scoped counts for failure rate (consistent time window)
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+                AND updated_at > datetime('now', '-24 hours')
+            """, (PipelineState.NEEDS_RETRY.value,))
+            failed_24h = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM processing_pipelines
+                WHERE state = ?
+                AND updated_at > datetime('now', '-24 hours')
+            """, (PipelineState.FAILED.value,))
+            permanently_failed_24h = cursor.fetchone()[0]
+
             # Queue by priority
             queue_by_priority = self.repo.get_queue_by_priority()
 
         # Generate alerts
-        alerts = self._generate_alerts(queued, failed, permanently_failed, completed_24h)
+        alerts = self._generate_alerts(queued, failed_24h, permanently_failed_24h, completed_24h)
 
         # Determine status
         if active > 0:
