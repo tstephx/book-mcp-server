@@ -65,6 +65,6 @@ class TestOpenAIEmbeddingGenerator:
         assert result.shape == (10, 1536)
 
     def test_dimension_property(self):
-        """Dimension reports 1536."""
+        """Dimension reports 3072 (text-embedding-3-large)."""
         gen = OpenAIEmbeddingGenerator.__new__(OpenAIEmbeddingGenerator)
-        assert gen.dimension == 1536
+        assert gen.dimension == 3072

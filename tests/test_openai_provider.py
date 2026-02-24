@@ -17,7 +17,7 @@ def test_openai_provider_default_model():
     from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
 
     provider = OpenAIProvider(api_key="test-key")
-    assert provider.model == "gpt-4o-mini"
+    assert provider.model == "gpt-4.1-mini"
 
 
 def test_openai_provider_custom_model():

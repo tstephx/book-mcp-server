@@ -115,7 +115,7 @@ class TestGenerateEmbeddings:
         assert rows[0]["content"] == "chunk zero"
         # Verify embeddings were stored
         assert rows[0]["embedding"] is not None
-        assert rows[0]["embedding_model"] == "text-embedding-3-small"
+        assert rows[0]["embedding_model"] == "text-embedding-3-large"
         conn.close()
 
     @patch("agentic_pipeline.adapters.processing_adapter.chunk_chapter")
