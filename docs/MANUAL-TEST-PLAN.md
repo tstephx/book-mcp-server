@@ -58,13 +58,13 @@ The library contains 173 books with 3,172 chapters and 100% embedding coverage.
 Pick a known book to use as the test fixture throughout:
 
 > **Test Book:** Use the first book returned by `list_books()`.
-> Capture its `book_id`, `title`, first `chapter_number`, and a `chapter_id` from the first chapter.
+> All tools return formatted text (str), not structured dicts. Capture values manually from the output.
 
 ```
-BOOK_ID    = <from list_books()[0].id>
-BOOK_TITLE = <from list_books()[0].title>
+BOOK_ID    = <copy book id from list_books() output — alphanumeric string>
+BOOK_TITLE = <copy title from list_books() output>
 CH_NUM     = 1
-CHAPTER_ID = <from get_table_of_contents(BOOK_ID), first chapter id>
+CHAPTER_ID = <copy chapter id UUID from get_summary() or DB directly — NOT available in TOC output>
 ```
 
 > **Test Query:** `"docker containers"`
@@ -93,105 +93,105 @@ Quick pass — every tool returns a non-error response. No output quality judgme
 **Core Library (3)**
 
 ```
-list_books() — returns dict with list of books
-get_book_info(book_id=BOOK_ID) — returns dict with title, author, word_count
-get_table_of_contents(book_id=BOOK_ID) — returns dict with chapter list
+list_books() — returns str (formatted book list)
+get_book_info(book_id=BOOK_ID) — returns str with title, author, word_count
+get_table_of_contents(book_id=BOOK_ID) — returns str with chapter list
 ```
 
 **Chapter Reading (3)**
 
 ```
-get_chapter(book_id=BOOK_ID, chapter_number=CH_NUM) — returns dict with chapter content or section index
-get_section(book_id=BOOK_ID, chapter_number=CH_NUM, section_number=1) — returns dict with section content (or error if not split)
-list_sections(book_id=BOOK_ID, chapter_number=CH_NUM) — returns dict with section list (or empty if not split)
+get_chapter(book_id=BOOK_ID, chapter_number=CH_NUM) — returns str with chapter content or section index
+get_section(book_id=BOOK_ID, chapter_number=CH_NUM, section_number=1) — returns str with section content (or error if not split)
+list_sections(book_id=BOOK_ID, chapter_number=CH_NUM) — returns str with section list (or empty if not split)
 ```
 
 **Search (5)**
 
 ```
-search_titles(query="docker") — returns dict with book and chapter matches
-semantic_search(query="docker containers", limit=3) — returns dict with similarity-ranked results
-hybrid_search(query="docker containers", limit=5) — returns dict with RRF-fused results
-text_search(query="docker", limit=5) — returns dict with FTS5 keyword matches
-search_all_books(query="docker containers", max_per_book=2) — returns dict grouped by book
+search_titles(query="docker") — returns str with book and chapter matches
+semantic_search(query="docker containers", limit=3) — returns str with similarity-ranked results
+hybrid_search(query="docker containers", limit=5) — returns str with RRF-fused results (rrf_score field)
+text_search(query="docker", limit=5) — returns str with FTS5 keyword matches
+search_all_books(query="docker containers", max_per_book=2) — returns str grouped by book
 ```
 
 **Discovery (3)**
 
 ```
-find_related_content(text_snippet="container networking fundamentals") — returns dict with cross-book matches
-get_topic_coverage(topic="docker") — returns dict with all chapters covering topic
-extract_code_examples(book_id=BOOK_ID, chapter_number=CH_NUM) — returns dict with code blocks
+find_related_content(text_snippet="container networking fundamentals") — returns str with cross-book matches
+get_topic_coverage(topic="docker") — returns str with all chapters covering topic
+extract_code_examples(book_id=BOOK_ID, chapter_number=CH_NUM) — returns str with code blocks
 ```
 
 **Reading Progress (6)**
 
 ```
-mark_as_reading(book_id=BOOK_ID, chapter_number=CH_NUM) — returns confirmation dict
-mark_as_read(book_id=BOOK_ID, chapter_number=CH_NUM, notes="test") — returns confirmation dict
-get_reading_progress(book_id=BOOK_ID) — returns dict with chapter statuses
-add_bookmark(book_id=BOOK_ID, chapter_number=CH_NUM, title="Test bookmark") — returns confirmation dict
-get_bookmarks(book_id=BOOK_ID) — returns list of bookmarks
-remove_bookmark(bookmark_id=<from add_bookmark result>) — returns confirmation dict
+mark_as_reading(book_id=BOOK_ID, chapter_number=CH_NUM) — returns str confirmation
+mark_as_read(book_id=BOOK_ID, chapter_number=CH_NUM, notes="test") — returns str confirmation
+get_reading_progress(book_id=BOOK_ID) — returns str with chapter statuses
+add_bookmark(book_id=BOOK_ID, chapter_number=CH_NUM, title="Test bookmark") — returns str confirmation
+get_bookmarks(book_id=BOOK_ID) — returns str with bookmarks list
+remove_bookmark(bookmark_id=<from add_bookmark result>) — returns str confirmation
 ```
 
 **Analytics (3)**
 
 ```
-get_library_statistics() — returns dict with word counts, author distribution
-find_duplicate_coverage(similarity_threshold=0.7) — returns dict with similar chapter pairs
-get_author_insights() — returns dict with author analytics
+get_library_statistics() — returns str with word counts, author distribution
+find_duplicate_coverage(similarity_threshold=0.7) — returns str with similar chapter pairs
+get_author_insights() — returns str with author analytics
 ```
 
 **Export (2)**
 
 ```
-export_chapter_to_markdown(book_id=BOOK_ID, chapter_number=CH_NUM) — returns dict with markdown content
-create_study_guide(book_id=BOOK_ID, chapter_number=CH_NUM, format="summary") — returns dict with study content
+export_chapter_to_markdown(book_id=BOOK_ID, chapter_number=CH_NUM) — returns str with markdown content
+create_study_guide(book_id=BOOK_ID, chapter_number=CH_NUM, format="summary") — returns str with study content
 ```
 
 **Learning (3)**
 
 ```
-teach_concept(concept="git branching", depth="executive") — returns dict with analogy + content
-generate_learning_path(goal="Build a VPS on Hetzner", depth="quick") — returns dict with phases
-list_project_templates() — returns dict with template list
+teach_concept(concept="git branching", depth="executive") — returns str with analogy + content
+generate_learning_path(goal="Build a VPS on Hetzner", depth="quick") — returns str with phases
+list_project_templates() — returns str with template list
 ```
 
 **Project Planning (7)**
 
 ```
-generate_implementation_plan(goal="Build a VPS on Hetzner") — returns dict with phases + milestones
-list_implementation_templates() — returns dict with template list
-get_phase_prompts(goal="Build a VPS on Hetzner") — returns dict with prompts by phase
-generate_brd(goal="Build a VPS on Hetzner", template_style="lean") — returns dict with BRD document
-generate_wireframe_brief(goal="Build a VPS on Hetzner", audience="executive") — returns dict with architecture brief
-list_architecture_templates() — returns dict with template list
-analyze_project(goal="Build a VPS on Hetzner", mode="overview") — returns dict with analysis
+generate_implementation_plan(goal="Build a VPS on Hetzner") — returns str with phases + milestones
+list_implementation_templates() — returns str with template list
+get_phase_prompts(goal="Build a VPS on Hetzner") — returns str with prompts by phase
+generate_brd(goal="Build a VPS on Hetzner", template_style="lean") — returns str with BRD document
+generate_wireframe_brief(goal="Build a VPS on Hetzner", audience="executive") — returns str with architecture brief
+list_architecture_templates() — returns str with template list
+analyze_project(goal="Build a VPS on Hetzner", mode="overview") — returns str with analysis
 ```
 
 **Summaries (2)**
 
 ```
-get_summary(chapter_id=CHAPTER_ID) — returns dict with extractive summary
-summarize_book(book_id=BOOK_ID) — returns dict with generation results
+get_summary(chapter_id=CHAPTER_ID) — returns str with extractive summary
+summarize_book(book_id=BOOK_ID) — returns str with generation results
 ```
 
 **System/Admin (5)**
 
 ```
-library_status() — returns dict with overview, books, pipeline_summary
-get_library_stats() — returns dict with aggregate statistics
-get_cache_stats() — returns dict with cache hit/miss rates
-clear_cache(cache_type="chapters") — returns dict with confirmation + stats
-audit_chapter_quality(severity="bad") — returns dict with audit results
+library_status() — returns str with overview, books, pipeline_summary
+get_library_stats() — returns str with aggregate statistics
+get_cache_stats() — returns str with cache hit/miss rates
+clear_cache(cache_type="chapters") — returns str confirmation + stats
+audit_chapter_quality(severity="bad") — returns str with audit results
 ```
 
 **Embedding Management (2)**
 
 ```
-refresh_embeddings() — returns dict with status, updated/skipped counts
-generate_summary_embeddings() — returns dict with generated/skipped counts
+refresh_embeddings() — returns str with status, updated/skipped counts
+generate_summary_embeddings() — returns str with generated/skipped counts
 ```
 
 ---
@@ -236,11 +236,11 @@ escape_hatch(reason="test") — returns dict with success
 autonomy_readiness() — returns dict with readiness assessment
 ```
 
-**Pipeline Management (4)**
+**Pipeline Management (2)**
 
 ```
-process(book_path="/path/to/test.epub") — returns dict with pipeline_id (requires real file)
-status(pipeline_id=<known id>) — returns dict with state, confidence
+process(book_path="/path/to/test.epub") — returns str with pipeline_id (requires real file)
+status(pipeline_id=<known id>) — returns str with state, confidence
 ```
 
 *Note: `process` and `status` require a real book file / valid pipeline ID. Skip if no test fixture available.*
@@ -266,7 +266,7 @@ agentic-pipeline validate --json — outputs JSON quality report
 agentic-pipeline backfill --dry-run — previews untracked books
 agentic-pipeline autonomy status — shows autonomy mode
 agentic-pipeline spot-check --list — lists pending spot-checks
-agentic-pipeline batch-approve --execute=false — previews batch approve (dry-run by default)
+agentic-pipeline batch-approve — previews batch approve (dry-run by default; add --execute to apply)
 agentic-pipeline batch-reject --reason="test" — previews batch reject (dry-run by default)
 agentic-pipeline classify --text "Chapter 1: Introduction to Python..." — classifies sample text
 agentic-pipeline escape-hatch "test" — activates escape hatch (CAUTION: changes state)
@@ -288,10 +288,9 @@ Deeper checks on high-value tools where output correctness matters.
 ### list_books
 Run: `list_books()`
 - [ ] Returns at least 170 books (library had 173 as of 2026-02-11; count grows over time)
-- [ ] Each book has `id`, `title`, `author`, `word_count` fields
-- [ ] `word_count` values are integers > 0
+- [ ] Output includes id, title, author, word_count for each book (formatted text — verify visually)
 - [ ] Books are sorted alphabetically by title
-- [ ] No duplicate book IDs in results
+- [ ] No duplicate book IDs visible in results
 
 ### get_book_info
 Run: `get_book_info(book_id=BOOK_ID)`
@@ -316,8 +315,8 @@ Run: `semantic_search(query="docker containers", limit=5, min_similarity=0.8)`
 
 ### hybrid_search
 Run: `hybrid_search(query="docker containers", limit=5, diverse=False)`
-- [ ] Returns results with both `fts_rank` and `semantic_similarity` scores
-- [ ] Results include a `fusion_score` or equivalent combined ranking
+- [ ] Results include both keyword and semantic relevance scores
+- [ ] Results include an `rrf_score` combined ranking field
 - [ ] Top results are Docker-related
 
 Run: `hybrid_search(query="docker containers", limit=5, diverse=True)`
