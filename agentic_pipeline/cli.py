@@ -768,27 +768,150 @@ def escape_hatch(reason: str):
 
 
 @main.command("spot-check")
-@click.option("--list", "list_pending", is_flag=True, help="List pending spot-checks")
-def spot_check(list_pending: bool):
-    """Start or manage spot-check reviews."""
+@click.option("--list", "list_pending", is_flag=True, help="List pending spot-checks without reviewing")
+@click.option("--days", default=7, show_default=True, help="Look back N days for auto-approved books")
+@click.option("--reviewer", default="human:cli", show_default=True, help="Reviewer identifier")
+def spot_check(list_pending: bool, days: int, reviewer: str):
+    """Interactively review a sample of auto-approved books.
+
+    Selects a random 10% sample of auto-approved books from the last N days
+    that haven't been spot-checked yet, then walks through each one asking
+    whether the classification and quality look correct.
+    """
+    import json
     from .db.config import get_db_path
     from .autonomy import SpotCheckManager
+    from .db.connection import get_pipeline_db
 
     db_path = get_db_path()
     manager = SpotCheckManager(db_path)
 
-    if list_pending:
-        pending = manager.select_for_review()
-        if not pending:
-            console.print("[green]No spot-checks pending.[/green]")
-            return
+    candidates = manager.select_for_review(days=days)
 
-        console.print(f"\n[bold]Pending Spot-Checks ({len(pending)} books)[/bold]\n")
-        for book in pending[:10]:
-            console.print(f"  {book['book_id'][:8]}... [{book['original_book_type']}] {book['original_confidence']:.0%}")
-    else:
-        console.print("Use --list to see pending spot-checks")
-        console.print("Interactive spot-check not yet implemented")
+    if not candidates:
+        console.print("[green]No spot-checks pending.[/green]")
+        console.print(f"  (No un-reviewed auto-approvals in the last {days} days)")
+        return
+
+    if list_pending:
+        console.print(f"\n[bold]Pending Spot-Checks ({len(candidates)} books)[/bold]\n")
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Book ID", style="dim")
+        table.add_column("Type")
+        table.add_column("Confidence")
+        table.add_column("Approved")
+        table.add_column("Title")
+        for book in candidates:
+            title = _get_book_title(db_path, book["book_id"])
+            table.add_row(
+                book["book_id"][:8] + "...",
+                book.get("original_book_type", "?"),
+                f"{book.get('original_confidence', 0):.0%}",
+                (book.get("created_at") or "")[:10],
+                title,
+            )
+        console.print(table)
+        return
+
+    # Interactive review
+    console.print(f"\n[bold]Spot-Check Review[/bold] — {len(candidates)} book(s) to review")
+    console.print("  [y] correct  [n] incorrect  [s] skip  [q] quit\n")
+
+    reviewed = 0
+    correct = 0
+
+    for i, book in enumerate(candidates, 1):
+        title = _get_book_title(db_path, book["book_id"])
+        confidence = book.get("original_confidence", 0)
+        book_type = book.get("original_book_type", "unknown")
+        approved_at = (book.get("created_at") or "")[:10]
+
+        console.print(f"[bold]Book {i}/{len(candidates)}[/bold]")
+        console.print(f"  Title:       {title}")
+        console.print(f"  Type:        {book_type}")
+        console.print(f"  Confidence:  {confidence:.0%}")
+        console.print(f"  Approved:    {approved_at}")
+
+        while True:
+            choice = click.prompt("  Result", default="s").strip().lower()
+
+            if choice in ("q", "quit"):
+                console.print("\n[yellow]Review stopped early.[/yellow]")
+                _print_spot_check_summary(reviewed, correct)
+                return
+
+            if choice in ("s", "skip"):
+                console.print("  [dim]Skipped.[/dim]\n")
+                break
+
+            if choice in ("y", "yes"):
+                manager.submit_result(
+                    book_id=book["book_id"],
+                    classification_correct=True,
+                    quality_acceptable=True,
+                    reviewer=reviewer,
+                )
+                console.print("  [green]Recorded: correct.[/green]\n")
+                reviewed += 1
+                correct += 1
+                break
+
+            if choice in ("n", "no"):
+                classification_ok = click.confirm("  Classification correct?", default=True)
+                quality_ok = click.confirm("  Quality acceptable?", default=True)
+                notes = click.prompt("  Notes (optional)", default="").strip() or None
+                manager.submit_result(
+                    book_id=book["book_id"],
+                    classification_correct=classification_ok,
+                    quality_acceptable=quality_ok,
+                    reviewer=reviewer,
+                    notes=notes,
+                )
+                console.print("  [yellow]Recorded: issue flagged.[/yellow]\n")
+                reviewed += 1
+                break
+
+            console.print("  [red]Enter y, n, s, or q.[/red]")
+
+    _print_spot_check_summary(reviewed, correct)
+
+
+def _get_book_title(db_path, book_id: str) -> str:
+    """Look up a book's title from its processing_result JSON."""
+    from .db.connection import get_pipeline_db
+    import json
+
+    try:
+        with get_pipeline_db(str(db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT processing_result, source_path FROM processing_pipelines WHERE id = ?",
+                (book_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return book_id[:8] + "..."
+            if row["processing_result"]:
+                result = json.loads(row["processing_result"])
+                title = result.get("title") or result.get("book_title")
+                if title:
+                    return title
+            # Fall back to filename
+            path = row["source_path"] or ""
+            return Path(path).stem[:60] or book_id[:8] + "..."
+    except Exception:
+        return book_id[:8] + "..."
+
+
+def _print_spot_check_summary(reviewed: int, correct: int) -> None:
+    """Print a summary of the spot-check session."""
+    if reviewed == 0:
+        console.print("[dim]No books reviewed this session.[/dim]")
+        return
+    accuracy = correct / reviewed
+    color = "green" if accuracy >= 0.9 else "yellow" if accuracy >= 0.75 else "red"
+    console.print(f"[bold]Session summary:[/bold] {reviewed} reviewed, "
+                  f"[{color}]{correct} correct ({accuracy:.0%})[/{color}]")
 
 
 @main.command()
