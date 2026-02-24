@@ -112,16 +112,16 @@ class BookIdInput(BaseModel):
 
     book_id: str = Field(
         ...,
-        description="UUID of the book"
+        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
     )
 
     @field_validator('book_id')
     @classmethod
     def validate_book_id(cls, v):
-        """Ensure book_id is a valid UUID"""
-        if not re.match(UUID_PATTERN, v.lower()):
-            raise ValueError(f"Invalid book_id format. Expected UUID, got: {v}")
-        return v.lower()
+        """Accept UUID or slug-style book identifier"""
+        if not v or not v.strip():
+            raise ValueError("book_id cannot be empty")
+        return v
 
 class ChapterInput(BaseModel):
     """Schema for chapter retrieval operations
@@ -138,7 +138,7 @@ class ChapterInput(BaseModel):
 
     book_id: str = Field(
         ...,
-        description="UUID of the book"
+        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
     )
     chapter_number: int = Field(
         ...,
@@ -154,10 +154,10 @@ class ChapterInput(BaseModel):
     @field_validator('book_id')
     @classmethod
     def validate_book_id(cls, v):
-        """Ensure book_id is a valid UUID"""
-        if not re.match(UUID_PATTERN, v.lower()):
-            raise ValueError(f"Invalid book_id format. Expected UUID, got: {v}")
-        return v.lower()
+        """Accept UUID or slug-style book identifier"""
+        if not v or not v.strip():
+            raise ValueError("book_id cannot be empty")
+        return v
 
     @field_validator('chapter_number')
     @classmethod
@@ -181,7 +181,7 @@ class ChapterRangeInput(BaseModel):
 
     book_id: str = Field(
         ...,
-        description="UUID of the book"
+        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
     )
     chapter_number: int = Field(
         ...,
@@ -192,10 +192,10 @@ class ChapterRangeInput(BaseModel):
     @field_validator('book_id')
     @classmethod
     def validate_book_id(cls, v):
-        """Ensure book_id is a valid UUID"""
-        if not re.match(UUID_PATTERN, v.lower()):
-            raise ValueError(f"Invalid book_id format. Expected UUID, got: {v}")
-        return v.lower()
+        """Accept UUID or slug-style book identifier"""
+        if not v or not v.strip():
+            raise ValueError("book_id cannot be empty")
+        return v
 
 # Validation helper functions
 def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
@@ -222,24 +222,24 @@ def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
     return limit
 
 def validate_book_id(book_id: str) -> str:
-    """Validate book ID format
+    """Validate book ID — accepts UUID or slug-style identifier.
 
     Args:
-        book_id: Book ID to validate
+        book_id: Book ID to validate (UUID or slug)
 
     Returns:
-        Validated book ID (lowercase)
+        Validated book ID as-is (resolution happens at query time)
 
     Raises:
-        ValueError: If book_id is not a valid UUID
+        ValueError: If book_id is empty or not a string
     """
     if not isinstance(book_id, str):
         raise ValueError(f"book_id must be a string, got {type(book_id)}")
 
-    if not re.match(UUID_PATTERN, book_id.lower()):
-        raise ValueError(f"Invalid book_id format. Expected UUID, got: {book_id}")
+    if not book_id.strip():
+        raise ValueError("book_id cannot be empty")
 
-    return book_id.lower()
+    return book_id
 
 def validate_chapter_number(chapter_number: int) -> int:
     """Validate chapter number

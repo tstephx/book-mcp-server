@@ -539,7 +539,7 @@ def create_server() -> FastMCP:
         Perfect for context injection when discussing a specific book.
         """
         from .database import execute_query, execute_single
-        from .utils.validators import validate_book_id, ValidationError
+        from .utils.validators import resolve_book_id, ValidationError
 
         # Topic detection keywords (shared with catalog)
         topic_keywords = {
@@ -556,7 +556,7 @@ def create_server() -> FastMCP:
         }
 
         try:
-            book_id = validate_book_id(book_id)
+            book_id = resolve_book_id(book_id)
 
             # Get book details
             book = execute_single("SELECT * FROM books WHERE id = ?", (book_id,))
