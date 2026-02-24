@@ -39,7 +39,7 @@ TRANSITIONS = {
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books
     PipelineState.REJECTED: {PipelineState.ARCHIVED},
     PipelineState.ARCHIVED: set(),  # Terminal
-    PipelineState.FAILED: set(),  # Terminal
+    PipelineState.FAILED: set(),  # Terminal — intentionally not archivable (permanent operational record)
 }
 
 TERMINAL_STATES = {

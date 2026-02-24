@@ -79,14 +79,14 @@ class HealthMonitor:
             queue_by_priority = self.repo.get_queue_by_priority()
 
         # Generate alerts
-        alerts = self._generate_alerts(queued, failed, completed_24h)
+        alerts = self._generate_alerts(queued, failed, permanently_failed, completed_24h)
 
         # Determine status
         if active > 0:
             status = "processing"
         elif queued > 0:
             status = "queued"
-        elif failed > 0:
+        elif failed > 0 or permanently_failed > 0:
             status = "has_failures"
         else:
             status = "idle"
@@ -103,7 +103,7 @@ class HealthMonitor:
             "status": status,
         }
 
-    def _generate_alerts(self, queued: int, failed: int, completed_24h: int) -> list[dict]:
+    def _generate_alerts(self, queued: int, failed: int, permanently_failed: int, completed_24h: int) -> list[dict]:
         """Generate alerts based on current state."""
         alerts = []
 
@@ -114,10 +114,10 @@ class HealthMonitor:
                 "message": f"Queue has {queued} books waiting (threshold: {self.alert_queue_threshold})"
             })
 
-        # Check failure rate
-        total_recent = completed_24h + failed
+        # Check failure rate (includes permanently_failed — terminal failures are worst-case)
+        total_recent = completed_24h + failed + permanently_failed
         if total_recent > 10:  # Only check if enough data
-            failure_rate = failed / total_recent
+            failure_rate = (failed + permanently_failed) / total_recent
             if failure_rate > self.alert_failure_rate:
                 alerts.append({
                     "type": "high_failure_rate",
