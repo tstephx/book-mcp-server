@@ -161,4 +161,4 @@ book-mcp-server/
 - [CLAUDE.md](./CLAUDE.md) — Full reference for contributors (entry points, commands, architecture)
 - [docs/USER-GUIDE.md](./docs/USER-GUIDE.md) — Book library tool reference
 - [docs/MANUAL-TEST-PLAN.md](./docs/MANUAL-TEST-PLAN.md) — Manual test procedures
-- [DESIGN.md](./DESIGN.md) — Architecture decisions and rationale
+- [docs/decisions/](./docs/decisions/) — Architecture decision records

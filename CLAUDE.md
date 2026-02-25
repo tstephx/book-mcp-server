@@ -78,6 +78,9 @@ agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/boo
 ```
 Files in `processed_dir` are excluded from watch scans. Name collisions handled with counter suffixes. Archive failures logged but don't affect pipeline state.
 
+### Book ID Resolution
+Tool calls that accept a `book_id` parameter also accept partial title slugs. `resolve_book_id()` in `src/utils/validators.py` handles resolution: UUID fast path → fuzzy LIKE title match → did-you-mean error. All book_tools, chapter_tools, and server.py call this instead of the old `validate_book_id()`.
+
 ### Escape Hatch
 ```bash
 agentic-pipeline escape-hatch "reason"
@@ -197,4 +200,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-02-23*
+*Last updated: 2026-02-25*

@@ -199,14 +199,7 @@ Resources provide automatic context injection:
 | `collection://list` | List all reading collections |
 | `collection://{name}` | Books in curated collection |
 
-### Available Collections
-
-- `python-essentials` - Core Python books
-- `devops-stack` - DevOps and infrastructure
-- `ai-ml-track` - AI/ML learning path
-- `data-engineering` - Data pipeline books
-- `architecture` - Software architecture
-- `web-development` - Web dev resources
+> **Note:** Named collections (`collection://{name}`) are not yet implemented. The resource URIs are defined but collection membership is not configured.
 
 ---
 
