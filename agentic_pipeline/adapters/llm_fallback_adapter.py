@@ -89,9 +89,6 @@ class LLMFallbackAdapter:
             Improved detection results, or None if LLM cannot improve
         """
         client = self._get_llm_client()
-        if client is None:
-            logger.warning("LLM client not available, skipping fallback")
-            return None
 
         try:
             prompt = self._build_prompt(request)

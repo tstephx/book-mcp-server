@@ -77,4 +77,4 @@ def test_reingest_without_force_fallback_does_not_pass_flag(db_path, tmp_path):
     assert result.exit_code == 0, result.output
     mock_process.assert_called_once()
     _, kwargs = mock_process.call_args
-    assert kwargs.get("force_fallback") is False or kwargs.get("force_fallback") is None
+    assert kwargs.get("force_fallback") is False
