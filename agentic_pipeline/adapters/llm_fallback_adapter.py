@@ -8,6 +8,8 @@ chapter detection fallback when the book-ingestion library has low confidence.
 import logging
 from typing import Optional
 
+import openai
+
 # Import the protocol from book-ingestion
 from book_ingestion.ports.llm_fallback import (
     LLMFallbackPort,
@@ -45,13 +47,7 @@ class LLMFallbackAdapter:
     def _get_llm_client(self):
         """Lazy-load the LLM client."""
         if self._llm_client is None:
-            try:
-                # Try to import anthropic client
-                import anthropic
-                self._llm_client = anthropic.Anthropic()
-            except ImportError:
-                logger.warning("anthropic package not available for LLM fallback")
-                return None
+            self._llm_client = openai.OpenAI()
         return self._llm_client
 
     def should_trigger(self, confidence: float, method: str) -> bool:
@@ -99,8 +95,8 @@ class LLMFallbackAdapter:
 
         try:
             prompt = self._build_prompt(request)
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
                 max_tokens=4096,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -159,7 +155,7 @@ Respond in this JSON format:
 
         try:
             # Extract text content
-            content = response.content[0].text
+            content = response.choices[0].message.content
 
             # Find JSON in response
             start = content.find("{")
