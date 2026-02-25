@@ -46,7 +46,7 @@ agentic-pipeline init
 agentic-pipeline health
 
 # CLI: run worker with directory watching + auto-archive
-agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
+agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline --processed-dir ~/Documents/_ebooks/agentic-book-pipeline/processed
 
 # CLI: full command reference — see docs/USER-GUIDE.md#cli-commands
 
@@ -68,13 +68,13 @@ High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and aut
 
 ### File Watcher
 ```bash
-agentic-pipeline worker --watch-dir /path/to/books/
+agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline
 ```
 Scans run as lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
 
 ### Auto-Archive
 ```bash
-agentic-pipeline worker --watch-dir /path/to/books/ --processed-dir /path/to/books/processed
+agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline --processed-dir ~/Documents/_ebooks/agentic-book-pipeline/processed
 ```
 Files in `processed_dir` are excluded from watch scans. Name collisions handled with counter suffixes. Archive failures logged but don't affect pipeline state.
 
