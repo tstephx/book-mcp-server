@@ -163,7 +163,10 @@ Respond in this JSON format:
             if start == -1 or end == 0:
                 return None
 
-            data = json.loads(content[start:end])
+            # Strip single-line comments (// ...) which OpenAI models sometimes include
+            import re
+            json_str = re.sub(r"//[^\n]*", "", content[start:end])
+            data = json.loads(json_str)
 
             # If chapters look correct, return minimal improvement
             if data.get("chapters_look_correct", True):
