@@ -272,7 +272,7 @@ class Orchestrator:
                 "error": str(e)
             }
 
-    def _process_book(self, pipeline_id: str, book_path: str, content_hash: str) -> dict:
+    def _process_book(self, pipeline_id: str, book_path: str, content_hash: str, force_fallback: bool = False) -> dict:
         """Process book through all states."""
 
         # HASHING (already done via _compute_hash)
@@ -294,7 +294,7 @@ class Orchestrator:
         # PROCESSING
         self._transition(pipeline_id, PipelineState.PROCESSING)
         try:
-            processing_result = self._run_processing(book_path, book_id=pipeline_id)
+            processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=force_fallback)
         except (ProcessingError, PipelineTimeoutError) as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
             self._transition(pipeline_id, PipelineState.NEEDS_RETRY)

@@ -276,7 +276,9 @@ def retry(max_attempts: int):
 
 @main.command()
 @click.argument("book_id")
-def reingest(book_id: str):
+@click.option("--force-fallback", is_flag=True, default=False,
+              help="Skip anchor detection and use LLM-assisted chapter detection.")
+def reingest(book_id: str, force_fallback: bool):
     """Reprocess a book through the full pipeline.
 
     Archives the existing pipeline record and creates a new one.
@@ -313,7 +315,7 @@ def reingest(book_id: str):
     # Process through the pipeline
     config = OrchestratorConfig.from_env()
     orchestrator = Orchestrator(config)
-    result = orchestrator._process_book(new_pid, source_path, record["content_hash"])
+    result = orchestrator._process_book(new_pid, source_path, record["content_hash"], force_fallback=force_fallback)
 
     state = result.get("state", "unknown")
     if state == "complete":
