@@ -20,8 +20,8 @@ import pytest
 # Constants & skip conditions
 # ---------------------------------------------------------------------------
 
-DB_PATH = os.path.expanduser("~/_Projects/book-ingestion-python/data/library.db")
-BOOKS_DIR = os.path.expanduser("~/_Projects/book-ingestion-python/data/books")
+DB_PATH = os.path.expanduser("~/Library/Application Support/book-library/library.db")
+BOOKS_DIR = os.path.expanduser("~/Library/Application Support/book-library/books")
 HAS_DB = os.path.exists(DB_PATH)
 HAS_OPENAI = bool(os.environ.get("OPENAI_API_KEY", ""))
 

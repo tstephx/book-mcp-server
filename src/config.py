@@ -17,9 +17,9 @@ class Config:
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
-    # Paths - default to book-ingestion-python project
-    _DEFAULT_DB = str(Path(__file__).parent.parent.parent / "book-ingestion-python" / "data" / "library.db")
-    _DEFAULT_BOOKS = str(Path(__file__).parent.parent.parent / "book-ingestion-python" / "data" / "books")
+    # Paths - default to standalone data directory
+    _DEFAULT_DB = str(Path.home() / "Library" / "Application Support" / "book-library" / "library.db")
+    _DEFAULT_BOOKS = str(Path.home() / "Library" / "Application Support" / "book-library" / "books")
 
     DB_PATH: Path = Path(os.getenv("BOOK_DB_PATH", _DEFAULT_DB))
     BOOKS_DIR: Path = Path(os.getenv("BOOKS_DIR", _DEFAULT_BOOKS))

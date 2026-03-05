@@ -37,7 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Base path for resolving relative chapter file_paths
-BOOKS_BASE = Path(__file__).resolve().parent.parent.parent / "book-ingestion-python"
+BOOKS_BASE = Path.home() / "Library" / "Application Support" / "book-library"
 
 CLASSIFICATION_COLUMNS = [
     ("book_type", "TEXT"),

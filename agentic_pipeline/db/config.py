@@ -5,7 +5,7 @@ import warnings
 from pathlib import Path
 
 # Default path to shared library.db (override with AGENTIC_PIPELINE_DB env var)
-DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent.parent / "book-ingestion-python" / "data" / "library.db"
+DEFAULT_DB_PATH = Path.home() / "Library" / "Application Support" / "book-library" / "library.db"
 
 
 def get_db_path() -> Path:

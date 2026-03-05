@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def get_default_db_path() -> Path:
     """Get default database path"""
-    return Path(__file__).parent.parent.parent / 'book-ingestion-python' / 'data' / 'library.db'
+    return Path.home() / "Library" / "Application Support" / "book-library" / "library.db"
 
 
 def column_exists(cursor: sqlite3.Cursor, table: str, column: str) -> bool:

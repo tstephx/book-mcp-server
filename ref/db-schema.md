@@ -1,7 +1,7 @@
 # Database Schema Reference
 
 All pipeline state lives in a single SQLite file (WAL mode).
-- **Location:** `AGENTIC_PIPELINE_DB` env var, or `~/_Projects/book-ingestion-python/data/library.db`
+- **Location:** `AGENTIC_PIPELINE_DB` env var, or `~/Library/Application Support/book-library/library.db`
 - **Connection:** always via `get_pipeline_db()` in `agentic_pipeline/db/connection.py` (timeout=10, row_factory=sqlite3.Row)
 - **Migrations:** `agentic_pipeline/db/migrations.py` — `MIGRATIONS` list, auto-applied by `run_migrations()`
 

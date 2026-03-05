@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 TARGET_MODEL = "text-embedding-3-large"
 TARGET_DIM = 3072
-DB_PATH = Path(__file__).parent.parent.parent / "book-ingestion-python" / "data" / "library.db"
+DB_PATH = Path.home() / "Library" / "Application Support" / "book-library" / "library.db"
 BATCH_SIZE = 30
 
 

@@ -33,7 +33,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-----------|-------------------|-------|
 | Pipeline (agentic-pipeline) | `AGENTIC_PIPELINE_DB` | `WATCH_DIR`, `PROCESSED_DIR` | Worker + state machine |
 | MCP server (Claude Desktop) | `BOOK_DB_PATH` | `BOOKS_DIR` | Read/search tools |
-| Both | — | — | Shared DB: `~/_Projects/book-ingestion-python/data/library.db` |
+| Both | — | — | Shared DB: `~/Library/Application Support/book-library/library.db` |
 | Embeddings | `OPENAI_API_KEY` | — | Required for semantic search + pipeline embedding |
 
 ## Quick Start
@@ -201,8 +201,8 @@ Add to `.mcp.json` in any project that needs the book library:
       "command": "/Users/taylorstephens/Dev/_Projects/book-mcp-server/.venv/bin/python",
       "args": ["/Users/taylorstephens/Dev/_Projects/book-mcp-server/server.py"],
       "env": {
-        "BOOK_DB_PATH": "/Users/taylorstephens/_Projects/book-ingestion-python/data/library.db",
-        "BOOKS_DIR": "/Users/taylorstephens/_Projects/book-ingestion-python/data/books",
+        "BOOK_DB_PATH": "/Users/taylorstephens/Library/Application Support/book-library/library.db",
+        "BOOKS_DIR": "/Users/taylorstephens/Library/Application Support/book-library/books",
         "OPENAI_API_KEY": "${OPENAI_API_KEY}"
       }
     }
