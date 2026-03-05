@@ -74,7 +74,7 @@ CHAPTER_ID = <copy chapter id UUID from get_summary() or DB directly — NOT ava
 ### Environment
 
 - Python venv activated: `source .venv/bin/activate`
-- Database exists at `~/_Projects/book-ingestion-python/data/library.db`
+- Database exists at `~/Library/Application Support/book-library/library.db`
 - `OPENAI_API_KEY` set (needed for embedding/semantic operations)
 - `AGENTIC_PIPELINE_DB` set or default path valid
 

@@ -394,8 +394,8 @@ agentic-pipeline health --json
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BOOK_DB_PATH` | `../book-ingestion-python/data/library.db` | Database path |
-| `BOOKS_DIR` | `../book-ingestion-python/data/books` | Books directory |
+| `BOOK_DB_PATH` | `~/Library/Application Support/book-library/library.db` | Database path |
+| `BOOKS_DIR` | `~/Library/Application Support/book-library/books` | Books directory |
 | `MAX_SEARCH_RESULTS` | `10` | Default search limit |
 | `MAX_CHAPTER_SIZE` | `100000` | Max chapter size (bytes) |
 | `ENABLE_CACHING` | `false` | Enable chapter caching |

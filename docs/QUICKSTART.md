@@ -43,9 +43,9 @@ Open `~/Library/Application Support/Claude/claude_desktop_config.json` and add:
 
 **Required:** Use the `.venv/bin/python` path (not bare `python`). `OPENAI_API_KEY` is needed for semantic search.
 
-`BOOK_DB_PATH` and `BOOKS_DIR` come from your `book-ingestion-python` setup — typically:
-- `BOOK_DB_PATH`: `~/_Projects/book-ingestion-python/data/library.db`
-- `BOOKS_DIR`: `~/_Projects/book-ingestion-python/data/books`
+`BOOK_DB_PATH` and `BOOKS_DIR` point to the standalone data directory:
+- `BOOK_DB_PATH`: `~/Library/Application Support/book-library/library.db`
+- `BOOKS_DIR`: `~/Library/Application Support/book-library/books`
 
 ---
 
