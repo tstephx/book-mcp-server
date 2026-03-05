@@ -3,6 +3,15 @@
 
 **DO NOT scan directories on startup.** This project is well-documented below.
 
+## Reference Documentation (`ref/`)
+
+| File | Contents |
+|------|----------|
+| [`ref/pipeline-architecture.md`](ref/pipeline-architecture.md) | State machine, orchestrator API, approval flow, autonomy modes, config knobs |
+| [`ref/mcp-tools.md`](ref/mcp-tools.md) | All MCP tools for both servers with signatures and descriptions |
+| [`ref/db-schema.md`](ref/db-schema.md) | All pipeline DB tables and columns |
+| [`ref/module-map.md`](ref/module-map.md) | "Which file handles X?" — responsibility of every module in `agentic_pipeline/` |
+
 ## What This Is
 Two MCP servers + a CLI pipeline in one repo:
 - **Book library** — read-only search/read/learning tools for Claude Desktop
