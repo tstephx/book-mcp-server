@@ -139,7 +139,7 @@ def test_low_confidence_needs_approval(config, sample_book):
                 result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "pending_approval"
-    assert result["needs_review"] == True
+    assert result["needs_review"]
 
 
 def test_validation_failure_rejects_book(config, sample_book):

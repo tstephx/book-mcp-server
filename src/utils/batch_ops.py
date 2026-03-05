@@ -10,7 +10,7 @@ Provides memory-efficient batch processing for:
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Callable, Iterator, Optional, List
+from typing import Iterator, Optional, List
 
 from ..database import execute_query, get_db_connection
 

@@ -24,7 +24,7 @@ import logging
 import re
 import sqlite3
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from math import sqrt
 from pathlib import Path
 
@@ -372,9 +372,6 @@ def run_audit(
 def print_table(audits: list[BookAudit], severity_filter: str) -> None:
     """Print a Rich-style summary table."""
     try:
-        from rich.console import Console
-        from rich.table import Table
-
         _print_rich_table(audits, severity_filter)
     except ImportError:
         _print_plain_table(audits, severity_filter)
@@ -492,7 +489,7 @@ def print_deep_dive(audit: BookAudit) -> None:
         ))
 
         # Stats
-        console.print(f"\n[bold]Chapter Statistics:[/bold]")
+        console.print("\n[bold]Chapter Statistics:[/bold]")
         console.print(f"  Chapters: {audit.chapter_count}")
         console.print(f"  Total words: {audit.total_words:,}")
         console.print(f"  Avg words/chapter: {audit.avg_words:,.0f}")
@@ -506,7 +503,7 @@ def print_deep_dive(audit: BookAudit) -> None:
         console.print(f"  Severity: [{style}]{audit.severity}[/{style}]")
 
         if audit.issues:
-            console.print(f"\n[bold]Issues:[/bold]")
+            console.print("\n[bold]Issues:[/bold]")
             for issue in audit.issues:
                 console.print(f"  - {issue}")
 
@@ -555,10 +552,10 @@ def print_deep_dive(audit: BookAudit) -> None:
         if audit.epub_toc_count is not None:
             print(f"EPUB TOC entries: {audit.epub_toc_count}")
         if audit.issues:
-            print(f"\nIssues:")
+            print("\nIssues:")
             for issue in audit.issues:
                 print(f"  - {issue}")
-        print(f"\nChapters:")
+        print("\nChapters:")
         for ch in audit.chapters:
             flags = [ti.issue for ti in audit.title_issues if ti.chapter_number == ch.chapter_number]
             flag_str = f"  [{', '.join(flags)}]" if flags else ""

@@ -37,7 +37,7 @@ def test_orchestrator_initializes(config):
     orchestrator = Orchestrator(config)
 
     assert orchestrator.config == config
-    assert orchestrator.shutdown_requested == False
+    assert not orchestrator.shutdown_requested
 
 
 def test_orchestrator_idempotency_skips_complete(db_path, config):
@@ -56,7 +56,7 @@ def test_orchestrator_idempotency_skips_complete(db_path, config):
     with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
-    assert result["skipped"] == True
+    assert result["skipped"]
     assert "already" in result["reason"].lower()
 
 
@@ -75,7 +75,7 @@ def test_orchestrator_idempotency_skips_in_progress(db_path, config):
     with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
-    assert result["skipped"] == True
+    assert result["skipped"]
     assert "in progress" in result["reason"].lower()
 
 
@@ -94,7 +94,7 @@ def test_orchestrator_idempotency_skips_failed(db_path, config):
     with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
-    assert result["skipped"] == True
+    assert result["skipped"]
     assert "permanently failed" in result["reason"].lower()
 
 
@@ -124,7 +124,7 @@ def test_orchestrator_classifies_book(db_path, config):
         with patch('builtins.open', MagicMock()):
             with patch.object(orchestrator, '_extract_sample', return_value="Chapter 1..."):
                 with patch.object(orchestrator, '_compute_hash', return_value="newhash"):
-                    result = orchestrator.process_one("/book.epub")
+                    orchestrator.process_one("/book.epub")
 
     # Should have called classifier
     orchestrator.classifier.classify.assert_called_once()
@@ -244,7 +244,7 @@ def test_orchestrator_graceful_shutdown(db_path, config):
     # Simulate SIGINT
     orchestrator._handle_shutdown(signal.SIGINT, None)
 
-    assert orchestrator.shutdown_requested == True
+    assert orchestrator.shutdown_requested
 
 
 def test_scan_directory_finds_new_books(db_path, config, tmp_path):

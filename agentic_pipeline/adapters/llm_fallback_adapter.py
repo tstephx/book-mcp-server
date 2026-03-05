@@ -12,7 +12,6 @@ import openai
 
 # Import the protocol from book-ingestion
 from book_ingestion.ports.llm_fallback import (
-    LLMFallbackPort,
     LLMFallbackRequest,
     LLMFallbackResponse,
 )

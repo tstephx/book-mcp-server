@@ -30,6 +30,7 @@ dev = [
     "pytest-asyncio>=0.21",
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
+    "ruff>=0.3",
 ]
 
 [tool.pytest.ini_options]
@@ -67,6 +68,19 @@ exclude_lines = [
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F"]
+ignore = [
+    "E501",  # line too long — handled by formatter, not enforced in CI
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]  # test files import for side-effects
 
 [project.scripts]
 agentic-pipeline = "agentic_pipeline.cli:main"

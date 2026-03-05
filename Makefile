@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-e2e test-cov test-fast test-watch clean-test help
+.PHONY: test test-unit test-integration test-e2e test-cov test-fast test-watch clean-test lint lint-fix format help
 
 VENV := .venv/bin/python
 PYTEST := $(VENV) -m pytest
@@ -14,6 +14,11 @@ help:
 	@echo "  make test-cov       - Unit tests with HTML coverage report"
 	@echo "  make test-fast      - Parallel unit tests (pytest-xdist)"
 	@echo "  make test-all       - All tests including integration"
+	@echo ""
+	@echo "Lint/format targets:"
+	@echo "  make lint           - Check for lint errors (ruff)"
+	@echo "  make lint-fix       - Auto-fix lint errors"
+	@echo "  make format         - Format code (ruff format)"
 	@echo ""
 	@echo "Pipeline targets:"
 	@echo "  make health         - Check pipeline health"
@@ -54,6 +59,19 @@ test-all:
 # Run a specific test file or pattern — usage: make test-file FILE=tests/test_approval_actions.py
 test-file:
 	$(PYTEST) $(FILE) -v
+
+# ─── Lint / format ───────────────────────────────────────────────────────────
+
+RUFF := .venv/bin/ruff
+
+lint:
+	$(RUFF) check .
+
+lint-fix:
+	$(RUFF) check . --fix --unsafe-fixes
+
+format:
+	$(RUFF) format .
 
 # ─── Pipeline shortcuts ──────────────────────────────────────────────────────
 

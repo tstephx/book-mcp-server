@@ -15,7 +15,6 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from ..config import Config
 from ..database import get_db_connection
 from .cache import get_cache
 from .file_utils import resolve_chapter_path, read_chapter_content

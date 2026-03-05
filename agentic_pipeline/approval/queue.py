@@ -2,10 +2,8 @@
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from agentic_pipeline.db.pipelines import PipelineRepository
-from agentic_pipeline.pipeline.states import PipelineState
 
 
 class ApprovalQueue:

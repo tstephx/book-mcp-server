@@ -6,7 +6,6 @@ Complements semantic search with exact term matching.
 """
 
 import logging
-import re
 from typing import Optional
 
 from ..database import get_db_connection, execute_query
@@ -39,7 +38,7 @@ def escape_fts_query(query: str) -> str:
     # But preserve * for prefix matching
     special_chars = ['-', '^', ':', '(', ')']
     for char in special_chars:
-        query = query.replace(char, f' ')
+        query = query.replace(char, ' ')
 
     # Clean up multiple spaces
     query = ' '.join(query.split())
@@ -159,7 +158,7 @@ def full_text_search(
         # Check if it's a syntax error
         if "fts5" in str(e).lower() or "syntax" in str(e).lower():
             return {
-                "error": f"Invalid search syntax. Try simpler terms or use quotes for phrases.",
+                "error": "Invalid search syntax. Try simpler terms or use quotes for phrases.",
                 "query": query,
                 "results": []
             }

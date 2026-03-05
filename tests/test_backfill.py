@@ -68,7 +68,7 @@ def test_create_backfill_skips_existing(db_path):
     repo = PipelineRepository(db_path)
 
     # Create a normal pipeline record first
-    pid = repo.create("/books/test.epub", "hash123")
+    repo.create("/books/test.epub", "hash123")
 
     # Backfill with same hash should return False (skip)
     result = repo.create_backfill(

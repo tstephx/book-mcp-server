@@ -19,17 +19,10 @@ Follows MCP best practices:
 
 import logging
 import re
-from typing import Optional, Literal
 from datetime import datetime
-from ..database import get_db_connection, execute_query, execute_single
 from ..utils.context_managers import embedding_model_context
 from ..utils.vector_store import find_top_k
-from ..utils.file_utils import read_chapter_content
-from ..utils.excerpt_utils import extract_relevant_excerpt
-from ..utils.cache import get_cache
 from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
-import numpy as np
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -215,10 +208,10 @@ PHASE_CONCEPTS = {
 def _detect_project_type(goal: str) -> tuple[str, dict]:
     """Detect project type from goal description"""
     goal_lower = goal.lower()
-    
+
     # Keyword matching for project types
     type_keywords = {
-        "vps": ["vps", "server", "hosting", "hetzner", "digitalocean", "linode", 
+        "vps": ["vps", "server", "hosting", "hetzner", "digitalocean", "linode",
                 "virtual private", "self-host", "deploy server"],
         "web_app": ["web app", "website", "frontend", "backend", "full stack",
                     "react", "vue", "django", "flask", "fastapi"],
@@ -231,20 +224,20 @@ def _detect_project_type(goal: str) -> tuple[str, dict]:
         "mcp_server": ["mcp server", "mcp tool", "model context protocol",
                        "claude tool", "ai tool"]
     }
-    
+
     # Find best match
     best_match = None
     best_score = 0
-    
+
     for project_type, keywords in type_keywords.items():
         score = sum(1 for kw in keywords if kw in goal_lower)
         if score > best_score:
             best_score = score
             best_match = project_type
-    
+
     if best_match and best_score > 0:
         return best_match, PROJECT_DOMAINS[best_match]
-    
+
     # Default to generic project
     return "generic", {
         "name": "Technical Project",
@@ -314,21 +307,21 @@ def _group_results_by_phase(results: list, phases: list) -> dict:
     """Group search results into project phases"""
     phase_results = {phase['name']: [] for phase in phases}
     phase_results['Other'] = []
-    
+
     for result in results:
         matched = False
         result_text = f"{result['chapter_title']} {result['search_term']}".lower()
-        
+
         for phase in phases:
-            phase_topics = " ".join(phase['topics']).lower()
+            " ".join(phase['topics']).lower()
             if any(topic.lower() in result_text for topic in phase['topics']):
                 phase_results[phase['name']].append(result)
                 matched = True
                 break
-        
+
         if not matched:
             phase_results['Other'].append(result)
-    
+
     return phase_results
 
 
@@ -341,18 +334,18 @@ def _get_phase_concepts(project_type: str, phase_name: str) -> list:
 
 def _generate_concept_briefs(concepts: list, project_type: str) -> dict:
     """Generate brief explanations for concepts using teach_concept logic
-    
+
     Returns dict mapping concept -> brief explanation
     """
     from .learning_tools import get_analogy, _find_relevant_sources, _generate_quick_summary
-    
+
     briefs = {}
-    
+
     for concept in concepts[:5]:  # Limit to 5 concepts per phase
         try:
             # Get analogy if available
             analogy_data = get_analogy(concept)
-            
+
             if analogy_data:
                 briefs[concept] = {
                     "brief": analogy_data.get("analogy", "")[:300],
@@ -383,7 +376,7 @@ def _generate_concept_briefs(concepts: list, project_type: str) -> dict:
                 "pm_context": "",
                 "has_analogy": False
             }
-    
+
     return briefs
 
 
@@ -392,22 +385,22 @@ def _estimate_time(phases: list, results_by_phase: dict) -> dict:
     total_learn = 0
     total_implement = 0
     phase_times = {}
-    
+
     for phase in phases:
         phase_name = phase['name']
         result_count = len(results_by_phase.get(phase_name, []))
-        
+
         # More results = more content to cover
         base_hours = 4 + (result_count * 1.5)
         impl_hours = 2 + (result_count * 0.75)
-        
+
         phase_times[phase_name] = {
             "learn_hours": round(base_hours),
             "implement_hours": round(impl_hours)
         }
         total_learn += base_hours
         total_implement += impl_hours
-    
+
     return {
         "phases": phase_times,
         "total_learn_hours": round(total_learn),
@@ -419,21 +412,21 @@ def _estimate_time(phases: list, results_by_phase: dict) -> dict:
 def _generate_checklist(phases: list, results_by_phase: dict) -> list:
     """Generate implementation checklist"""
     checklist = []
-    
+
     for phase in phases:
         phase_name = phase['name']
         phase_items = {
             "phase": phase_name,
             "items": []
         }
-        
+
         # Add topic-based items
         for topic in phase['topics']:
             phase_items["items"].append({
                 "task": f"Learn {topic}",
                 "type": "learn"
             })
-        
+
         # Add implementation items based on results
         results = results_by_phase.get(phase_name, [])
         if results:
@@ -441,14 +434,14 @@ def _generate_checklist(phases: list, results_by_phase: dict) -> list:
                 "task": f"Review relevant chapters ({len(results)} found)",
                 "type": "read"
             })
-        
+
         phase_items["items"].append({
             "task": f"Implement {phase_name.lower()} components",
             "type": "implement"
         })
-        
+
         checklist.append(phase_items)
-    
+
     return checklist
 
 
@@ -463,19 +456,19 @@ def _build_markdown_guide(
     concept_briefs: dict = None
 ) -> str:
     """Build comprehensive markdown learning guide
-    
+
     Args:
         concept_briefs: Optional dict mapping phase_name -> {concept: brief_data}
     """
     lines = []
-    
+
     # Header
     lines.append(f"# Project Learning Guide: {project_config['name']}")
     lines.append(f"## {goal}")
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Overview
     lines.append("## 🎯 Project Overview")
     lines.append("")
@@ -485,7 +478,7 @@ def _build_markdown_guide(
     lines.append(f"**Estimated Implementation Time:** {time_estimates['total_implement_hours']} hours")
     lines.append(f"**Total Time:** {time_estimates['total_hours']} hours")
     lines.append("")
-    
+
     # Books found
     books_used = {}
     for r in results:
@@ -495,20 +488,20 @@ def _build_markdown_guide(
                 'chapters': []
             }
         books_used[r['book_title']]['chapters'].append(r['chapter_title'])
-    
+
     lines.append("## 📚 Library Resources")
     lines.append("")
     lines.append(f"Found **{len(results)}** relevant chapters across **{len(books_used)}** books:")
     lines.append("")
-    
+
     for book, info in sorted(books_used.items(), key=lambda x: -len(x[1]['chapters'])):
         author_str = f" by {info['author']}" if info['author'] else ""
         lines.append(f"| **{book}**{author_str} | {len(info['chapters'])} chapters |")
-    
+
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Learning Path
     lines.append("## 🗺️ Learning Path")
     lines.append("")
@@ -525,19 +518,19 @@ def _build_markdown_guide(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Detailed phases
     for i, phase in enumerate(project_config['phases'], 1):
         phase_name = phase['name']
         phase_results = results_by_phase.get(phase_name, [])
         time = time_estimates['phases'].get(phase_name, {})
-        
+
         lines.append(f"## Phase {i}: {phase_name}")
         lines.append("")
         lines.append(f"**Learning Time:** ~{time.get('learn_hours', 4)} hours")
         lines.append(f"**Topics:** {', '.join(phase['topics'])}")
         lines.append("")
-        
+
         # Add concept briefs if available
         if concept_briefs and phase_name in concept_briefs:
             phase_concepts = concept_briefs[phase_name]
@@ -549,13 +542,13 @@ def _build_markdown_guide(
                     if brief_data.get('brief'):
                         lines.append(f"> {brief_data['brief']}")
                     if brief_data.get('pm_context'):
-                        lines.append(f">")
+                        lines.append(">")
                         lines.append(f"> *PM Context: {brief_data['pm_context']}*")
                     if brief_data.get('source'):
-                        lines.append(f">")
+                        lines.append(">")
                         lines.append(f"> *Source: {brief_data['source']}*")
                     lines.append("")
-        
+
         if phase_results:
             lines.append("### 📖 Recommended Reading")
             lines.append("")
@@ -566,7 +559,7 @@ def _build_markdown_guide(
                     excerpt = r['excerpt'][:200].replace('\n', ' ')
                     lines.append(f"- Preview: *{excerpt}...*")
                 lines.append("")
-        
+
         lines.append("### ✅ Checklist")
         lines.append("")
         for topic in phase['topics']:
@@ -577,40 +570,40 @@ def _build_markdown_guide(
         lines.append("")
         lines.append("---")
         lines.append("")
-    
+
     # Full reading list
     lines.append("## 📋 Complete Reading List")
     lines.append("")
     lines.append("All relevant chapters, ordered by relevance:")
     lines.append("")
-    
+
     for i, r in enumerate(results[:20], 1):  # Top 20
         lines.append(f"{i}. **{r['book_title']}** — Ch. {r['chapter_number']}: {r['chapter_title']} ({r['similarity']:.0%})")
-    
+
     if len(results) > 20:
         lines.append(f"\n*...and {len(results) - 20} more chapters*")
-    
+
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Implementation checklist
     lines.append("## 📝 Implementation Checklist")
     lines.append("")
-    
+
     for phase_check in checklist:
         lines.append(f"### {phase_check['phase']}")
         for item in phase_check['items']:
             lines.append(f"- [ ] {item['task']}")
         lines.append("")
-    
+
     lines.append("---")
     lines.append("")
-    
+
     # Footer
     lines.append("*Generated from your book library using semantic search*")
     lines.append(f"*Created: {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
-    
+
     return "\n".join(lines)
 
 
@@ -620,7 +613,7 @@ def _build_markdown_guide(
 
 def register_project_learning_tools(mcp):
     """Register project learning path tools with MCP server"""
-    
+
     @mcp.tool()
     def generate_learning_path(
         goal: str,
@@ -630,17 +623,17 @@ def register_project_learning_tools(mcp):
         output_path: str = ""
     ) -> dict:
         """Generate a project-based learning path from your book library
-        
+
         Analyzes your goal, searches your book library for relevant content,
         and creates a phased learning guide with reading recommendations,
         time estimates, and implementation checklists.
-        
+
         Works with both specific and ambiguous goals:
         - "Build a VPS on Hetzner to host my portfolio and apps"
         - "Create a data pipeline for analyzing CSV files"
         - "Learn enough Docker to deploy my Python app"
         - "Build an MCP server for my notes"
-        
+
         Args:
             goal: What you want to build or achieve. Be as specific or vague as you like.
             depth: Level of detail in the guide:
@@ -651,7 +644,7 @@ def register_project_learning_tools(mcp):
                    analogies for key topics in each phase using teach_concept logic.
             save_to_file: If True, saves the guide to a markdown file
             output_path: Custom path for saved file (optional)
-                   
+
         Returns:
             Dictionary with:
             - goal: Your stated goal
@@ -664,7 +657,7 @@ def register_project_learning_tools(mcp):
             - concept_briefs: Key concepts with explanations (if include_concepts=True)
             - guide: Full markdown learning guide
             - file_path: Path if saved to file
-            
+
         Examples:
             generate_learning_path("Build a VPS to host my portfolio")
             generate_learning_path("Create a Python data pipeline", depth="quick")
@@ -678,22 +671,22 @@ def register_project_learning_tools(mcp):
                     "error": f"Invalid depth '{depth}'. Use: {', '.join(valid_depths)}",
                     "valid_depths": valid_depths
                 }
-            
+
             logger.info(f"Generating learning path for: {goal}")
-            
+
             # Detect project type
             project_type, project_config = _detect_project_type(goal)
             logger.info(f"Detected project type: {project_type}")
-            
+
             # Adjust search scope based on depth
             limit_per_term = {"quick": 3, "comprehensive": 5, "deep": 8}[depth]
-            
+
             # Expand search terms with the goal itself
             search_terms = [goal] + project_config['search_terms']
-            
+
             # Search library
             results = _search_library_for_topics(search_terms, limit_per_term)
-            
+
             if not results:
                 return {
                     "goal": goal,
@@ -701,16 +694,16 @@ def register_project_learning_tools(mcp):
                     "message": "No relevant content found in your library for this goal.",
                     "suggestion": "Try rephrasing your goal or check your library with list_books()"
                 }
-            
+
             # Group by phase
             results_by_phase = _group_results_by_phase(results, project_config['phases'])
-            
+
             # Estimate time
             time_estimates = _estimate_time(project_config['phases'], results_by_phase)
-            
+
             # Generate checklist
             checklist = _generate_checklist(project_config['phases'], results_by_phase)
-            
+
             # Generate concept briefs if requested
             concept_briefs = None
             if include_concepts:
@@ -723,14 +716,14 @@ def register_project_learning_tools(mcp):
                         concept_briefs[phase_name] = _generate_concept_briefs(
                             phase_concepts, project_type
                         )
-            
+
             # Build guide
             guide = _build_markdown_guide(
                 goal, project_type, project_config,
                 results, results_by_phase, time_estimates, checklist,
                 concept_briefs=concept_briefs
             )
-            
+
             # Save to file if requested
             file_path = None
             if save_to_file:
@@ -739,7 +732,7 @@ def register_project_learning_tools(mcp):
                     safe_name = re.sub(r'[^\w\s-]', '', goal.lower())
                     safe_name = re.sub(r'[\s]+', '-', safe_name)[:50]
                     output_path = f"learning-path-{safe_name}.md"
-                
+
                 try:
                     with open(output_path, 'w') as f:
                         f.write(guide)
@@ -747,10 +740,10 @@ def register_project_learning_tools(mcp):
                     logger.info(f"Saved learning path to: {output_path}")
                 except Exception as e:
                     logger.warning(f"Could not save file: {e}")
-            
+
             # Get unique books
             books_found = len(set(r['book_title'] for r in results))
-            
+
             # Build reading list summary
             reading_list = [
                 {
@@ -761,7 +754,7 @@ def register_project_learning_tools(mcp):
                 }
                 for r in results[:10]
             ]
-            
+
             return {
                 "goal": goal,
                 "project_type": project_config['name'],
@@ -786,29 +779,29 @@ def register_project_learning_tools(mcp):
                 "guide": guide,
                 "file_path": file_path
             }
-            
+
         except Exception as e:
             logger.error(f"generate_learning_path error: {e}", exc_info=True)
             return {"error": str(e)}
-    
-    
+
+
     @mcp.tool()
     def list_project_templates() -> dict:
         """List available project templates and their learning phases
-        
+
         Shows the built-in project templates that the learning path generator
         recognizes. Use these as inspiration or guidance for your goals.
-        
+
         Returns:
             Dictionary with:
             - templates: List of project templates with phases
             - usage_tip: How to use with generate_learning_path
-            
+
         Examples:
             list_project_templates()
         """
         templates = []
-        
+
         for template_id, config in PROJECT_DOMAINS.items():
             templates.append({
                 "id": template_id,
@@ -816,7 +809,7 @@ def register_project_learning_tools(mcp):
                 "phases": [p['name'] for p in config['phases']],
                 "example_goals": _get_example_goals(template_id)
             })
-        
+
         return {
             "templates": templates,
             "usage_tip": "Use generate_learning_path('your goal here') - the system will auto-detect the best template",

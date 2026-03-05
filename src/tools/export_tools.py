@@ -5,7 +5,7 @@ Enables creating markdown exports, study guides, and flashcards from chapters
 
 import logging
 import re
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from datetime import datetime
 
 from ..database import execute_single, execute_query
@@ -373,11 +373,11 @@ def register_export_tools(mcp: "FastMCP") -> None:
             if format in ['comprehensive', 'summary']:
                 guide_parts.append("## Study Tips")
                 guide_parts.append("")
-                guide_parts.append(f"1. Read through the chapter once for overview")
+                guide_parts.append("1. Read through the chapter once for overview")
                 guide_parts.append(f"2. Review the {len(term_concepts) if format == 'comprehensive' else 'key'} vocabulary terms")
                 guide_parts.append(f"3. Practice with the {len(flashcards)} flashcards above")
                 if code_concepts if format == 'comprehensive' else False:
-                    guide_parts.append(f"4. Try running the code examples yourself")
+                    guide_parts.append("4. Try running the code examples yourself")
                 guide_parts.append(f"5. Connect concepts to {next_chapter['title'] if next_chapter else 'related topics'}")
                 guide_parts.append("")
                 guide_parts.append("---")

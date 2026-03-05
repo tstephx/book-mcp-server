@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import io
 
-from ..database import get_db_connection, execute_query, execute_single
+from ..database import execute_query, execute_single
 from ..utils.vector_store import cosine_similarity
 
 if TYPE_CHECKING:

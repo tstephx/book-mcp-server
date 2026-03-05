@@ -34,7 +34,7 @@ from .utils.cache import get_cache
 def create_server() -> FastMCP:
     """
     Create and configure the MCP server
-    
+
     Returns:
         Configured FastMCP server instance
     """
@@ -46,13 +46,13 @@ def create_server() -> FastMCP:
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         raise
-    
+
     # Check database health
     health = check_database_health()
     if health["status"] != "healthy":
         logger.error(f"Database unhealthy: {health.get('error')}")
         raise RuntimeError(f"Database health check failed: {health.get('error')}")
-    
+
     logger.info(f"Database healthy: {health['books']} books, {health['chapters']} chapters, "
                f"{health['total_words']:,} total words")
 
@@ -61,7 +61,7 @@ def create_server() -> FastMCP:
 
     # Create server
     mcp = FastMCP(Config.SERVER_NAME)
-    
+
     # Register tools (modular organization)
     logger.info("Registering tools...")
     register_book_tools(mcp)
@@ -411,7 +411,6 @@ def create_server() -> FastMCP:
         """
         from .database import execute_query, execute_single
         from collections import Counter
-        import re
 
         try:
             # Get aggregate statistics
@@ -502,17 +501,16 @@ def create_server() -> FastMCP:
     @mcp.resource("book://catalog")
     def get_catalog() -> str:
         """Resource: Complete book catalog"""
-        from .tools.book_tools import register_book_tools
         # We need to call list_books but it's decorated, so we import the function
         from .database import execute_query
-        
+
         try:
             books = execute_query("""
                 SELECT id, title, author, word_count
                 FROM books
                 ORDER BY title
             """)
-            
+
             result = "📚 Book Catalog\n" + "="*50 + "\n\n"
             for book in books:
                 result += f"• {book['title']}"
@@ -520,12 +518,12 @@ def create_server() -> FastMCP:
                     result += f" by {book['author']}"
                 result += f" ({book['word_count']:,} words)\n"
                 result += f"  ID: {book['id']}\n"
-            
+
             return result
         except Exception as e:
             logger.error(f"Error in catalog resource: {e}")
             return f"Error: {str(e)}"
-    
+
     @mcp.resource("book://{book_id}/metadata")
     def get_book_metadata(book_id: str) -> str:
         """Resource: Comprehensive book metadata for RAG context injection
@@ -601,10 +599,10 @@ def create_server() -> FastMCP:
             elif embedded_count > 0:
                 result += f"Embeddings: ⚠️ Partial ({embedded_count}/{len(chapters)})\n"
             else:
-                result += f"Embeddings: ❌ None\n"
+                result += "Embeddings: ❌ None\n"
 
             # Chapter listing
-            result += f"\n📑 Chapters\n" + "-"*60 + "\n"
+            result += "\n📑 Chapters\n" + "-"*60 + "\n"
             for ch in chapters:
                 embed_icon = "✓" if ch['has_embedding'] else "○"
                 result += f"{embed_icon} {ch['chapter_number']:2}. {ch['title']}"
@@ -612,7 +610,7 @@ def create_server() -> FastMCP:
                     result += f" ({ch['word_count']:,} words)"
                 result += "\n"
 
-            result += f"\n💡 Use semantic_search() to find specific content in this book."
+            result += "\n💡 Use semantic_search() to find specific content in this book."
 
             logger.info(f"Generated metadata for book: {book['title']}")
             return result
@@ -749,25 +747,25 @@ def create_server() -> FastMCP:
 
                 # Semantic search readiness
                 if book['embedded_chapters'] == book['chapter_count']:
-                    result += f"   Semantic Search: ✅ Ready\n"
+                    result += "   Semantic Search: ✅ Ready\n"
                 elif book['embedded_chapters'] > 0:
                     result += f"   Semantic Search: ⚠️ Partial ({book['embedded_chapters']}/{book['chapter_count']})\n"
                 else:
-                    result += f"   Semantic Search: ❌ Not indexed\n"
+                    result += "   Semantic Search: ❌ Not indexed\n"
 
                 result += f"   ID: {book['id']}\n"
 
             # Collection summary
-            result += f"\n📊 Collection Summary\n" + "-"*60 + "\n"
+            result += "\n📊 Collection Summary\n" + "-"*60 + "\n"
             result += f"Total Books: {len(matching_books)}\n"
             result += f"Total Chapters: {total_chapters}\n"
             result += f"Total Words: {total_words:,}\n"
             est_hours = total_words / 15000  # ~250 words/min, 60 min
             result += f"Estimated Reading Time: {est_hours:.0f} hours\n"
 
-            result += f"\n💡 Tips:\n"
-            result += f"• Use semantic_search('topic') to find specific content\n"
-            result += f"• Access book details with book://{{book_id}}/metadata\n"
+            result += "\n💡 Tips:\n"
+            result += "• Use semantic_search('topic') to find specific content\n"
+            result += "• Access book details with book://{book_id}/metadata\n"
 
             logger.info(f"Generated collection '{collection_name}' with {len(matching_books)} books")
             return result

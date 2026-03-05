@@ -6,7 +6,6 @@ Tier 2: Chapter Content - TTL-based with file mtime validation
 """
 
 import logging
-import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path

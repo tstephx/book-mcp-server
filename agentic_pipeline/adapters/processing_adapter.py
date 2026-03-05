@@ -13,7 +13,6 @@ from typing import Optional
 from book_ingestion import (
     BookIngestionApp,
     ProcessingMode,
-    PipelineResult,
 )
 from src.utils.chunker import chunk_chapter
 from src.utils.openai_embeddings import OpenAIEmbeddingGenerator

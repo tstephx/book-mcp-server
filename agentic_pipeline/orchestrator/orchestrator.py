@@ -18,7 +18,6 @@ from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
 from agentic_pipeline.orchestrator.errors import (
-    IdempotencyError,
     ProcessingError,
     EmbeddingError,
     PipelineTimeoutError,

@@ -36,7 +36,7 @@ def test_fallback_adapter_uses_openai_client():
 
     with patch("agentic_pipeline.adapters.llm_fallback_adapter.openai") as mock_openai:
         mock_openai.OpenAI.return_value = MagicMock()
-        client = adapter._get_llm_client()
+        adapter._get_llm_client()
 
     mock_openai.OpenAI.assert_called_once()
 

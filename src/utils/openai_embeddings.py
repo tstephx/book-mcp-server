@@ -70,7 +70,7 @@ class OpenAIEmbeddingGenerator:
             raise ValueError("Cannot generate embeddings for empty list")
 
         all_embeddings: list[np.ndarray] = []
-        enc = _get_encoding()
+        _get_encoding()
 
         current_batch: list[str] = []
         current_tokens = 0

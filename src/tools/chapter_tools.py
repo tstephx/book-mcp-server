@@ -435,7 +435,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                 return str(e)
             except UnicodeDecodeError:
                 logger.error(f"Failed to decode chapter file: {chapter_path}")
-                return f"Error: Unable to read chapter file (encoding issue)"
+                return "Error: Unable to read chapter file (encoding issue)"
             except IOError as e:
                 logger.error(f"IO error reading chapter file: {e}")
                 return f"Error reading chapter file: {str(e)}"
@@ -588,7 +588,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                 return str(e)
             except UnicodeDecodeError:
                 logger.error(f"Failed to decode section file: {section_file}")
-                return f"Error: Unable to read section file (encoding issue)"
+                return "Error: Unable to read section file (encoding issue)"
             except IOError as e:
                 logger.error(f"IO error reading section file: {e}")
                 return f"Error reading section file: {str(e)}"

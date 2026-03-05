@@ -141,7 +141,6 @@ def _make_mock_generator():
 
 def test_generate_single_embedding(db_with_embedding_columns):
     """generate_summary_embedding should store BLOB in DB"""
-    db_path = db_with_embedding_columns
     gen = _make_mock_generator()
 
     with patch('src.utils.summaries.execute_query') as mock_query, \

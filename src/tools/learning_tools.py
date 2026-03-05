@@ -12,16 +12,9 @@ Follows MCP best practices:
 """
 
 import logging
-from typing import Optional, Literal
-from ..database import get_db_connection, execute_query
 from ..utils.context_managers import embedding_model_context
 from ..utils.vector_store import find_top_k
-from ..utils.file_utils import read_chapter_content
-from ..utils.excerpt_utils import extract_relevant_excerpt
-from ..utils.cache import get_cache
 from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
-import numpy as np
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +34,7 @@ DEPTH_CONFIGS = {
         "description": "10-minute read. Enough to discuss intelligently with engineers.",
         "source_limit": 5,
         "min_similarity": 0.30,
-        "output_sections": ["summary", "what_it_is", "business_impact", "vocabulary", 
+        "output_sections": ["summary", "what_it_is", "business_impact", "vocabulary",
                           "decisions", "prerequisites", "related"],
         "detail_level": "moderate"
     },
@@ -50,7 +43,7 @@ DEPTH_CONFIGS = {
         "source_limit": 8,
         "min_similarity": 0.25,
         "output_sections": ["summary", "what_it_is", "how_it_works", "business_impact",
-                          "vocabulary", "decisions", "tradeoffs", "examples", 
+                          "vocabulary", "decisions", "tradeoffs", "examples",
                           "prerequisites", "related", "deep_reading"],
         "detail_level": "comprehensive"
     }
@@ -88,7 +81,7 @@ CONCEPT_ANALOGIES = {
         "analogy": "A pull request is like a formal change proposal with built-in review workflow. You're saying 'I'd like to incorporate these changes - please review before approving.'",
         "pm_context": "It's your approval gate - like a stage-gate review before changes go live."
     },
-    
+
     # Containers / Docker
     "docker": {
         "analogy": "Docker is like shipping containers for software. Just as standardized containers revolutionized global shipping (any cargo, any ship, any port), Docker standardizes how software runs (any app, any server, any cloud).",
@@ -98,7 +91,7 @@ CONCEPT_ANALOGIES = {
         "analogy": "A container is like a pre-configured, self-sufficient office in a box. It includes everything needed to do the work - the desk, computer, software, even the specific versions of tools - isolated from other 'offices.'",
         "pm_context": "Reduces deployment risk and environment dependencies. Easier to scale teams and projects."
     },
-    
+
     # Architecture
     "api": {
         "analogy": "An API is like a standardized interface in an organization. Just as your company has defined processes for how departments request resources from each other, an API defines how software systems make requests.",
@@ -113,16 +106,16 @@ CONCEPT_ANALOGIES = {
 def get_analogy(concept: str) -> dict:
     """Get business/organizational analogy for a concept"""
     concept_lower = concept.lower()
-    
+
     # Direct match
     if concept_lower in CONCEPT_ANALOGIES:
         return CONCEPT_ANALOGIES[concept_lower]
-    
+
     # Partial match
     for key, value in CONCEPT_ANALOGIES.items():
         if key in concept_lower or concept_lower in key:
             return value
-    
+
     return None
 
 
@@ -132,7 +125,7 @@ def get_analogy(concept: str) -> dict:
 
 def register_learning_tools(mcp):
     """Register learning/teaching tools with MCP server"""
-    
+
     @mcp.tool()
     def teach_concept(
         concept: str,
@@ -140,13 +133,13 @@ def register_learning_tools(mcp):
         output_format: str = "markdown"
     ) -> dict:
         """Teach a technical concept with business/organizational analogies
-        
+
         Designed for a Program Manager with MBA background who needs to learn
         technical concepts quickly and discuss them intelligently with engineers.
-        
+
         Uses your book library as the knowledge source, translating technical
         jargon into business/PM-friendly language.
-        
+
         Args:
             concept: The concept to learn (e.g., "git branching", "docker containers")
             depth: Learning depth:
@@ -156,7 +149,7 @@ def register_learning_tools(mcp):
             output_format: How to present the information:
                    - "markdown": Structured document for saving/reference (default)
                    - "conversational": Natural explanation for dialogue
-                   
+
         Returns:
             Dictionary with teaching content including:
             - concept: What was taught
@@ -165,7 +158,7 @@ def register_learning_tools(mcp):
             - content: The teaching content (markdown or conversational)
             - sources: Book chapters used
             - related_concepts: What to learn next
-            
+
         Examples:
             teach_concept("git", depth="executive")
             teach_concept("docker containers", depth="working")
@@ -178,27 +171,27 @@ def register_learning_tools(mcp):
                     "error": f"Invalid depth '{depth}'. Use: executive, working, or practitioner",
                     "valid_depths": list(DEPTH_CONFIGS.keys())
                 }
-            
+
             # Validate output format
             if output_format not in OUTPUT_FORMATS:
                 return {
                     "error": f"Invalid output_format '{output_format}'. Use: markdown or conversational",
                     "valid_formats": list(OUTPUT_FORMATS.keys())
                 }
-            
+
             config = DEPTH_CONFIGS[depth]
             logger.info(f"Teaching '{concept}' at depth={depth}, format={output_format}")
-            
+
             # Get business analogy if available
             analogy_data = get_analogy(concept)
-            
+
             # Search library for relevant content
             sources = _find_relevant_sources(
-                concept, 
+                concept,
                 limit=config["source_limit"],
                 min_similarity=config["min_similarity"]
             )
-            
+
             if not sources:
                 return {
                     "concept": concept,
@@ -206,16 +199,16 @@ def register_learning_tools(mcp):
                     "message": f"No content found about '{concept}' in your library.",
                     "suggestion": "Try a more specific term or check your library contents with list_books()"
                 }
-            
+
             # Build teaching content
             if output_format == "markdown":
                 content = _build_markdown_content(concept, depth, config, analogy_data, sources)
             else:
                 content = _build_conversational_content(concept, depth, config, analogy_data, sources)
-            
+
             # Extract related concepts from sources
             related = _extract_related_concepts(concept, sources)
-            
+
             return {
                 "concept": concept,
                 "depth": depth,
@@ -235,7 +228,7 @@ def register_learning_tools(mcp):
                 "related_concepts": related,
                 "next_steps": f"To go deeper, try: teach_concept('{concept}', depth='practitioner')" if depth != "practitioner" else None
             }
-            
+
         except Exception as e:
             logger.error(f"teach_concept error: {e}", exc_info=True)
             return {"error": str(e)}
@@ -280,17 +273,17 @@ def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0
         return []
 
 
-def _build_markdown_content(concept: str, depth: str, config: dict, 
+def _build_markdown_content(concept: str, depth: str, config: dict,
                             analogy_data: dict, sources: list) -> str:
     """Build structured markdown teaching content"""
     lines = []
-    
+
     # Header
     lines.append(f"# {concept.title()} — {depth.title()} Knowledge")
     lines.append("")
     lines.append(f"*{config['description']}*")
     lines.append("")
-    
+
     # The 60-Second Version (Business Analogy)
     lines.append("## The 60-Second Version")
     lines.append("")
@@ -301,20 +294,20 @@ def _build_markdown_content(concept: str, depth: str, config: dict,
     else:
         lines.append(_generate_quick_summary(concept, sources))
     lines.append("")
-    
+
     # What It Actually Is (if not executive)
     if depth != "executive" and sources:
         lines.append("## What It Actually Is")
         lines.append("")
         lines.append(_synthesize_definition(concept, sources))
         lines.append("")
-    
+
     # Why It Matters (Business Impact)
     lines.append("## Why It Matters (Business Impact)")
     lines.append("")
     lines.append(_generate_business_impact(concept, sources))
     lines.append("")
-    
+
     # Key Vocabulary (for working and practitioner)
     if depth in ["working", "practitioner"]:
         vocab = _extract_vocabulary(concept, sources)
@@ -326,21 +319,21 @@ def _build_markdown_content(concept: str, depth: str, config: dict,
             for term, definition in vocab.items():
                 lines.append(f"- **{term}**: {definition}")
             lines.append("")
-    
+
     # Decisions You'll Encounter (for working and practitioner)
     if depth in ["working", "practitioner"]:
         lines.append("## Common Decisions You'll Encounter")
         lines.append("")
         lines.append(_generate_decisions(concept, sources))
         lines.append("")
-    
+
     # Tradeoffs (practitioner only)
     if depth == "practitioner":
         lines.append("## Tradeoffs to Consider")
         lines.append("")
         lines.append(_generate_tradeoffs(concept, sources))
         lines.append("")
-    
+
     # Source Chapters
     if sources:
         lines.append("## Source Chapters")
@@ -350,7 +343,7 @@ def _build_markdown_content(concept: str, depth: str, config: dict,
         for s in sources[:5]:
             lines.append(f"- **{s['book_title']}** — Chapter {s['chapter_number']}: {s['chapter_title']} ({s['similarity']:.0%} relevant)")
         lines.append("")
-    
+
     return "\n".join(lines)
 
 
@@ -358,7 +351,7 @@ def _build_conversational_content(concept: str, depth: str, config: dict,
                                    analogy_data: dict, sources: list) -> str:
     """Build natural conversational teaching content"""
     parts = []
-    
+
     # Opening
     if analogy_data:
         parts.append(f"Let me explain {concept} in a way that'll click for you as a PM.")
@@ -370,20 +363,20 @@ def _build_conversational_content(concept: str, depth: str, config: dict,
         parts.append(f"Alright, let's break down {concept}.")
         parts.append("")
         parts.append(_generate_quick_summary(concept, sources))
-    
+
     # Add depth-appropriate detail
     if depth != "executive":
         parts.append("")
         parts.append("Here's what's actually happening under the hood:")
         parts.append("")
         parts.append(_synthesize_definition(concept, sources))
-    
+
     # Business impact
     parts.append("")
     parts.append("From a business perspective, this matters because:")
     parts.append("")
     parts.append(_generate_business_impact(concept, sources))
-    
+
     # Key terms for working/practitioner
     if depth in ["working", "practitioner"]:
         vocab = _extract_vocabulary(concept, sources)
@@ -393,19 +386,19 @@ def _build_conversational_content(concept: str, depth: str, config: dict,
             parts.append("")
             for term, definition in list(vocab.items())[:4]:
                 parts.append(f"• {term} — {definition}")
-    
+
     # Decisions for practitioner
     if depth == "practitioner":
         parts.append("")
         parts.append("When this comes up in planning or review meetings, you might need to weigh in on:")
         parts.append("")
         parts.append(_generate_decisions(concept, sources))
-    
+
     # Close with sources
     parts.append("")
     if sources:
         parts.append(f"This is based on what I found in your library, primarily from '{sources[0]['book_title']}' if you want to dig deeper.")
-    
+
     return "\n".join(parts)
 
 
@@ -413,14 +406,14 @@ def _generate_quick_summary(concept: str, sources: list) -> str:
     """Generate a quick summary from source excerpts"""
     if not sources:
         return f"{concept} is a technical concept used in software development."
-    
+
     # Use the most relevant excerpt as the basis
     best_excerpt = sources[0].get('excerpt', '')
     if best_excerpt:
         # Return a cleaned version of the first paragraph
         paragraphs = best_excerpt.split('\n\n')
         return paragraphs[0][:500] if paragraphs else best_excerpt[:500]
-    
+
     return f"Based on your library, {concept} appears in discussions about {sources[0]['book_title']}."
 
 
@@ -428,7 +421,7 @@ def _synthesize_definition(concept: str, sources: list) -> str:
     """Synthesize a definition from multiple sources"""
     if not sources:
         return ""
-    
+
     excerpts = [s.get('excerpt', '')[:400] for s in sources[:3] if s.get('excerpt')]
     if excerpts:
         return "\n\n".join(excerpts)

@@ -4,16 +4,14 @@ Enables finding related content and topic coverage across the library
 """
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 import numpy as np
-import io
 import re
 
-from ..database import get_db_connection, execute_query, execute_single
+from ..database import execute_single
 from ..utils.vector_store import find_top_k, cosine_similarity
 from ..utils.context_managers import embedding_model_context
-from ..utils.file_utils import read_chapter_content, get_chapter_excerpt
-from ..utils.cache import get_cache
+from ..utils.file_utils import read_chapter_content
 from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 
 if TYPE_CHECKING:

@@ -1,6 +1,6 @@
 """Context managers for resource lifecycle management
 
-Following MCP best practice from Chapter 6: "Context managers allow you to 
+Following MCP best practice from Chapter 6: "Context managers allow you to
 allocate and release resources precisely when you want to."
 
 These ensure proper initialization and cleanup of expensive resources.
@@ -43,34 +43,34 @@ def embedding_model_context() -> Generator:
 @contextmanager
 def database_transaction() -> Generator:
     """Manage database transaction lifecycle
-    
+
     Ensures proper commit/rollback of database operations.
     Use this for write operations that need transactional guarantees.
-    
+
     Usage:
         with database_transaction() as conn:
             cursor = conn.cursor()
             cursor.execute("INSERT ...")
             # Automatically commits on success
             # Automatically rolls back on error
-    
+
     Yields:
         sqlite3.Connection: Database connection with transaction
-        
+
     Raises:
         Exception: Any database error (after rollback)
-        
+
     Example:
         with database_transaction() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE chapters SET embedding = ? WHERE id = ?", 
+            cursor.execute("UPDATE chapters SET embedding = ? WHERE id = ?",
                           (embedding_bytes, chapter_id))
             # Auto-commit if successful
     """
     from ..database import get_db_connection
-    
+
     logger.debug("Starting database transaction...")
-    
+
     with get_db_connection() as conn:
         try:
             yield conn
@@ -82,20 +82,20 @@ def database_transaction() -> Generator:
             raise
 
 @contextmanager
-def batch_processing_context(batch_size: int = 32, 
+def batch_processing_context(batch_size: int = 32,
                              description: str = "Processing") -> Generator:
     """Manage batch processing operations
-    
+
     Provides progress tracking and proper cleanup for batch operations.
     Useful for processing large numbers of items (embeddings, etc.)
-    
+
     Args:
         batch_size: Number of items per batch
         description: Description for logging
-        
+
     Yields:
         dict: Context with batch_size and progress tracking
-        
+
     Example:
         with batch_processing_context(batch_size=32, description="Embeddings") as ctx:
             for i, batch in enumerate(batches):
@@ -103,16 +103,16 @@ def batch_processing_context(batch_size: int = 32,
                 ctx['processed'] += len(batch)
     """
     import time
-    
+
     start_time = time.time()
     context = {
         'batch_size': batch_size,
         'processed': 0,
         'start_time': start_time
     }
-    
+
     logger.info(f"Starting {description} (batch_size={batch_size})")
-    
+
     try:
         yield context
     finally:
@@ -124,34 +124,34 @@ def batch_processing_context(batch_size: int = 32,
         )
 
 @contextmanager
-def error_context(operation: str, 
+def error_context(operation: str,
                   default_value: Optional[any] = None,
                   raise_error: bool = True) -> Generator:
     """Wrap operations with consistent error handling
-    
+
     Provides consistent error logging and optional graceful degradation.
-    
+
     Args:
         operation: Description of operation for logging
         default_value: Value to return on error (if raise_error=False)
         raise_error: Whether to raise exception or return default
-        
+
     Yields:
         dict: Context for storing operation results
-        
+
     Example:
         with error_context("semantic search", default_value=[]) as ctx:
             ctx['result'] = perform_search()
-        
+
         results = ctx.get('result', [])
     """
     context = {}
-    
+
     try:
         yield context
     except Exception as e:
         logger.error(f"Error in {operation}: {e}", exc_info=True)
-        
+
         if raise_error:
             raise
         else:

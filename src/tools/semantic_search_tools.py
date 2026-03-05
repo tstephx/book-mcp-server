@@ -3,7 +3,6 @@
 import logging
 from typing import Optional
 
-import numpy as np
 
 from ..utils.openai_embeddings import OpenAIEmbeddingGenerator
 from ..utils.chunk_loader import load_chunk_embeddings

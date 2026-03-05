@@ -5,7 +5,7 @@ Enables personal library management with reading history and annotations
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..database import get_db_connection, execute_query, execute_single
 

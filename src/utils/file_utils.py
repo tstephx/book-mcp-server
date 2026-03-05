@@ -8,7 +8,6 @@ Integrates with cache for performance.
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from ..config import Config
 from .cache import get_cache

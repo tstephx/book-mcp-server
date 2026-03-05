@@ -26,7 +26,7 @@ def test_full_autonomy_flow(db_path):
     config = AutonomyConfig(db_path)
     collector = MetricsCollector(db_path)
     engine = CalibrationEngine(db_path, min_samples=10)
-    spot_check = SpotCheckManager(db_path)
+    SpotCheckManager(db_path)
 
     # Start in supervised mode
     assert config.get_mode() == "supervised"

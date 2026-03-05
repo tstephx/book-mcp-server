@@ -19,17 +19,10 @@ Follows MCP best practices:
 
 import logging
 import re
-from typing import Optional, Literal
 from datetime import datetime, timedelta
-from ..database import get_db_connection, execute_query, execute_single
 from ..utils.context_managers import embedding_model_context
 from ..utils.vector_store import find_top_k
-from ..utils.file_utils import read_chapter_content
-from ..utils.excerpt_utils import extract_relevant_excerpt
-from ..utils.cache import get_cache
 from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
-import numpy as np
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +150,7 @@ IMPLEMENTATION_TEMPLATES = {
         ],
         "rollback_strategy": "Maintain server snapshot before major changes. Document rollback procedures for each phase. Keep previous configs in version control."
     },
-    
+
     "web_app": {
         "name": "Web Application",
         "phases": [
@@ -259,7 +252,7 @@ IMPLEMENTATION_TEMPLATES = {
         ],
         "rollback_strategy": "Blue-green deployment or canary releases. Database migrations must be reversible. Feature flags for gradual rollout."
     },
-    
+
     "data_pipeline": {
         "name": "Data Pipeline / Analytics",
         "phases": [
@@ -355,7 +348,7 @@ IMPLEMENTATION_TEMPLATES = {
         ],
         "rollback_strategy": "Maintain previous pipeline version. Implement data versioning. Have manual backfill procedures ready."
     },
-    
+
     "automation": {
         "name": "Automation / Scripting",
         "phases": [
@@ -435,7 +428,7 @@ IMPLEMENTATION_TEMPLATES = {
         ],
         "rollback_strategy": "Keep manual process documented. Implement kill switch. Version control all scripts."
     },
-    
+
     "mcp_server": {
         "name": "MCP Server Development",
         "phases": [
@@ -587,9 +580,9 @@ GENERIC_TEMPLATE = {
 def _detect_project_type(goal: str) -> tuple[str, dict]:
     """Detect project type and return appropriate template"""
     goal_lower = goal.lower()
-    
+
     type_keywords = {
-        "vps": ["vps", "server", "hosting", "hetzner", "digitalocean", "linode", 
+        "vps": ["vps", "server", "hosting", "hetzner", "digitalocean", "linode",
                 "virtual private", "self-host", "deploy server", "linux server"],
         "web_app": ["web app", "website", "frontend", "backend", "full stack",
                     "react", "vue", "django", "flask", "fastapi", "api"],
@@ -600,19 +593,19 @@ def _detect_project_type(goal: str) -> tuple[str, dict]:
         "mcp_server": ["mcp server", "mcp tool", "model context protocol",
                        "claude tool", "ai tool"]
     }
-    
+
     best_match = None
     best_score = 0
-    
+
     for project_type, keywords in type_keywords.items():
         score = sum(1 for kw in keywords if kw in goal_lower)
         if score > best_score:
             best_score = score
             best_match = project_type
-    
+
     if best_match and best_score > 0:
         return best_match, IMPLEMENTATION_TEMPLATES[best_match]
-    
+
     return "generic", GENERIC_TEMPLATE
 
 
@@ -667,30 +660,30 @@ def _calculate_timeline(phases: list, start_date: datetime = None) -> list:
     """Calculate timeline with start/end dates for each phase"""
     if start_date is None:
         start_date = datetime.now()
-    
+
     timeline = []
     current_date = start_date
-    
+
     for phase in phases:
         duration = phase.get('duration_days', 5)
         end_date = current_date + timedelta(days=duration)
-        
+
         timeline.append({
             "phase": phase['name'],
             "start": current_date.strftime("%Y-%m-%d"),
             "end": end_date.strftime("%Y-%m-%d"),
             "duration_days": duration
         })
-        
+
         current_date = end_date + timedelta(days=1)  # 1 day buffer
-    
+
     return timeline
 
 
 def _generate_prompts_for_phase(phase: dict, project_type: str) -> list:
     """Generate actionable prompts for a phase"""
     prompts = []
-    
+
     # Action prompts from objectives
     for obj in phase.get('objectives', []):
         prompts.append({
@@ -698,7 +691,7 @@ def _generate_prompts_for_phase(phase: dict, project_type: str) -> list:
             "prompt": f"Help me {obj.lower()}",
             "context": phase['name']
         })
-    
+
     # Decision prompts
     for decision in phase.get('decisions', []):
         prompts.append({
@@ -706,7 +699,7 @@ def _generate_prompts_for_phase(phase: dict, project_type: str) -> list:
             "prompt": f"Compare options for: {decision['question']} Options: {', '.join(decision['options'])}. Consider: {decision['considerations']}",
             "context": phase['name']
         })
-    
+
     # Research prompts from search terms
     for term in phase.get('search_terms', []):
         prompts.append({
@@ -714,7 +707,7 @@ def _generate_prompts_for_phase(phase: dict, project_type: str) -> list:
             "prompt": f"Search my book library for best practices on: {term}",
             "context": phase['name']
         })
-    
+
     # Risk mitigation prompts
     for risk in phase.get('risks', []):
         prompts.append({
@@ -722,7 +715,7 @@ def _generate_prompts_for_phase(phase: dict, project_type: str) -> list:
             "prompt": f"How do I mitigate this risk: {risk}",
             "context": phase['name']
         })
-    
+
     return prompts
 
 
@@ -738,7 +731,7 @@ def _build_implementation_markdown(
 ) -> str:
     """Build comprehensive implementation plan markdown"""
     lines = []
-    
+
     # Header
     lines.append(f"# Implementation Plan: {template['name']}")
     lines.append(f"## {goal}")
@@ -747,11 +740,11 @@ def _build_implementation_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Executive Summary
     total_days = sum(t['duration_days'] for t in timeline)
     adjusted_days = total_days if team_size == 1 else max(total_days // team_size, total_days // 2)
-    
+
     lines.append("## 📋 Executive Summary")
     lines.append("")
     lines.append(f"**Project:** {goal}")
@@ -761,7 +754,7 @@ def _build_implementation_markdown(
     lines.append(f"**Start Date:** {timeline[0]['start']}")
     lines.append(f"**Target Completion:** {timeline[-1]['end']}")
     lines.append("")
-    
+
     # Success Criteria
     lines.append("### Success Criteria")
     lines.append("")
@@ -770,7 +763,7 @@ def _build_implementation_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Timeline Overview
     lines.append("## 📅 Timeline Overview")
     lines.append("")
@@ -783,25 +776,25 @@ def _build_implementation_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Detailed Phases
     for i, phase in enumerate(template['phases'], 1):
         phase_timeline = timeline[i-1]
         phase_practices = best_practices.get(phase['name'], [])
-        
+
         lines.append(f"## Phase {i}: {phase['name']}")
         lines.append("")
         lines.append(f"**Duration:** {phase_timeline['duration_days']} days")
         lines.append(f"**Timeline:** {phase_timeline['start']} → {phase_timeline['end']}")
         lines.append("")
-        
+
         # Objectives
         lines.append("### 🎯 Objectives")
         lines.append("")
         for obj in phase.get('objectives', []):
             lines.append(f"- [ ] {obj}")
         lines.append("")
-        
+
         # Deliverables
         if phase.get('deliverables'):
             lines.append("### 📦 Deliverables")
@@ -809,7 +802,7 @@ def _build_implementation_markdown(
             for d in phase['deliverables']:
                 lines.append(f"- {d}")
             lines.append("")
-        
+
         # Decisions
         if phase.get('decisions'):
             lines.append("### 🤔 Decisions Required")
@@ -819,7 +812,7 @@ def _build_implementation_markdown(
                 lines.append(f"- Options: {', '.join(decision['options'])}")
                 lines.append(f"- Consider: {decision['considerations']}")
                 lines.append("")
-        
+
         # Risks
         if phase.get('risks'):
             lines.append("### ⚠️ Risks")
@@ -827,7 +820,7 @@ def _build_implementation_markdown(
             for risk in phase['risks']:
                 lines.append(f"- {risk}")
             lines.append("")
-        
+
         # Gates
         if phase.get('gates'):
             lines.append("### ✅ Phase Gates (Exit Criteria)")
@@ -835,7 +828,7 @@ def _build_implementation_markdown(
             for gate in phase['gates']:
                 lines.append(f"- [ ] {gate}")
             lines.append("")
-        
+
         # Best Practices from Library
         if phase_practices:
             lines.append("### 📚 Recommended Reading")
@@ -843,10 +836,10 @@ def _build_implementation_markdown(
             for bp in phase_practices[:3]:
                 lines.append(f"- **{bp['book_title']}** — Ch. {bp['chapter_number']}: {bp['chapter_title']}")
             lines.append("")
-        
+
         lines.append("---")
         lines.append("")
-    
+
     # Rollback Strategy
     lines.append("## 🔄 Rollback Strategy")
     lines.append("")
@@ -854,14 +847,14 @@ def _build_implementation_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Prompts Section
     if include_prompts and all_prompts:
         lines.append("## 💬 Implementation Prompts")
         lines.append("")
         lines.append("*Copy these prompts to get help with specific tasks:*")
         lines.append("")
-        
+
         # Group by phase
         current_phase = None
         for prompt in all_prompts:
@@ -869,20 +862,20 @@ def _build_implementation_markdown(
                 current_phase = prompt['context']
                 lines.append(f"### {current_phase}")
                 lines.append("")
-            
+
             type_emoji = {
                 "action": "🔨",
                 "decision": "🤔",
                 "research": "🔍",
                 "risk": "⚠️"
             }.get(prompt['type'], "📝")
-            
+
             lines.append(f"{type_emoji} **{prompt['type'].title()}:** `{prompt['prompt']}`")
             lines.append("")
-        
+
         lines.append("---")
         lines.append("")
-    
+
     # Footer
     lines.append("## 📝 Notes")
     lines.append("")
@@ -894,7 +887,7 @@ def _build_implementation_markdown(
     lines.append("---")
     lines.append("")
     lines.append(f"*Generated from book library with {len([bp for bps in best_practices.values() for bp in bps])} relevant chapters identified*")
-    
+
     return "\n".join(lines)
 
 
@@ -904,7 +897,7 @@ def _build_implementation_markdown(
 
 def register_project_planning_tools(mcp):
     """Register project planning tools with MCP server"""
-    
+
     @mcp.tool()
     def generate_implementation_plan(
         goal: str,
@@ -944,7 +937,7 @@ def register_project_planning_tools(mcp):
         """
         try:
             logger.info(f"Generating implementation plan for: {goal}")
-            
+
             # Parse start date
             if start_date:
                 try:
@@ -953,14 +946,14 @@ def register_project_planning_tools(mcp):
                     parsed_start = datetime.now()
             else:
                 parsed_start = datetime.now()
-            
+
             # Detect project type
             project_type, template = _detect_project_type(goal)
             logger.info(f"Detected project type: {project_type}")
-            
+
             # Calculate timeline
             timeline = _calculate_timeline(template['phases'], parsed_start)
-            
+
             # Search for best practices per phase
             best_practices = {}
             for phase in template['phases']:
@@ -968,20 +961,20 @@ def register_project_planning_tools(mcp):
                 if search_terms:
                     practices = _search_for_best_practices(search_terms, limit=3)
                     best_practices[phase['name']] = practices
-            
+
             # Generate prompts for all phases
             all_prompts = []
             if include_prompts:
                 for phase in template['phases']:
                     phase_prompts = _generate_prompts_for_phase(phase, project_type)
                     all_prompts.extend(phase_prompts)
-            
+
             # Build markdown
             plan_markdown = _build_implementation_markdown(
                 goal, project_type, template, timeline,
                 best_practices, all_prompts, team_size, include_prompts
             )
-            
+
             # Save to file if requested
             file_path = None
             if save_to_file:
@@ -989,7 +982,7 @@ def register_project_planning_tools(mcp):
                     safe_name = re.sub(r'[^\w\s-]', '', goal.lower())
                     safe_name = re.sub(r'[\s]+', '-', safe_name)[:50]
                     output_path = f"implementation-plan-{safe_name}.md"
-                
+
                 try:
                     with open(output_path, 'w') as f:
                         f.write(plan_markdown)
@@ -997,11 +990,11 @@ def register_project_planning_tools(mcp):
                     logger.info(f"Saved implementation plan to: {output_path}")
                 except Exception as e:
                     logger.warning(f"Could not save file: {e}")
-            
+
             # Calculate totals
             total_days = sum(t['duration_days'] for t in timeline)
             total_chapters = sum(len(bps) for bps in best_practices.values())
-            
+
             return {
                 "goal": goal,
                 "project_type": template['name'],
@@ -1030,29 +1023,29 @@ def register_project_planning_tools(mcp):
                 "plan": plan_markdown,
                 "file_path": file_path
             }
-            
+
         except Exception as e:
             logger.error(f"generate_implementation_plan error: {e}", exc_info=True)
             return {"error": str(e)}
-    
-    
+
+
     @mcp.tool()
     def list_implementation_templates() -> dict:
         """List available implementation plan templates
-        
+
         Shows the built-in project templates with their phases, typical
         durations, and what each template covers.
-        
+
         Returns:
             Dictionary with:
             - templates: List of templates with phases and durations
             - usage_tip: How to use with generate_implementation_plan
-            
+
         Examples:
             list_implementation_templates()
         """
         templates = []
-        
+
         for template_id, config in IMPLEMENTATION_TEMPLATES.items():
             total_days = sum(p.get('duration_days', 5) for p in config['phases'])
             templates.append({
@@ -1062,14 +1055,14 @@ def register_project_planning_tools(mcp):
                 "total_days": total_days,
                 "success_criteria_count": len(config.get('success_criteria', []))
             })
-        
+
         return {
             "templates": templates,
             "usage_tip": "Use generate_implementation_plan('your goal') - the system auto-detects the best template",
             "customization": "Templates are customized based on your goal. Specific keywords trigger specific templates."
         }
-    
-    
+
+
     @mcp.tool()
     def get_phase_prompts(
         goal: str,
@@ -1077,10 +1070,10 @@ def register_project_planning_tools(mcp):
         prompt_type: str = "all"
     ) -> dict:
         """Get actionable prompts for a specific phase or entire project
-        
+
         Generates prompts you can use to get help with specific tasks,
         make decisions, research topics, or mitigate risks.
-        
+
         Args:
             goal: Your project goal (used to detect project type)
             phase_name: Specific phase to get prompts for (empty = all phases)
@@ -1090,10 +1083,10 @@ def register_project_planning_tools(mcp):
                         - "decision": Decision-making prompts
                         - "research": Research/learning prompts
                         - "risk": Risk mitigation prompts
-        
+
         Returns:
             Dictionary with prompts organized by phase
-            
+
         Examples:
             get_phase_prompts("Build a VPS")
             get_phase_prompts("Build a VPS", phase_name="Security")
@@ -1101,21 +1094,21 @@ def register_project_planning_tools(mcp):
         """
         try:
             project_type, template = _detect_project_type(goal)
-            
+
             all_prompts = {}
-            
+
             for phase in template['phases']:
                 if phase_name and phase['name'].lower() != phase_name.lower():
                     continue
-                
+
                 phase_prompts = _generate_prompts_for_phase(phase, project_type)
-                
+
                 if prompt_type != "all":
                     phase_prompts = [p for p in phase_prompts if p['type'] == prompt_type]
-                
+
                 if phase_prompts:
                     all_prompts[phase['name']] = phase_prompts
-            
+
             return {
                 "goal": goal,
                 "project_type": template['name'],
@@ -1126,16 +1119,16 @@ def register_project_planning_tools(mcp):
                 "prompts": all_prompts,
                 "total_prompts": sum(len(p) for p in all_prompts.values())
             }
-            
+
         except Exception as e:
             logger.error(f"get_phase_prompts error: {e}", exc_info=True)
             return {"error": str(e)}
 
-    
+
     # =========================================================================
     # BRD (BUSINESS REQUIREMENTS DOCUMENT) TOOL
     # =========================================================================
-    
+
     @mcp.tool()
     def generate_brd(
         goal: str,
@@ -1146,11 +1139,11 @@ def register_project_planning_tools(mcp):
         output_path: str = ""
     ) -> dict:
         """Generate a Business Requirements Document (BRD) for a project
-        
+
         Creates a PM-ready BRD that translates technical projects into
         business language. Includes problem statement, scope, requirements,
         success metrics, risks, and stakeholder analysis.
-        
+
         Args:
             goal: What you want to build or achieve
             template_style: Document format:
@@ -1161,7 +1154,7 @@ def register_project_planning_tools(mcp):
             include_technical: Include technical requirements section (default: True)
             save_to_file: If True, saves the BRD to a markdown file
             output_path: Custom path for saved file (optional)
-                   
+
         Returns:
             Dictionary with:
             - goal: Your stated goal
@@ -1169,16 +1162,16 @@ def register_project_planning_tools(mcp):
             - brd: Full BRD document (markdown)
             - sections: Individual sections for reference
             - file_path: Path if saved to file
-            
+
         Examples:
             generate_brd("Build a VPS to host my portfolio")
             generate_brd("Create a data pipeline", template_style="lean")
-            generate_brd("Build internal tool", template_style="enterprise", 
+            generate_brd("Build internal tool", template_style="enterprise",
                         business_context="Team of 3, Q2 deadline, $5k budget")
         """
         try:
             logger.info(f"Generating BRD for: {goal}")
-            
+
             # Validate template style
             valid_styles = ["standard", "lean", "enterprise"]
             if template_style not in valid_styles:
@@ -1186,17 +1179,17 @@ def register_project_planning_tools(mcp):
                     "error": f"Invalid template_style '{template_style}'. Use: {', '.join(valid_styles)}",
                     "valid_styles": valid_styles
                 }
-            
+
             # Detect project type
             project_type, impl_template = _detect_project_type(goal)
             brd_config = _get_brd_template(project_type)
-            
+
             # Search library for relevant requirements/best practices
             best_practices = _search_for_brd_content(
                 brd_config.get('search_terms', [goal]),
                 limit=5
             )
-            
+
             # Build BRD sections
             sections = _build_brd_sections(
                 goal=goal,
@@ -1208,7 +1201,7 @@ def register_project_planning_tools(mcp):
                 best_practices=best_practices,
                 template_style=template_style
             )
-            
+
             # Build full document
             brd_markdown = _build_brd_markdown(
                 goal=goal,
@@ -1217,7 +1210,7 @@ def register_project_planning_tools(mcp):
                 sections=sections,
                 template_style=template_style
             )
-            
+
             # Save to file if requested
             file_path = None
             if save_to_file:
@@ -1225,7 +1218,7 @@ def register_project_planning_tools(mcp):
                     safe_name = re.sub(r'[^\w\s-]', '', goal.lower())
                     safe_name = re.sub(r'[\s]+', '-', safe_name)[:50]
                     output_path = f"brd-{safe_name}.md"
-                
+
                 try:
                     with open(output_path, 'w') as f:
                         f.write(brd_markdown)
@@ -1233,7 +1226,7 @@ def register_project_planning_tools(mcp):
                     logger.info(f"Saved BRD to: {output_path}")
                 except Exception as e:
                     logger.warning(f"Could not save file: {e}")
-            
+
             return {
                 "goal": goal,
                 "project_type": brd_config['name'],
@@ -1244,16 +1237,16 @@ def register_project_planning_tools(mcp):
                 "brd": brd_markdown,
                 "file_path": file_path
             }
-            
+
         except Exception as e:
             logger.error(f"generate_brd error: {e}", exc_info=True)
             return {"error": str(e)}
-    
-    
+
+
     # =========================================================================
     # WIREFRAME / ARCHITECTURE BRIEF TOOL
     # =========================================================================
-    
+
     @mcp.tool()
     def generate_wireframe_brief(
         goal: str,
@@ -1264,11 +1257,11 @@ def register_project_planning_tools(mcp):
         output_path: str = ""
     ) -> dict:
         """Generate an architecture wireframe/brief for a project
-        
+
         Creates a visual and textual overview of system architecture suitable
         for different audiences. Includes component diagrams, data flows,
         technology decisions, and integration points.
-        
+
         Args:
             goal: What you want to build or achieve
             audience: Target audience for the brief:
@@ -1279,7 +1272,7 @@ def register_project_planning_tools(mcp):
             custom_components: Override default components with custom list
             save_to_file: If True, saves the brief to a markdown file
             output_path: Custom path for saved file (optional)
-                   
+
         Returns:
             Dictionary with:
             - goal: Your stated goal
@@ -1290,7 +1283,7 @@ def register_project_planning_tools(mcp):
             - mermaid_diagram: Diagram code (if include_diagram=True)
             - brief: Full architecture brief (markdown)
             - file_path: Path if saved to file
-            
+
         Examples:
             generate_wireframe_brief("Build a VPS on Hetzner")
             generate_wireframe_brief("Build a web app", audience="executive")
@@ -1298,7 +1291,7 @@ def register_project_planning_tools(mcp):
         """
         try:
             logger.info(f"Generating wireframe brief for: {goal}")
-            
+
             # Validate audience
             valid_audiences = ["executive", "stakeholder", "technical"]
             if audience not in valid_audiences:
@@ -1306,15 +1299,15 @@ def register_project_planning_tools(mcp):
                     "error": f"Invalid audience '{audience}'. Use: {', '.join(valid_audiences)}",
                     "valid_audiences": valid_audiences
                 }
-            
+
             # Detect project type
             project_type, impl_template = _detect_project_type(goal)
             arch_template = _get_architecture_template(project_type)
-            
+
             # Search library for architecture best practices
             search_terms = ["architecture", "system design"] + list(arch_template.get('components', [{}])[0].get('technologies', []))[:2]
             best_practices = _search_for_architecture_content(search_terms, limit=5)
-            
+
             # Build the brief markdown
             brief_markdown = _build_wireframe_markdown(
                 goal=goal,
@@ -1324,10 +1317,10 @@ def register_project_planning_tools(mcp):
                 best_practices=best_practices,
                 custom_components=custom_components or []
             )
-            
+
             # Adjust content for audience
             brief_markdown = _adjust_for_audience(brief_markdown, audience)
-            
+
             # Save to file if requested
             file_path = None
             if save_to_file:
@@ -1335,7 +1328,7 @@ def register_project_planning_tools(mcp):
                     safe_name = re.sub(r'[^\w\s-]', '', goal.lower())
                     safe_name = re.sub(r'[\s]+', '-', safe_name)[:50]
                     output_path = f"architecture-{safe_name}.md"
-                
+
                 try:
                     with open(output_path, 'w') as f:
                         f.write(brief_markdown)
@@ -1343,7 +1336,7 @@ def register_project_planning_tools(mcp):
                     logger.info(f"Saved architecture brief to: {output_path}")
                 except Exception as e:
                     logger.warning(f"Could not save file: {e}")
-            
+
             return {
                 "goal": goal,
                 "project_type": arch_template['name'],
@@ -1358,22 +1351,22 @@ def register_project_planning_tools(mcp):
                 "brief": brief_markdown,
                 "file_path": file_path
             }
-            
+
         except Exception as e:
             logger.error(f"generate_wireframe_brief error: {e}", exc_info=True)
             return {"error": str(e)}
-    
-    
+
+
     @mcp.tool()
     def list_architecture_templates() -> dict:
         """List available architecture templates
-        
+
         Shows the built-in architecture templates with their components
         and technology stacks.
-        
+
         Returns:
             Dictionary with available templates and their details
-            
+
         Examples:
             list_architecture_templates()
         """
@@ -1389,22 +1382,22 @@ def register_project_planning_tools(mcp):
                     "integration_count": len(config.get('integrations', [])),
                     "has_diagram": bool(config.get('mermaid_diagram'))
                 })
-            
+
             return {
                 "templates": templates,
                 "usage_tip": "Use generate_wireframe_brief('your goal') - the system auto-detects the best template",
                 "audiences": ["executive", "stakeholder", "technical"]
             }
-            
+
         except Exception as e:
             logger.error(f"list_architecture_templates error: {e}", exc_info=True)
             return {"error": str(e)}
-    
-    
+
+
     # =========================================================================
     # ANALYZE PROJECT - ORCHESTRATOR TOOL
     # =========================================================================
-    
+
     @mcp.tool()
     def analyze_project(
         goal: str,
@@ -1414,12 +1407,12 @@ def register_project_planning_tools(mcp):
         output_dir: str = ""
     ) -> dict:
         """Analyze a project goal and optionally generate all planning artifacts
-        
+
         This is the entry-point tool that can:
         1. Analyze your goal and recommend next steps (overview mode)
         2. Generate essential artifacts quickly (quick mode)
         3. Generate comprehensive project documentation (full mode)
-        
+
         Args:
             goal: What you want to build or achieve
             mode: Analysis depth:
@@ -1431,7 +1424,7 @@ def register_project_planning_tools(mcp):
                       If None, uses mode defaults.
             save_artifacts: If True, saves all generated artifacts to files
             output_dir: Directory for saved files (default: current directory)
-                   
+
         Returns:
             Dictionary with:
             - goal: Your stated goal
@@ -1441,7 +1434,7 @@ def register_project_planning_tools(mcp):
             - recommendations: Suggested next steps
             - artifacts: Generated artifacts (if mode != "overview")
             - file_paths: Saved file paths (if save_artifacts=True)
-            
+
         Examples:
             analyze_project("Build a VPS on Hetzner")  # Quick overview
             analyze_project("Build a web app", mode="quick")  # Essential docs
@@ -1449,7 +1442,7 @@ def register_project_planning_tools(mcp):
         """
         try:
             logger.info(f"Analyzing project: {goal} (mode={mode})")
-            
+
             # Validate mode
             valid_modes = ["overview", "quick", "full"]
             if mode not in valid_modes:
@@ -1457,15 +1450,15 @@ def register_project_planning_tools(mcp):
                     "error": f"Invalid mode '{mode}'. Use: {', '.join(valid_modes)}",
                     "valid_modes": valid_modes
                 }
-            
+
             # Detect project type and get templates
             project_type, impl_template = _detect_project_type(goal)
             arch_template = _get_architecture_template(project_type)
             brd_template = _get_brd_template(project_type)
-            
+
             # Analyze complexity
             complexity = _assess_complexity(impl_template, arch_template)
-            
+
             # Build analysis
             analysis = _build_project_analysis(
                 goal=goal,
@@ -1475,7 +1468,7 @@ def register_project_planning_tools(mcp):
                 brd_template=brd_template,
                 complexity=complexity
             )
-            
+
             # Build recommendations
             recommendations = _build_recommendations(
                 goal=goal,
@@ -1483,7 +1476,7 @@ def register_project_planning_tools(mcp):
                 complexity=complexity,
                 mode=mode
             )
-            
+
             result = {
                 "goal": goal,
                 "project_type": impl_template['name'],
@@ -1492,7 +1485,7 @@ def register_project_planning_tools(mcp):
                 "analysis": analysis,
                 "recommendations": recommendations
             }
-            
+
             # Generate artifacts if requested
             if mode != "overview":
                 # Determine which artifacts to generate
@@ -1502,7 +1495,7 @@ def register_project_planning_tools(mcp):
                     artifact_list = ["brd", "implementation_plan"]
                 else:  # full
                     artifact_list = ["learning_path", "brd", "architecture", "implementation_plan"]
-                
+
                 generated = _generate_artifacts(
                     goal=goal,
                     project_type=project_type,
@@ -1513,17 +1506,17 @@ def register_project_planning_tools(mcp):
                     save_artifacts=save_artifacts,
                     output_dir=output_dir
                 )
-                
+
                 result["artifacts"] = generated["artifacts"]
                 result["artifact_summary"] = generated["summary"]
                 if save_artifacts:
                     result["file_paths"] = generated.get("file_paths", [])
-            
+
             # Add overview markdown
             result["overview"] = _build_analysis_markdown(result, mode)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"analyze_project error: {e}", exc_info=True)
             return {"error": str(e)}
@@ -1617,7 +1610,7 @@ BRD_TEMPLATES = {
         ],
         "search_terms": ["server requirements", "VPS security", "infrastructure planning", "web hosting"]
     },
-    
+
     "web_app": {
         "name": "Web Application",
         "problem_statement": "Need a custom web application to solve a specific business problem that cannot be adequately addressed by existing off-the-shelf solutions.",
@@ -1702,7 +1695,7 @@ BRD_TEMPLATES = {
         ],
         "search_terms": ["web development requirements", "application architecture", "API design", "user authentication"]
     },
-    
+
     "data_pipeline": {
         "name": "Data Pipeline / Analytics",
         "problem_statement": "Need automated, reliable data processing to transform raw data into actionable insights, reducing manual effort and enabling data-driven decisions.",
@@ -1786,7 +1779,7 @@ BRD_TEMPLATES = {
         ],
         "search_terms": ["ETL requirements", "data pipeline design", "data quality", "data warehouse"]
     },
-    
+
     "automation": {
         "name": "Automation / Scripting",
         "problem_statement": "Repetitive manual tasks are consuming valuable time and introducing human error. Automation will improve efficiency, accuracy, and free up resources for higher-value work.",
@@ -1862,7 +1855,7 @@ BRD_TEMPLATES = {
         ],
         "search_terms": ["automation requirements", "scripting best practices", "process automation"]
     },
-    
+
     "mcp_server": {
         "name": "MCP Server Development",
         "problem_statement": "Need to extend AI assistant capabilities with custom tools that integrate with specific data sources, APIs, or workflows not available out-of-the-box.",
@@ -1997,7 +1990,7 @@ def _build_brd_sections(
     template_style: str
 ) -> dict:
     """Build individual BRD sections"""
-    
+
     sections = {
         "executive_summary": _build_executive_summary(goal, brd_config, business_context),
         "problem_statement": brd_config.get('problem_statement', ''),
@@ -2019,7 +2012,7 @@ def _build_brd_sections(
         "timeline_summary": _build_timeline_summary(impl_template),
         "best_practices": best_practices
     }
-    
+
     # Add enterprise sections if needed
     if template_style == "enterprise":
         sections["governance"] = {
@@ -2033,7 +2026,7 @@ def _build_brd_sections(
             "security": "Standard security review required",
             "data_privacy": "Data handling per company policy"
         }
-    
+
     return sections
 
 
@@ -2041,14 +2034,14 @@ def _build_executive_summary(goal: str, brd_config: dict, business_context: str)
     """Build executive summary paragraph"""
     summary = f"This document outlines the business requirements for: {goal}. "
     summary += f"{brd_config.get('problem_statement', '')} "
-    
+
     if business_context:
         summary += f"Additional context: {business_context}. "
-    
+
     objectives = brd_config.get('business_objectives', [])[:3]
     if objectives:
         summary += f"Key objectives include: {', '.join(objectives[:3]).lower()}."
-    
+
     return summary
 
 
@@ -2056,7 +2049,7 @@ def _build_timeline_summary(impl_template: dict) -> dict:
     """Extract timeline summary from implementation template"""
     phases = impl_template.get('phases', [])
     total_days = sum(p.get('duration_days', 5) for p in phases)
-    
+
     return {
         "total_days": total_days,
         "total_weeks": round(total_days / 5),
@@ -2076,19 +2069,19 @@ def _build_brd_markdown(
 ) -> str:
     """Build full BRD markdown document"""
     lines = []
-    
+
     # Header
-    lines.append(f"# Business Requirements Document")
+    lines.append("# Business Requirements Document")
     lines.append(f"## {goal}")
     lines.append("")
     lines.append(f"**Document Type:** BRD ({template_style.title()} Template)")
     lines.append(f"**Project Type:** {brd_config['name']}")
     lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d')}")
-    lines.append(f"**Status:** Draft")
+    lines.append("**Status:** Draft")
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Table of Contents (for standard and enterprise)
     if template_style in ["standard", "enterprise"]:
         lines.append("## Table of Contents")
@@ -2111,13 +2104,13 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-    
+
     # Executive Summary
     lines.append("## 1. Executive Summary")
     lines.append("")
     lines.append(sections['executive_summary'])
     lines.append("")
-    
+
     if template_style == "lean":
         # Lean version - condensed format
         lines.append("---")
@@ -2147,12 +2140,12 @@ def _build_brd_markdown(
         timeline = sections['timeline_summary']
         lines.append(f"**Estimated Duration:** {timeline['total_days']} days (~{timeline['total_weeks']} weeks)")
         lines.append("")
-        
+
     else:
         # Standard and Enterprise - full format
         lines.append("---")
         lines.append("")
-        
+
         # Problem Statement
         lines.append("## 2. Problem Statement")
         lines.append("")
@@ -2160,7 +2153,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Business Objectives
         lines.append("## 3. Business Objectives")
         lines.append("")
@@ -2169,7 +2162,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Scope
         lines.append("## 4. Scope")
         lines.append("")
@@ -2185,7 +2178,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Stakeholders
         lines.append("## 5. Stakeholders")
         lines.append("")
@@ -2196,7 +2189,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Requirements
         lines.append("## 6. Requirements")
         lines.append("")
@@ -2207,7 +2200,7 @@ def _build_brd_markdown(
         for req in sections['requirements']['functional']:
             lines.append(f"| {req['id']} | {req['requirement']} | {req['priority']} |")
         lines.append("")
-        
+
         if sections['requirements']['non_functional']:
             lines.append("### 6.2 Non-Functional Requirements")
             lines.append("")
@@ -2218,7 +2211,7 @@ def _build_brd_markdown(
             lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Success Metrics
         lines.append("## 7. Success Metrics")
         lines.append("")
@@ -2229,7 +2222,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Assumptions & Constraints
         lines.append("## 8. Assumptions & Constraints")
         lines.append("")
@@ -2245,7 +2238,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Dependencies
         lines.append("## 9. Dependencies")
         lines.append("")
@@ -2259,7 +2252,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Risks
         lines.append("## 10. Risks & Mitigations")
         lines.append("")
@@ -2270,7 +2263,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Timeline
         lines.append("## 11. Timeline")
         lines.append("")
@@ -2286,7 +2279,7 @@ def _build_brd_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Enterprise-only sections
         if template_style == "enterprise":
             lines.append("## 12. Governance")
@@ -2302,7 +2295,7 @@ def _build_brd_markdown(
             lines.append("")
             lines.append("---")
             lines.append("")
-            
+
             lines.append("## 13. Compliance")
             lines.append("")
             comp = sections.get('compliance', {})
@@ -2314,7 +2307,7 @@ def _build_brd_markdown(
             lines.append("")
             lines.append("---")
             lines.append("")
-        
+
         # Appendix
         appendix_num = 14 if template_style == "enterprise" else 12
         lines.append(f"## {appendix_num}. Appendix: Reference Materials")
@@ -2331,7 +2324,7 @@ def _build_brd_markdown(
         lines.append("- Technical Architecture (if applicable)")
         lines.append("- User Stories / Acceptance Criteria (if applicable)")
         lines.append("")
-    
+
     # Footer
     lines.append("---")
     lines.append("")
@@ -2344,7 +2337,7 @@ def _build_brd_markdown(
     lines.append("---")
     lines.append("")
     lines.append("*This BRD was generated using the book-library MCP server. Review and customize before formal use.*")
-    
+
     return "\n".join(lines)
 
 
@@ -2425,13 +2418,13 @@ ARCHITECTURE_TEMPLATES = {
     subgraph Internet
         Users[Users/Clients]
     end
-    
+
     subgraph VPS["VPS Instance"]
         subgraph Network["Network Layer"]
             FW[Firewall/UFW]
             RP[Reverse Proxy<br/>nginx]
         end
-        
+
         subgraph Platform["Container Platform"]
             Docker[Docker Engine]
             subgraph Apps["Applications"]
@@ -2440,24 +2433,24 @@ ARCHITECTURE_TEMPLATES = {
                 App3[API Service]
             end
         end
-        
+
         subgraph Data["Data Layer"]
             DB[(Database<br/>PostgreSQL)]
             Cache[(Cache<br/>Redis)]
         end
-        
+
         subgraph Ops["Operations"]
             Mon[Monitoring<br/>Uptime Kuma]
             Backup[Backup<br/>restic]
         end
     end
-    
+
     subgraph External["External Services"]
         DNS[DNS Provider]
         SSL[Let's Encrypt]
         S3[Cloud Storage]
     end
-    
+
     Users -->|HTTPS| FW
     FW --> RP
     RP --> App1
@@ -2498,7 +2491,7 @@ ARCHITECTURE_TEMPLATES = {
             }
         ]
     },
-    
+
     "web_app": {
         "name": "Web Application",
         "description": "Full-stack web application with frontend, backend API, and database",
@@ -2565,30 +2558,30 @@ ARCHITECTURE_TEMPLATES = {
         Browser[Web Browser]
         Mobile[Mobile App]
     end
-    
+
     subgraph Frontend["Frontend Layer"]
         UI[React/Vue App]
         Static[Static Assets]
     end
-    
+
     subgraph Backend["Backend Layer"]
         API[API Server<br/>FastAPI/Django]
         Auth[Auth Service<br/>JWT/OAuth]
         Workers[Background Workers<br/>Celery]
     end
-    
+
     subgraph Data["Data Layer"]
         DB[(Primary DB<br/>PostgreSQL)]
         Cache[(Cache<br/>Redis)]
         Files[File Storage<br/>S3]
     end
-    
+
     subgraph External["External Services"]
         Email[Email Service]
         Payment[Payment Gateway]
         Analytics[Analytics]
     end
-    
+
     Browser --> UI
     Mobile --> API
     UI --> API
@@ -2629,7 +2622,7 @@ ARCHITECTURE_TEMPLATES = {
             }
         ]
     },
-    
+
     "data_pipeline": {
         "name": "Data Pipeline / Analytics",
         "description": "ETL/ELT pipeline for processing and analyzing data",
@@ -2704,36 +2697,36 @@ ARCHITECTURE_TEMPLATES = {
         DB1[(Source DBs)]
         Files[Files/CSV]
     end
-    
+
     subgraph Extract["Extract"]
         Ingest[Ingestion<br/>Python/Airbyte]
     end
-    
+
     subgraph Stage["Staging"]
         Raw[(Raw Layer<br/>S3/Staging)]
     end
-    
+
     subgraph Transform["Transform"]
         DBT[Transformation<br/>dbt/pandas]
         DQ[Data Quality<br/>Great Expectations]
     end
-    
+
     subgraph Load["Load"]
         DW[(Data Warehouse<br/>PostgreSQL)]
         Marts[(Data Marts)]
     end
-    
+
     subgraph Consume["Consumption"]
         BI[BI Tools<br/>Metabase]
         Reports[Reports]
         ML[ML Models]
     end
-    
+
     subgraph Control["Orchestration"]
         Orch[Orchestrator<br/>Airflow]
         Mon[Monitoring]
     end
-    
+
     API --> Ingest
     DB1 --> Ingest
     Files --> Ingest
@@ -2775,7 +2768,7 @@ ARCHITECTURE_TEMPLATES = {
             }
         ]
     },
-    
+
     "automation": {
         "name": "Automation / Scripting",
         "description": "Automated workflow for repetitive tasks",
@@ -2841,29 +2834,29 @@ ARCHITECTURE_TEMPLATES = {
         Manual[Manual<br/>CLI]
         Event[Event Trigger<br/>webhook]
     end
-    
+
     subgraph Config["Configuration"]
         Conf[Config Files<br/>YAML/JSON]
         Env[Environment<br/>Variables]
         Secrets[Secrets<br/>Manager]
     end
-    
+
     subgraph Engine["Script Engine"]
         Main[Main Script<br/>Python]
         Libs[Libraries<br/>requests, pandas]
         Error[Error Handler]
     end
-    
+
     subgraph IO["Input/Output"]
         Input[Input Data<br/>Files/APIs]
         Output[Output Data<br/>Files/APIs]
     end
-    
+
     subgraph Monitor["Monitoring"]
         Logs[Log Files]
         Alerts[Alerts<br/>Email/Slack]
     end
-    
+
     Cron --> Main
     Manual --> Main
     Event --> Main
@@ -2897,7 +2890,7 @@ ARCHITECTURE_TEMPLATES = {
             }
         ]
     },
-    
+
     "mcp_server": {
         "name": "MCP Server Development",
         "description": "Model Context Protocol server for extending AI assistant capabilities",
@@ -2961,21 +2954,21 @@ ARCHITECTURE_TEMPLATES = {
     subgraph Claude["Claude Desktop"]
         AI[Claude AI]
     end
-    
+
     subgraph Server["MCP Server"]
         Core[Server Core<br/>FastMCP]
-        
+
         subgraph Tools["Tool Modules"]
             T1[Tool 1]
             T2[Tool 2]
             T3[Tool 3]
         end
-        
+
         subgraph Resources["Resources"]
             R1[Resource 1]
             R2[Resource 2]
         end
-        
+
         subgraph Utils["Utilities"]
             Log[Logging]
             Val[Validators]
@@ -2983,17 +2976,17 @@ ARCHITECTURE_TEMPLATES = {
             Cache[Cache]
         end
     end
-    
+
     subgraph Data["Data Layer"]
         DB[(SQLite DB)]
         Files[Files/Docs]
         Index[Vector Index]
     end
-    
+
     subgraph External["External"]
         APIs[External APIs]
     end
-    
+
     AI <-->|MCP Protocol| Core
     Core --> T1
     Core --> T2
@@ -3090,7 +3083,7 @@ def _build_integration_table(integrations: list) -> str:
     """Build markdown table of integrations"""
     if not integrations:
         return "*No external integrations required.*"
-    
+
     lines = []
     lines.append("| Integration | Purpose | Type |")
     lines.append("|-------------|---------|------|")
@@ -3103,7 +3096,7 @@ def _build_decisions_section(decisions: list) -> str:
     """Build technology decisions section"""
     if not decisions:
         return "*Technology decisions to be made during implementation.*"
-    
+
     lines = []
     for d in decisions:
         lines.append(f"### {d['decision']}")
@@ -3130,7 +3123,7 @@ def _adjust_for_audience(content: str, audience: str) -> str:
                 skip_section = True
             elif line.startswith("## ") or line.startswith("# "):
                 skip_section = False
-            
+
             if not skip_section:
                 filtered.append(line)
         return "\n".join(filtered)
@@ -3147,7 +3140,7 @@ def _build_wireframe_markdown(
 ) -> str:
     """Build wireframe/architecture brief markdown"""
     lines = []
-    
+
     # Header
     lines.append(f"# Architecture Brief: {arch_template['name']}")
     lines.append(f"## {goal}")
@@ -3157,7 +3150,7 @@ def _build_wireframe_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Overview
     lines.append("## 📋 Overview")
     lines.append("")
@@ -3165,7 +3158,7 @@ def _build_wireframe_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # System Diagram
     lines.append("## 🏗️ System Architecture")
     lines.append("")
@@ -3173,7 +3166,7 @@ def _build_wireframe_markdown(
     lines.append(arch_template['mermaid_diagram'])
     lines.append("```")
     lines.append("")
-    
+
     # Text fallback for non-Mermaid renderers
     lines.append("<details>")
     lines.append("<summary>View as text diagram</summary>")
@@ -3185,14 +3178,14 @@ def _build_wireframe_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Components
     components = custom_components if custom_components else arch_template['components']
     lines.append("## 🧩 Components")
     lines.append("")
     lines.append(_build_component_table(components))
     lines.append("")
-    
+
     # Component Details (not for executive)
     if audience != "executive":
         lines.append("### Component Details")
@@ -3210,10 +3203,10 @@ def _build_wireframe_markdown(
             lines.append("")
             lines.append(f"**Technologies:** {', '.join(c.get('technologies', []))}")
             lines.append("")
-    
+
     lines.append("---")
     lines.append("")
-    
+
     # Data Flows (not for executive)
     if audience != "executive":
         lines.append("## 🔄 Data Flows")
@@ -3222,7 +3215,7 @@ def _build_wireframe_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-    
+
     # Integrations
     lines.append("## 🔌 External Integrations")
     lines.append("")
@@ -3230,7 +3223,7 @@ def _build_wireframe_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Technology Decisions (technical audience only)
     if audience == "technical":
         lines.append("## 🔧 Technology Decisions")
@@ -3238,7 +3231,7 @@ def _build_wireframe_markdown(
         lines.append(_build_decisions_section(arch_template['technology_decisions']))
         lines.append("---")
         lines.append("")
-    
+
     # Key Considerations
     lines.append("## 💡 Key Considerations")
     lines.append("")
@@ -3262,7 +3255,7 @@ def _build_wireframe_markdown(
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Reference Materials
     if best_practices:
         lines.append("## 📚 Reference Materials")
@@ -3274,7 +3267,7 @@ def _build_wireframe_markdown(
         lines.append("")
         lines.append("---")
         lines.append("")
-    
+
     # Footer
     lines.append("## 📝 Notes")
     lines.append("")
@@ -3285,7 +3278,7 @@ def _build_wireframe_markdown(
     lines.append("---")
     lines.append("")
     lines.append("*Generated using book-library MCP server. Review and customize for your specific needs.*")
-    
+
     return "\n".join(lines)
 
 
@@ -3294,12 +3287,12 @@ def _generate_ascii_diagram(arch_template: dict) -> str:
     components = arch_template.get('components', [])
     if not components:
         return "No components defined"
-    
+
     lines = []
     lines.append("ARCHITECTURE OVERVIEW")
     lines.append("=" * 50)
     lines.append("")
-    
+
     # Group by type
     types = {}
     for c in components:
@@ -3307,18 +3300,18 @@ def _generate_ascii_diagram(arch_template: dict) -> str:
         if t not in types:
             types[t] = []
         types[t].append(c['name'])
-    
+
     for type_name, component_names in types.items():
         lines.append(f"[{type_name}]")
         for name in component_names:
             lines.append(f"  └── {name}")
         lines.append("")
-    
+
     lines.append("DATA FLOW")
     lines.append("-" * 30)
     for flow in arch_template.get('data_flows', [])[:5]:
         lines.append(f"  {flow['from']} → {flow['to']}")
-    
+
     return "\n".join(lines)
 
 
@@ -3334,14 +3327,14 @@ def _search_for_architecture_content(search_terms: list, limit: int = 5) -> list
 
 def _assess_complexity(impl_template: dict, arch_template: dict) -> dict:
     """Assess project complexity based on templates"""
-    
+
     # Count factors
     num_phases = len(impl_template.get('phases', []))
     total_days = sum(p.get('duration_days', 5) for p in impl_template.get('phases', []))
     num_components = len(arch_template.get('components', []))
     num_integrations = len(arch_template.get('integrations', []))
     num_decisions = len(arch_template.get('technology_decisions', []))
-    
+
     # Calculate complexity score
     score = 0
     score += num_phases * 2
@@ -3349,7 +3342,7 @@ def _assess_complexity(impl_template: dict, arch_template: dict) -> dict:
     score += num_components * 1.5
     score += num_integrations * 2
     score += num_decisions
-    
+
     # Determine level
     if score < 20:
         level = "simple"
@@ -3360,7 +3353,7 @@ def _assess_complexity(impl_template: dict, arch_template: dict) -> dict:
     else:
         level = "complex"
         description = "Multi-faceted project requiring careful planning"
-    
+
     return {
         "level": level,
         "score": round(score, 1),
@@ -3384,13 +3377,13 @@ def _build_project_analysis(
     complexity: dict
 ) -> dict:
     """Build comprehensive project analysis"""
-    
+
     # Extract key info
     phases = impl_template.get('phases', [])
     components = arch_template.get('components', [])
     objectives = brd_template.get('business_objectives', [])
     risks = brd_template.get('risks', [])
-    
+
     # Key decisions needed
     decisions = []
     for phase in phases:
@@ -3400,10 +3393,10 @@ def _build_project_analysis(
                 "decision": dec.get('name', dec) if isinstance(dec, dict) else dec,
                 "options": dec.get('options', []) if isinstance(dec, dict) else []
             })
-    
+
     # High-priority risks
     high_risks = [r for r in risks if r.get('impact') == 'High'][:3]
-    
+
     return {
         "summary": f"This is a {complexity['level']} {impl_template['name']} project with {len(phases)} phases over approximately {complexity['factors']['estimated_days']} days.",
         "key_objectives": objectives[:3],
@@ -3425,9 +3418,9 @@ def _build_recommendations(
     mode: str
 ) -> list:
     """Build actionable recommendations"""
-    
+
     recommendations = []
-    
+
     # Always recommend learning path for complex projects
     if complexity['level'] in ['moderate', 'complex']:
         recommendations.append({
@@ -3436,7 +3429,7 @@ def _build_recommendations(
             "tool": "generate_learning_path",
             "reason": f"Your library likely has content on {project_type.replace('_', ' ')} best practices"
         })
-    
+
     # BRD recommendation
     recommendations.append({
         "priority": "High",
@@ -3444,7 +3437,7 @@ def _build_recommendations(
         "tool": "generate_brd",
         "reason": "Clear requirements prevent scope creep and align stakeholders"
     })
-    
+
     # Architecture recommendation for technical projects
     if project_type in ['vps', 'web_app', 'data_pipeline', 'mcp_server']:
         recommendations.append({
@@ -3453,7 +3446,7 @@ def _build_recommendations(
             "tool": "generate_wireframe_brief",
             "reason": "Understanding component relationships reduces rework"
         })
-    
+
     # Implementation plan
     recommendations.append({
         "priority": "High",
@@ -3461,7 +3454,7 @@ def _build_recommendations(
         "tool": "generate_implementation_plan",
         "reason": "Breaks complex work into manageable phases with clear gates"
     })
-    
+
     # Phase prompts for complex projects
     if complexity['level'] == 'complex':
         recommendations.append({
@@ -3470,7 +3463,7 @@ def _build_recommendations(
             "tool": "get_phase_prompts",
             "reason": "Actionable prompts help maintain momentum"
         })
-    
+
     return recommendations
 
 
@@ -3485,16 +3478,16 @@ def _generate_artifacts(
     output_dir: str
 ) -> dict:
     """Generate requested artifacts"""
-    
+
     artifacts = {}
     file_paths = []
     summary = []
-    
+
     # Setup output directory
     if save_artifacts and output_dir:
         import os
         os.makedirs(output_dir, exist_ok=True)
-    
+
     # Generate each requested artifact
     if "learning_path" in artifact_list:
         # Build learning path data
@@ -3507,7 +3500,7 @@ def _generate_artifacts(
                 "topics": phase.get('objectives', [])[:3],
                 "duration_days": phase.get('duration_days', 5)
             })
-        
+
         artifacts["learning_path"] = {
             "goal": goal,
             "project_type": impl_template['name'],
@@ -3515,7 +3508,7 @@ def _generate_artifacts(
             "note": "Use generate_learning_path() for full version with library search"
         }
         summary.append(f"Learning Path: {len(lp_phases)} phases outlined")
-    
+
     if "brd" in artifact_list:
         # Build BRD summary
         brd_data = {
@@ -3532,7 +3525,7 @@ def _generate_artifacts(
             "risks": len(brd_template.get('risks', [])),
             "note": "Use generate_brd() for full document"
         }
-        
+
         if save_artifacts:
             # Generate full BRD for saving
             sections = _build_brd_sections(
@@ -3546,16 +3539,16 @@ def _generate_artifacts(
                 template_style="standard"
             )
             brd_md = _build_brd_markdown(goal, project_type, brd_template, sections, "standard")
-            
+
             path = f"{output_dir}/brd.md" if output_dir else "brd.md"
             with open(path, 'w') as f:
                 f.write(brd_md)
             file_paths.append(path)
             brd_data["file_path"] = path
-        
+
         artifacts["brd"] = brd_data
         summary.append(f"BRD: {brd_data['requirements']['functional']} functional requirements")
-    
+
     if "architecture" in artifact_list:
         # Build architecture summary
         arch_data = {
@@ -3567,7 +3560,7 @@ def _generate_artifacts(
             "has_diagram": bool(arch_template.get('mermaid_diagram')),
             "note": "Use generate_wireframe_brief() for full document with diagram"
         }
-        
+
         if save_artifacts:
             # Generate full architecture brief for saving
             arch_md = _build_wireframe_markdown(
@@ -3578,21 +3571,21 @@ def _generate_artifacts(
                 best_practices=[],
                 custom_components=[]
             )
-            
+
             path = f"{output_dir}/architecture.md" if output_dir else "architecture.md"
             with open(path, 'w') as f:
                 f.write(arch_md)
             file_paths.append(path)
             arch_data["file_path"] = path
-        
+
         artifacts["architecture"] = arch_data
         summary.append(f"Architecture: {len(arch_data['components'])} components")
-    
+
     if "implementation_plan" in artifact_list:
         # Build implementation plan summary
         phases = impl_template.get('phases', [])
         total_days = sum(p.get('duration_days', 5) for p in phases)
-        
+
         plan_data = {
             "goal": goal,
             "project_type": impl_template['name'],
@@ -3601,7 +3594,7 @@ def _generate_artifacts(
             "total_weeks": round(total_days / 5, 1),
             "note": "Use generate_implementation_plan() for full document with prompts"
         }
-        
+
         if save_artifacts:
             # Generate full implementation plan for saving
             timeline = _calculate_timeline(phases, None)
@@ -3609,7 +3602,7 @@ def _generate_artifacts(
             for phase in phases:
                 phase_prompts = _generate_prompts_for_phase(phase, project_type)
                 all_prompts.extend(phase_prompts)
-            
+
             plan_md = _build_implementation_markdown(
                 goal=goal,
                 project_type=project_type,
@@ -3620,16 +3613,16 @@ def _generate_artifacts(
                 team_size=1,
                 include_prompts=True
             )
-            
+
             path = f"{output_dir}/implementation-plan.md" if output_dir else "implementation-plan.md"
             with open(path, 'w') as f:
                 f.write(plan_md)
             file_paths.append(path)
             plan_data["file_path"] = path
-        
+
         artifacts["implementation_plan"] = plan_data
         summary.append(f"Implementation Plan: {len(phases)} phases, {total_days} days")
-    
+
     return {
         "artifacts": artifacts,
         "summary": summary,
@@ -3640,9 +3633,9 @@ def _generate_artifacts(
 def _build_analysis_markdown(result: dict, mode: str) -> str:
     """Build analysis overview markdown"""
     lines = []
-    
+
     # Header
-    lines.append(f"# Project Analysis")
+    lines.append("# Project Analysis")
     lines.append(f"## {result['goal']}")
     lines.append("")
     lines.append(f"**Project Type:** {result['project_type']}")
@@ -3651,14 +3644,14 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
     lines.append("")
     lines.append("---")
     lines.append("")
-    
+
     # Analysis Summary
     analysis = result.get('analysis', {})
     lines.append("## 📋 Summary")
     lines.append("")
     lines.append(analysis.get('summary', ''))
     lines.append("")
-    
+
     # Estimated Effort
     effort = analysis.get('estimated_effort', {})
     lines.append("### Estimated Effort")
@@ -3666,7 +3659,7 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
     lines.append(f"- **Duration:** {effort.get('days', 0)} days (~{effort.get('weeks', 0)} weeks)")
     lines.append(f"- **Phases:** {effort.get('phases', 0)}")
     lines.append("")
-    
+
     # Key Objectives
     objectives = analysis.get('key_objectives', [])
     if objectives:
@@ -3675,7 +3668,7 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
         for obj in objectives:
             lines.append(f"- {obj}")
         lines.append("")
-    
+
     # Main Components
     components = analysis.get('main_components', [])
     if components:
@@ -3684,7 +3677,7 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
         for comp in components:
             lines.append(f"- {comp}")
         lines.append("")
-    
+
     # Top Risks
     risks = analysis.get('top_risks', [])
     if risks:
@@ -3693,10 +3686,10 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
         for risk in risks:
             lines.append(f"- **{risk['risk']}** — {risk['mitigation']}")
         lines.append("")
-    
+
     lines.append("---")
     lines.append("")
-    
+
     # Recommendations
     recommendations = result.get('recommendations', [])
     if recommendations:
@@ -3710,7 +3703,7 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
             lines.append("")
             lines.append(f"**Why:** {rec['reason']}")
             lines.append("")
-    
+
     # Artifacts (if generated)
     if mode != "overview" and result.get('artifact_summary'):
         lines.append("---")
@@ -3720,14 +3713,14 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
         for item in result.get('artifact_summary', []):
             lines.append(f"- ✅ {item}")
         lines.append("")
-        
+
         if result.get('file_paths'):
             lines.append("### Saved Files")
             lines.append("")
             for path in result['file_paths']:
                 lines.append(f"- `{path}`")
             lines.append("")
-    
+
     # Next Steps
     lines.append("---")
     lines.append("")
@@ -3735,10 +3728,10 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
     lines.append("")
     if mode == "overview":
         lines.append("```python")
-        lines.append(f"# Generate essential documents")
+        lines.append("# Generate essential documents")
         lines.append(f'analyze_project("{result["goal"]}", mode="quick")')
         lines.append("")
-        lines.append(f"# Or generate everything")
+        lines.append("# Or generate everything")
         lines.append(f'analyze_project("{result["goal"]}", mode="full", save_artifacts=True)')
         lines.append("```")
     else:
@@ -3749,9 +3742,9 @@ def _build_analysis_markdown(result: dict, mode: str) -> str:
         lines.append("3. Follow the implementation plan phases")
         lines.append("4. Use `get_phase_prompts()` for detailed guidance")
     lines.append("")
-    
+
     lines.append("---")
     lines.append("")
     lines.append("*Generated using book-library MCP server project planning tools.*")
-    
+
     return "\n".join(lines)

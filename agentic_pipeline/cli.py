@@ -655,7 +655,7 @@ def backfill(dry_run: bool, execute: bool):
             )
 
         console.print(table)
-        console.print(f"\n[dim]Run with --execute to backfill[/dim]")
+        console.print("\n[dim]Run with --execute to backfill[/dim]")
     else:
         result = manager.run(dry_run=False)
         console.print(f"[green]Backfilled {result['backfilled']} books[/green]")

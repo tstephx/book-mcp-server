@@ -56,7 +56,7 @@ def register_audit_tools(mcp: "FastMCP") -> None:
                 book_id=book_id if book_id else None,
                 severity_filter=severity,
             )
-            book_count = len(result.get("books", []))
+            len(result.get("books", []))
             logger.info(
                 f"Chapter audit complete: {result['summary']['total']} books, "
                 f"{result['summary']['bad']} bad, {result['summary']['warning']} warning"
