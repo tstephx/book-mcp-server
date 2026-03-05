@@ -182,7 +182,6 @@ class Orchestrator:
         try:
             result = future.result(timeout=self.config.processing_timeout)
         except concurrent.futures.TimeoutError:
-            executor.shutdown(wait=False)
             raise PipelineTimeoutError(
                 f"Processing exceeded {self.config.processing_timeout}s timeout",
                 timeout=self.config.processing_timeout,
@@ -249,7 +248,6 @@ class Orchestrator:
         try:
             result = future.result(timeout=self.config.embedding_timeout)
         except concurrent.futures.TimeoutError:
-            executor.shutdown(wait=False)
             raise PipelineTimeoutError(
                 f"Embedding exceeded {self.config.embedding_timeout}s timeout",
                 timeout=self.config.embedding_timeout,

@@ -93,12 +93,6 @@ def process_book(path: str) -> dict:
 
     resolved = Path(path).resolve()
 
-    # Block path traversal — resolved path must not escape via relative segments
-    try:
-        Path(path).resolve().relative_to(resolved.anchor)
-    except ValueError:
-        pass  # anchor check is always satisfied; traversal is blocked by resolve()
-
     # Reject if the raw path contains traversal sequences
     if ".." in Path(path).parts:
         return {"error": f"Path traversal not allowed: {path}"}
@@ -263,9 +257,9 @@ def batch_reject_tool(
 
 
 def get_audit_log(
-    book_id: str = None,
-    actor: str = None,
-    action: str = None,
+    book_id: Optional[str] = None,
+    actor: Optional[str] = None,
+    action: Optional[str] = None,
     last_days: int = 7,
     limit: int = 100,
 ) -> list[dict]:
@@ -457,6 +451,9 @@ def reingest_book_tool(
         Dict with new pipeline_id and resulting state.
     """
     from agentic_pipeline.db.pipelines import PipelineRepository
+
+    if not book_id:
+        return {"error": "book_id is required"}
 
     path = Path(db_path) if db_path else get_db_path()
     repo = PipelineRepository(path)

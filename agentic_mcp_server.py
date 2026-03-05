@@ -128,9 +128,9 @@ def batch_reject(
 
 @mcp.tool()
 def audit(
-    book_id: str = None,
-    actor: str = None,
-    action: str = None,
+    book_id: Optional[str] = None,
+    actor: Optional[str] = None,
+    action: Optional[str] = None,
     last_days: int = 7,
     limit: int = 100
 ) -> list:
