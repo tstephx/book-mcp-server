@@ -295,6 +295,30 @@ class Orchestrator:
                 "error": str(e)
             }
 
+    def reprocess_existing(self, pipeline_id: str, book_path: str, content_hash: str) -> dict:
+        """Drive an already-created pipeline record through the full processing states.
+
+        Use this when the pipeline record has been created externally (e.g. by
+        prepare_reingest) and the caller holds the pipeline_id. Unlike process_one(),
+        this method skips hashing, idempotency checks, and record creation.
+        """
+        import time
+        start_time = time.time()
+        self.logger.processing_started(pipeline_id, book_path)
+        try:
+            result = self._process_book(pipeline_id, book_path, content_hash)
+            duration = time.time() - start_time
+            self.logger.processing_complete(pipeline_id, duration)
+            return result
+        except Exception as e:
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            return {
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.NEEDS_RETRY.value,
+                "error": str(e),
+            }
+
     def _process_book(self, pipeline_id: str, book_path: str, content_hash: str, force_fallback: bool = False) -> dict:
         """Process book through all states."""
 

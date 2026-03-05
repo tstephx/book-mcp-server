@@ -138,3 +138,57 @@ def test_batch_approve_accepts_none_book_type():
     assert args is not None and type(None) in args, (
         f"book_type annotation {annotation} is not Optional[str]"
     )
+
+
+# ---------------------------------------------------------------------------
+# C3: reingest_book_tool must use a public Orchestrator method, not _process_book
+# ---------------------------------------------------------------------------
+
+def test_orchestrator_exposes_reprocess_existing_as_public_method():
+    """Orchestrator must have a public reprocess_existing() method."""
+    from agentic_pipeline.orchestrator import Orchestrator
+    assert hasattr(Orchestrator, "reprocess_existing"), (
+        "Orchestrator has no public reprocess_existing() method. "
+        "reingest_book_tool must not call _process_book directly."
+    )
+    assert not hasattr(Orchestrator, "__reprocess_existing"), "Should be public, not mangled"
+
+
+def test_reingest_book_tool_does_not_call_private_process_book(db_path):
+    """reingest_book_tool must route through reprocess_existing(), not _process_book."""
+    import inspect
+    import agentic_pipeline.mcp_server as mcp_mod
+
+    source = inspect.getsource(mcp_mod.reingest_book_tool)
+    assert "._process_book(" not in source, (
+        "reingest_book_tool still calls the private _process_book() directly. "
+        "Use orchestrator.reprocess_existing() instead."
+    )
+
+
+def test_reprocess_existing_returns_pipeline_result(db_path, tmp_path):
+    """reprocess_existing() drives the pipeline for an existing record and returns result."""
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from unittest.mock import MagicMock, patch
+
+    # Create a pipeline record (simulating what prepare_reingest would do)
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "testhash123")
+
+    config = OrchestratorConfig(db_path=db_path)
+    orchestrator = Orchestrator(config)
+
+    mock_result = {
+        "pipeline_id": pid,
+        "state": "pending_approval",
+        "book_type": "technical_tutorial",
+        "confidence": 0.9,
+    }
+
+    with patch.object(orchestrator, "_process_book", return_value=mock_result) as mock_pb:
+        result = orchestrator.reprocess_existing(pid, "/book.epub", "testhash123")
+
+    mock_pb.assert_called_once_with(pid, "/book.epub", "testhash123")
+    assert result["pipeline_id"] == pid

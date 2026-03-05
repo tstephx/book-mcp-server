@@ -473,7 +473,7 @@ def reingest_book_tool(
 
     config = OrchestratorConfig.from_env()
     orchestrator = Orchestrator(config)
-    result = orchestrator._process_book(new_pid, source_path, record["content_hash"])
+    result = orchestrator.reprocess_existing(new_pid, source_path, record["content_hash"])
     result["new_pipeline_id"] = new_pid
     result["old_pipeline_id"] = book_id
     return result
