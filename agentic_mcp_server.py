@@ -7,6 +7,7 @@ management tools to Claude via MCP.
 """
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -36,6 +37,10 @@ from agentic_pipeline.mcp_server import (
     set_autonomy_mode,
     activate_escape_hatch_tool,
     get_autonomy_readiness,
+    # Library management (Phase 6)
+    backfill_library,
+    validate_library as validate_library_fn,
+    reingest_book_tool,
 )
 
 # Create MCP server
@@ -85,8 +90,8 @@ def stuck() -> list:
 
 @mcp.tool()
 def batch_approve(
-    min_confidence: float = None,
-    book_type: str = None,
+    min_confidence: Optional[float] = None,
+    book_type: Optional[str] = None,
     max_count: int = 50,
     execute: bool = False
 ) -> dict:
@@ -104,8 +109,8 @@ def batch_approve(
 @mcp.tool()
 def batch_reject(
     reason: str,
-    book_type: str = None,
-    max_confidence: float = None,
+    book_type: Optional[str] = None,
+    max_confidence: Optional[float] = None,
     max_count: int = 50,
     execute: bool = False
 ) -> dict:
@@ -157,6 +162,24 @@ def escape_hatch(reason: str) -> dict:
 def autonomy_readiness() -> dict:
     """Check if system is ready to advance to next autonomy level."""
     return get_autonomy_readiness()
+
+
+@mcp.tool()
+def backfill(dry_run: bool = True) -> dict:
+    """Register legacy library books in the pipeline audit trail. dry_run=True previews."""
+    return backfill_library(dry_run=dry_run)
+
+
+@mcp.tool()
+def validate_library() -> dict:
+    """Check all library books for quality issues (missing chapters, embeddings, low word count)."""
+    return validate_library_fn()
+
+
+@mcp.tool()
+def reingest(book_id: str) -> dict:
+    """Reprocess a book through the full pipeline. Requires the original source file."""
+    return reingest_book_tool(book_id=book_id)
 
 
 if __name__ == "__main__":

@@ -75,23 +75,44 @@ def rollback_book_tool(
     return rollback_book(path, pipeline_id, reason, actor)
 
 
+_ALLOWED_EXTENSIONS = {".epub", ".pdf"}
+
+
 def process_book(path: str) -> dict:
     """
     Process a book through the pipeline.
 
     Args:
-        path: Path to the book file (epub, pdf, etc.)
+        path: Path to the book file (.epub or .pdf only)
 
     Returns:
         Processing result with pipeline_id, state, book_type, and confidence
     """
+    if not path:
+        return {"error": "book_path is required"}
+
+    resolved = Path(path).resolve()
+
+    # Block path traversal — resolved path must not escape via relative segments
+    try:
+        Path(path).resolve().relative_to(resolved.anchor)
+    except ValueError:
+        pass  # anchor check is always satisfied; traversal is blocked by resolve()
+
+    # Reject if the raw path contains traversal sequences
+    if ".." in Path(path).parts:
+        return {"error": f"Path traversal not allowed: {path}"}
+
+    if resolved.suffix.lower() not in _ALLOWED_EXTENSIONS:
+        return {"error": f"Unsupported file type '{resolved.suffix}'. Allowed: {sorted(_ALLOWED_EXTENSIONS)}"}
+
     from agentic_pipeline.config import OrchestratorConfig
     from agentic_pipeline.orchestrator import Orchestrator
 
     config = OrchestratorConfig.from_env()
     orchestrator = Orchestrator(config)
 
-    result = orchestrator.process_one(path)
+    result = orchestrator.process_one(str(resolved))
     return result
 
 
@@ -181,8 +202,8 @@ def get_stuck_pipelines() -> list[dict]:
 
 
 def batch_approve_tool(
-    min_confidence: float = None,
-    book_type: str = None,
+    min_confidence: Optional[float] = None,
+    book_type: Optional[str] = None,
     max_count: int = 50,
     execute: bool = False,
 ) -> dict:
@@ -212,8 +233,8 @@ def batch_approve_tool(
 
 
 def batch_reject_tool(
-    book_type: str = None,
-    max_confidence: float = None,
+    book_type: Optional[str] = None,
+    max_confidence: Optional[float] = None,
     reason: str = "",
     max_count: int = 50,
     execute: bool = False,
@@ -309,7 +330,10 @@ def set_autonomy_mode(mode: str) -> dict:
     if config.is_escape_hatch_active():
         return {"error": "Cannot change mode while escape hatch is active"}
 
-    config.set_mode(mode)
+    try:
+        config.set_mode(mode)
+    except ValueError as e:
+        return {"error": str(e)}
     return {"mode": mode, "success": True}
 
 
