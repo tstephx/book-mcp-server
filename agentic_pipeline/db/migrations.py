@@ -4,6 +4,23 @@ import sqlite3
 from pathlib import Path
 
 
+SCHEMA_MIGRATIONS_TABLE = """
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+        name TEXT PRIMARY KEY,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+"""
+
+
+def _migration_applied(cursor: sqlite3.Cursor, name: str) -> bool:
+    cursor.execute("SELECT 1 FROM schema_migrations WHERE name = ?", (name,))
+    return cursor.fetchone() is not None
+
+
+def _record_migration(cursor: sqlite3.Cursor, name: str) -> None:
+    cursor.execute("INSERT INTO schema_migrations (name) VALUES (?)", (name,))
+
+
 MIGRATIONS = [
     # Pipeline tracking
     """
@@ -264,7 +281,10 @@ def run_migrations(db_path: Path) -> None:
         # Enable WAL mode for concurrent read/write access
         cursor.execute("PRAGMA journal_mode = WAL")
 
-        # Run table creation
+        # Schema migration version tracking — must exist before any versioned migration
+        cursor.execute(SCHEMA_MIGRATIONS_TABLE)
+
+        # Run table creation (all idempotent via CREATE TABLE IF NOT EXISTS)
         for migration in MIGRATIONS:
             cursor.execute(migration)
 
@@ -272,13 +292,16 @@ def run_migrations(db_path: Path) -> None:
         for index in INDEXES:
             cursor.execute(index)
 
-        # Add processing_result column to existing DBs (safe if already exists)
-        try:
-            cursor.execute(
-                "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
-            )
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+        # Versioned ALTER TABLE migrations — each runs exactly once.
+        # Check column existence first so this is safe on both new and legacy DBs.
+        if not _migration_applied(cursor, "add_processing_result_column"):
+            cursor.execute("PRAGMA table_info(processing_pipelines)")
+            existing_columns = {row[1] for row in cursor.fetchall()}
+            if "processing_result" not in existing_columns:
+                cursor.execute(
+                    "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
+                )
+            _record_migration(cursor, "add_processing_result_column")
 
         # Insert default autonomy config if not exists
         cursor.execute(

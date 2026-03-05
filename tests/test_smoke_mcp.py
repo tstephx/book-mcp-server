@@ -28,7 +28,10 @@ HAS_OPENAI = bool(os.environ.get("OPENAI_API_KEY", ""))
 needs_openai = pytest.mark.skipif(not HAS_OPENAI, reason="No OPENAI_API_KEY")
 slow = pytest.mark.slow
 
-pytestmark = pytest.mark.skipif(not HAS_DB, reason="Library database not found")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not HAS_DB, reason="Library database not found"),
+]
 
 # ---------------------------------------------------------------------------
 # Fixtures

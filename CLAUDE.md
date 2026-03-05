@@ -50,8 +50,13 @@ agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline --
 
 # CLI: full command reference — see docs/USER-GUIDE.md#cli-commands
 
-# Tests (use python -m pytest, not bare pytest)
-python -m pytest tests/ -v
+# Tests — use Makefile targets (venv must be activated)
+source .venv/bin/activate
+make test          # unit tests (default)
+make test-fast     # parallel, ~2x faster
+make test-cov      # with HTML coverage report → htmlcov/index.html
+make test-integration  # requires real DB + OPENAI_API_KEY
+# Or directly: python -m pytest tests/ -v
 ```
 
 ## Key Concepts

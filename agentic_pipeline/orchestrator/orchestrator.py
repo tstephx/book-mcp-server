@@ -1,6 +1,7 @@
 # agentic_pipeline/orchestrator/orchestrator.py
 """Pipeline Orchestrator - coordinates book processing."""
 
+import concurrent.futures
 import hashlib
 import logging
 import signal
@@ -40,7 +41,6 @@ class Orchestrator:
         self.classifier = ClassifierAgent(config.db_path)
         self.strategy_selector = StrategySelector()
         self.shutdown_requested = False
-        self._seen_paths: set[str] = set()
 
         # Initialize processing adapter for direct library calls
         self.processing_adapter = ProcessingAdapter(
@@ -173,11 +173,23 @@ class Orchestrator:
         Returns:
             Dict with processing results including quality_score, confidence, etc.
         """
-        result = self.processing_adapter.process_book(
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(
+            self.processing_adapter.process_book,
             book_path=book_path,
             book_id=book_id,
             force_fallback=force_fallback,
         )
+        try:
+            result = future.result(timeout=self.config.processing_timeout)
+        except concurrent.futures.TimeoutError:
+            executor.shutdown(wait=False)
+            raise PipelineTimeoutError(
+                f"Processing exceeded {self.config.processing_timeout}s timeout",
+                timeout=self.config.processing_timeout,
+            )
+        finally:
+            executor.shutdown(wait=False)
 
         if not result.success:
             raise ProcessingError(
@@ -230,7 +242,21 @@ class Orchestrator:
         Returns:
             Dict with embedding results
         """
-        result = self.processing_adapter.generate_embeddings(book_id=book_id)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(
+            self.processing_adapter.generate_embeddings,
+            book_id=book_id,
+        )
+        try:
+            result = future.result(timeout=self.config.embedding_timeout)
+        except concurrent.futures.TimeoutError:
+            executor.shutdown(wait=False)
+            raise PipelineTimeoutError(
+                f"Embedding exceeded {self.config.embedding_timeout}s timeout",
+                timeout=self.config.embedding_timeout,
+            )
+        finally:
+            executor.shutdown(wait=False)
 
         if not result.success:
             raise EmbeddingError(
@@ -332,18 +358,17 @@ class Orchestrator:
                 try:
                     processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=True)
                 except (ProcessingError, PipelineTimeoutError) as e:
-                    # Retry processing failed — permanently failed (processing error, not content rejection)
+                    # Retry processing failed — permanently reject (PROCESSING -> REJECTED is valid)
                     self.logger.error(pipeline_id, type(e).__name__, str(e))
-                    self.logger.state_transition(pipeline_id, PipelineState.PROCESSING.value, PipelineState.FAILED.value)
                     self.repo.update_state(
                         pipeline_id,
-                        PipelineState.FAILED,
+                        PipelineState.REJECTED,
                         error_details={
                             "initial_validation": initial_validation,
                             "retry_error": str(e),
                         },
                     )
-                    return {"pipeline_id": pipeline_id, "state": PipelineState.FAILED.value, "error": str(e)}
+                    return {"pipeline_id": pipeline_id, "state": PipelineState.REJECTED.value, "error": str(e)}
 
                 # Store updated processing results
                 self._store_processing_result(pipeline_id, processing_result)
@@ -488,19 +513,14 @@ class Orchestrator:
                 if self.config.processed_dir and book_path.is_relative_to(self.config.processed_dir):
                     continue
                 path_str = str(book_path)
-                if path_str in self._seen_paths:
-                    continue
                 try:
                     content_hash = self._compute_hash(path_str)
                     if self._check_idempotency(content_hash):
-                        self._seen_paths.add(path_str)
-                        continue  # Already in pipeline
+                        continue  # Already in pipeline (DB-backed check)
                     self.repo.create(path_str, content_hash)
-                    self._seen_paths.add(path_str)
                     self.logger.processing_started("detected", path_str)
                     detected += 1
                 except sqlite3.IntegrityError:
-                    self._seen_paths.add(path_str)
                     continue  # Race: another cycle already created this record
                 except Exception as e:
                     self.logger.error("scan", type(e).__name__, str(e))

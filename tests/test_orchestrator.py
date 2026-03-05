@@ -272,11 +272,12 @@ def test_scan_directory_skips_already_queued(db_path, config, tmp_path):
 
     # First scan detects the book
     assert orchestrator._scan_watch_dir() == 1
-    # Second scan skips it (cached in _seen_paths, no re-hash needed)
+    # Second scan skips it — DB-backed idempotency via content_hash
     assert orchestrator._scan_watch_dir() == 0
 
 
-def test_scan_directory_uses_seen_cache(db_path, config, tmp_path):
+def test_scan_directory_idempotency_is_db_backed(db_path, config, tmp_path):
+    """Second scan re-hashes but returns 0 — idempotency via DB, not in-memory set."""
     from agentic_pipeline.orchestrator import Orchestrator
     from unittest.mock import patch
 
@@ -288,10 +289,10 @@ def test_scan_directory_uses_seen_cache(db_path, config, tmp_path):
     # First scan hashes and detects the book
     assert orchestrator._scan_watch_dir() == 1
 
-    # Second scan should NOT call _compute_hash (path is cached)
-    with patch.object(orchestrator, '_compute_hash') as mock_hash:
+    # Second scan re-hashes (no in-memory cache) but still returns 0 via DB check
+    with patch.object(orchestrator, '_compute_hash', wraps=orchestrator._compute_hash) as mock_hash:
         assert orchestrator._scan_watch_dir() == 0
-        mock_hash.assert_not_called()
+        mock_hash.assert_called_once()  # Hash IS computed — DB check prevents duplicate detect
 
 
 def test_scan_directory_noop_when_no_watch_dir(db_path, config):

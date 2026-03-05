@@ -4,10 +4,12 @@ import logging
 import json
 import os
 import shutil
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+from agentic_pipeline.autonomy.config import AutonomyConfig
 from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
@@ -60,7 +62,7 @@ def _record_audit(
                 json.dumps(after_state) if after_state else None,
                 json.dumps(adjustments) if adjustments else None,
                 confidence,
-                "supervised",  # TODO: get from autonomy_config
+                AutonomyConfig(db_path).get_mode(),
             )
         )
         conn.commit()
@@ -175,13 +177,22 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
         }
 
 
+def _run_embedding_background(db_path: Path, pipeline_id: str, pipeline: dict) -> None:
+    """Run embedding in a daemon thread — called by approve_book() fire-and-forget."""
+    _complete_approved(db_path, pipeline_id, pipeline)
+
+
 def approve_book(
     db_path: Path,
     pipeline_id: str,
     actor: str,
     adjustments: Optional[dict] = None,
 ) -> dict:
-    """Approve a book and generate embeddings inline."""
+    """Approve a book. Returns immediately; embedding runs in a background thread.
+
+    The pipeline transitions PENDING_APPROVAL → APPROVED on return.
+    The background thread then drives APPROVED → EMBEDDING → COMPLETE (or NEEDS_RETRY).
+    """
     repo = PipelineRepository(db_path)
     pipeline = repo.get(pipeline_id)
 
@@ -196,17 +207,13 @@ def approve_book(
     confidence = profile.get("confidence")
 
     before_state = {"state": pipeline["state"]}
+    after_state = {"state": PipelineState.APPROVED.value}
 
-    # Transition state, then set approval metadata
+    # Transition to APPROVED immediately
     repo.update_state(pipeline_id, PipelineState.APPROVED)
     repo.mark_approved(pipeline_id, approved_by=actor, confidence=confidence)
 
-    # Run embedding inline (APPROVED → EMBEDDING → COMPLETE)
-    embed_result = _complete_approved(db_path, pipeline_id, pipeline)
-
-    after_state = {"state": embed_result["state"]}
-
-    # Record audit
+    # Record audit before spawning thread (so it's always written)
     _record_audit(
         db_path,
         pipeline_id,
@@ -219,10 +226,20 @@ def approve_book(
         confidence=confidence,
     )
 
+    # Fire-and-forget: embedding runs in background, MCP caller is not blocked
+    thread = threading.Thread(
+        target=_run_embedding_background,
+        args=(db_path, pipeline_id, pipeline),
+        daemon=True,
+        name=f"embed-{pipeline_id[:8]}",
+    )
+    thread.start()
+
     return {
         "success": True,
         "pipeline_id": pipeline_id,
-        **embed_result,
+        "state": PipelineState.APPROVED.value,
+        "embedding": "queued",
     }
 
 

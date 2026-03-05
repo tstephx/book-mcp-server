@@ -33,6 +33,7 @@ def get_pipeline_db(db_path: Optional[str] = None) -> Generator[sqlite3.Connecti
     try:
         conn = sqlite3.connect(str(db_path), timeout=10)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         yield conn
     finally:
         if conn:

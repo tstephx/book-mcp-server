@@ -49,24 +49,26 @@ def _create_pending_pipeline(db_path, processing_result=None):
     return pid
 
 
-@patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_book(MockAdapter, db_path):
+# ---------------------------------------------------------------------------
+# approve_book() — tests the new non-blocking contract
+# ---------------------------------------------------------------------------
+
+def test_approve_book(db_path):
+    """approve_book() returns immediately with state=approved, embedding=queued."""
     from agentic_pipeline.approval.actions import approve_book
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
 
-    mock_instance = MockAdapter.return_value
-    mock_instance.generate_embeddings.return_value = _mock_embedding_result()
-
-    pid = _create_pending_pipeline(db_path)
-    result = approve_book(db_path, pid, actor="human:taylor")
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        pid = _create_pending_pipeline(db_path)
+        result = approve_book(db_path, pid, actor="human:taylor")
 
     assert result["success"] is True
-    assert result["state"] == PipelineState.COMPLETE.value
-    assert result["chapters_embedded"] == 5
+    assert result["state"] == PipelineState.APPROVED.value
+    assert result["embedding"] == "queued"
 
     pipeline = PipelineRepository(db_path).get(pid)
-    assert pipeline["state"] == PipelineState.COMPLETE.value
+    assert pipeline["state"] == PipelineState.APPROVED.value
     assert pipeline["approved_by"] == "human:taylor"
 
 
@@ -84,19 +86,16 @@ def test_reject_book(db_path):
     assert pipeline["state"] == PipelineState.REJECTED.value
 
 
-@patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_creates_audit_record(MockAdapter, db_path):
-    from agentic_pipeline.approval.actions import approve_book
-    from agentic_pipeline.pipeline.states import PipelineState
+def test_approve_creates_audit_record(db_path):
     import sqlite3
 
-    mock_instance = MockAdapter.return_value
-    mock_instance.generate_embeddings.return_value = _mock_embedding_result()
+    from agentic_pipeline.approval.actions import approve_book
 
-    pid = _create_pending_pipeline(db_path)
-    approve_book(db_path, pid, actor="human:taylor")
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        pid = _create_pending_pipeline(db_path)
+        approve_book(db_path, pid, actor="human:taylor")
 
-    # Check audit record
+    # Audit is written before the thread starts — always present
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -109,9 +108,75 @@ def test_approve_creates_audit_record(MockAdapter, db_path):
     assert audit["actor"] == "human:taylor"
 
 
-@patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_embedding_failure_goes_to_needs_retry(MockAdapter, db_path):
+def test_audit_record_reflects_actual_autonomy_mode(db_path):
+    """Audit trail must record the real autonomy mode, not hardcoded 'supervised'."""
+    import sqlite3
+
     from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.autonomy.config import AutonomyConfig
+
+    AutonomyConfig(db_path).set_mode("partial")
+
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        pid = _create_pending_pipeline(db_path)
+        approve_book(db_path, pid, actor="human:taylor")
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT autonomy_mode FROM approval_audit WHERE pipeline_id = ?", (pid,))
+    audit = cursor.fetchone()
+    conn.close()
+
+    assert audit["autonomy_mode"] == "partial", (
+        f"Expected 'partial' but got '{audit['autonomy_mode']}' — "
+        "hardcoded 'supervised' still in place"
+    )
+
+
+# ---------------------------------------------------------------------------
+# _complete_approved() — tests embedding behaviour (runs in background thread)
+# ---------------------------------------------------------------------------
+
+def _setup_approved_pipeline(db_path, processing_result=None):
+    """Create a pipeline in APPROVED state, return (pipeline_id, pipeline_dict)."""
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    pid = _create_pending_pipeline(db_path, processing_result=processing_result)
+
+    repo = PipelineRepository(db_path)
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        from agentic_pipeline.approval.actions import approve_book
+        approve_book(db_path, pid, actor="human:taylor")
+
+    pipeline = repo.get(pid)
+    return pid, pipeline
+
+
+@patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+def test_complete_approved_succeeds(MockAdapter, db_path):
+    """_complete_approved() drives APPROVED → EMBEDDING → COMPLETE on success."""
+    from agentic_pipeline.approval.actions import _complete_approved
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    mock_instance = MockAdapter.return_value
+    mock_instance.generate_embeddings.return_value = _mock_embedding_result()
+
+    pid, pipeline = _setup_approved_pipeline(db_path)
+    result = _complete_approved(db_path, pid, pipeline)
+
+    assert result["state"] == PipelineState.COMPLETE.value
+    assert result["chapters_embedded"] == 5
+
+    assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.COMPLETE.value
+
+
+@patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+def test_complete_approved_embedding_failure_goes_to_needs_retry(MockAdapter, db_path):
+    """_complete_approved() transitions to NEEDS_RETRY when embedding returns failure."""
+    from agentic_pipeline.approval.actions import _complete_approved
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
 
@@ -120,66 +185,57 @@ def test_approve_embedding_failure_goes_to_needs_retry(MockAdapter, db_path):
         success=False, chapters_processed=0, error="OpenAI rate limit"
     )
 
-    pid = _create_pending_pipeline(db_path)
-    result = approve_book(db_path, pid, actor="human:taylor")
+    pid, pipeline = _setup_approved_pipeline(db_path)
+    result = _complete_approved(db_path, pid, pipeline)
 
-    assert result["success"] is True
     assert result["state"] == PipelineState.NEEDS_RETRY.value
     assert "OpenAI rate limit" in result["embedding_error"]
-
-    pipeline = PipelineRepository(db_path).get(pid)
-    assert pipeline["state"] == PipelineState.NEEDS_RETRY.value
+    assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.NEEDS_RETRY.value
 
 
 @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_embedding_exception_goes_to_needs_retry(MockAdapter, db_path):
-    from agentic_pipeline.approval.actions import approve_book
+def test_complete_approved_embedding_exception_goes_to_needs_retry(MockAdapter, db_path):
+    """_complete_approved() transitions to NEEDS_RETRY when embedding raises."""
+    from agentic_pipeline.approval.actions import _complete_approved
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
 
     mock_instance = MockAdapter.return_value
     mock_instance.generate_embeddings.side_effect = RuntimeError("Connection refused")
 
-    pid = _create_pending_pipeline(db_path)
-    result = approve_book(db_path, pid, actor="human:taylor")
+    pid, pipeline = _setup_approved_pipeline(db_path)
+    result = _complete_approved(db_path, pid, pipeline)
 
-    assert result["success"] is True
     assert result["state"] == PipelineState.NEEDS_RETRY.value
     assert "Connection refused" in result["embedding_error"]
-
-    pipeline = PipelineRepository(db_path).get(pid)
-    assert pipeline["state"] == PipelineState.NEEDS_RETRY.value
+    assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.NEEDS_RETRY.value
 
 
 @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_no_processing_result_uses_pipeline_id(MockAdapter, db_path):
-    from agentic_pipeline.approval.actions import approve_book
-    from agentic_pipeline.pipeline.states import PipelineState
+def test_complete_approved_no_processing_result_uses_pipeline_id(MockAdapter, db_path):
+    """_complete_approved() falls back to pipeline_id as book_id when no processing_result."""
+    from agentic_pipeline.approval.actions import _complete_approved
 
     mock_instance = MockAdapter.return_value
     mock_instance.generate_embeddings.return_value = _mock_embedding_result()
 
-    # No processing_result set — should fall back to pipeline_id as book_id
-    pid = _create_pending_pipeline(db_path, processing_result=None)
-    result = approve_book(db_path, pid, actor="human:taylor")
+    pid, pipeline = _setup_approved_pipeline(db_path, processing_result=None)
+    _complete_approved(db_path, pid, pipeline)
 
-    assert result["success"] is True
-    assert result["state"] == PipelineState.COMPLETE.value
     mock_instance.generate_embeddings.assert_called_once_with(book_id=pid)
 
 
 @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
-def test_approve_uses_book_id_from_processing_result(MockAdapter, db_path):
-    from agentic_pipeline.approval.actions import approve_book
-    from agentic_pipeline.pipeline.states import PipelineState
+def test_complete_approved_uses_book_id_from_processing_result(MockAdapter, db_path):
+    """_complete_approved() uses book_id from processing_result when present."""
+    from agentic_pipeline.approval.actions import _complete_approved
 
     mock_instance = MockAdapter.return_value
     mock_instance.generate_embeddings.return_value = _mock_embedding_result()
 
-    pid = _create_pending_pipeline(
+    pid, pipeline = _setup_approved_pipeline(
         db_path, processing_result={"book_id": "my-book-uuid"}
     )
-    result = approve_book(db_path, pid, actor="human:taylor")
+    _complete_approved(db_path, pid, pipeline)
 
-    assert result["success"] is True
     mock_instance.generate_embeddings.assert_called_once_with(book_id="my-book-uuid")

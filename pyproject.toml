@@ -28,12 +28,45 @@ include = ["agentic_pipeline*", "src*"]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
 ]
 
 [tool.pytest.ini_options]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests requiring external services (OPENAI_API_KEY, book_ingestion, real DB). Run with '-m integration'.",
+    "e2e: marks end-to-end CLI tests that exercise the full pipeline via subprocess.",
+    "unit: marks pure unit tests with no I/O dependencies.",
 ]
+# Default run skips integration tests (require real DB/API keys)
+addopts = "-m 'not integration'"
+
+[tool.coverage.run]
+source = ["agentic_pipeline", "src"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "agentic_pipeline/agents/prompts/*",
+]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+# Current: ~42%. src/ library utilities are under-tested.
+# Target path: 42% → 55% (add src/ utils tests) → 70% (full pipeline coverage)
+fail_under = 40
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [project.scripts]
 agentic-pipeline = "agentic_pipeline.cli:main"

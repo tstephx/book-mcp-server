@@ -183,10 +183,10 @@ def test_retry_uses_force_fallback(config, sample_book):
 
     assert result["state"] == "complete"
 
-    # First call: normal processing (no force_fallback)
+    # First call: normal processing (force_fallback=False)
     assert mock_run_processing.call_count == 2
     first_call = mock_run_processing.call_args_list[0]
-    assert first_call == call(sample_book, book_id=result["pipeline_id"])
+    assert first_call == call(sample_book, book_id=result["pipeline_id"], force_fallback=False)
 
     # Second call: retry with force_fallback=True
     second_call = mock_run_processing.call_args_list[1]
