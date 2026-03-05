@@ -3,6 +3,7 @@
 import pytest
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from conftest import transition_to
 
@@ -47,7 +48,9 @@ def test_approve_book_tool(db_path, setup_pending_books):
     from agentic_pipeline.mcp_server import approve_book_tool
 
     pid = setup_pending_books
-    result = approve_book_tool(str(db_path), pid)
+    # Patch background embedding — book_ingestion not installed in unit test env
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        result = approve_book_tool(str(db_path), pid)
 
     assert result["success"] is True
 

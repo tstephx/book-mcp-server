@@ -1,9 +1,10 @@
 """Tests that approve_book() returns promptly without blocking on embedding."""
 
+import threading
 import time
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -38,12 +39,18 @@ def _create_pending_pipeline(db_path):
 
 
 def test_approve_book_returns_before_embedding_completes(db_path):
-    """approve_book() must return in under 1s even if embedding takes 5s."""
+    """approve_book() must return in under 1s even if embedding takes a long time.
+
+    Uses a threading.Event so the background thread exits cleanly before DB
+    teardown — avoids PytestUnhandledThreadExceptionWarning in later tests.
+    """
     from agentic_pipeline.approval.actions import approve_book
 
+    # Event that the background thread blocks on; the test signals it to finish.
+    release = threading.Event()
+
     def slow_embed(*args, **kwargs):
-        time.sleep(5)
-        raise RuntimeError("should not reach assertions if blocking")
+        release.wait(timeout=10)  # blocks until test signals, or 10s safety timeout
 
     with patch(
         "agentic_pipeline.approval.actions._run_embedding_background",
@@ -57,6 +64,10 @@ def test_approve_book_returns_before_embedding_completes(db_path):
     assert elapsed < 1.0, f"approve_book blocked for {elapsed:.2f}s — embedding is still synchronous"
     assert result["success"] is True
     assert result["state"] == "approved"
+
+    # Unblock the daemon thread so it exits before pytest tears down the DB
+    release.set()
+    time.sleep(0.05)  # give the thread a moment to observe the signal and exit
 
 
 def test_approve_book_transitions_to_approved_state(db_path):
