@@ -9,7 +9,7 @@ Quick reference: "which file handles X?"
 | File | Responsibility |
 |------|---------------|
 | `agentic_pipeline/config.py` | `OrchestratorConfig` dataclass — all tunable knobs, reads env vars |
-| `agentic_pipeline/cli.py` | Click CLI entry point — 20+ human-facing commands |
+| `agentic_pipeline/cli.py` | Click CLI entry point — 29 human-facing commands (see `ref/cli-commands.md`) |
 | `agentic_pipeline/mcp_server.py` | MCP tool implementations — thin wrappers around domain modules |
 
 ---

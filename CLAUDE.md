@@ -11,6 +11,7 @@
 | [`ref/mcp-tools.md`](ref/mcp-tools.md) | All MCP tools for both servers with signatures and descriptions |
 | [`ref/db-schema.md`](ref/db-schema.md) | All pipeline DB tables and columns |
 | [`ref/module-map.md`](ref/module-map.md) | "Which file handles X?" — responsibility of every module in `agentic_pipeline/` |
+| [`ref/cli-commands.md`](ref/cli-commands.md) | All 29 CLI commands grouped by category with args and descriptions |
 
 ## What This Is
 Two MCP servers + a CLI pipeline in one repo:
@@ -24,7 +25,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-------------|-------------|
 | **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
 | **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
-| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 20+ commands for pipeline management, approval, autonomy, library maintenance. See `docs/USER-GUIDE.md#cli-commands`. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 29 commands for pipeline management, approval, autonomy, library maintenance. See `ref/cli-commands.md`. |
 | **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
 
 ## Environment Variables
@@ -57,7 +58,7 @@ agentic-pipeline health
 # CLI: run worker with directory watching + auto-archive
 agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline --processed-dir ~/Documents/_ebooks/agentic-book-pipeline/processed
 
-# CLI: full command reference — see docs/USER-GUIDE.md#cli-commands
+# CLI: full command reference — see ref/cli-commands.md
 
 # Tests — use Makefile targets (venv must be activated)
 source .venv/bin/activate
@@ -214,4 +215,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-02-25*
+*Last updated: 2026-03-05*
