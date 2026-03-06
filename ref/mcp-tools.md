@@ -142,7 +142,7 @@ Read-only tools for Claude Desktop. Implementations in `src/tools/*.py`.
 | `audit_chapter_quality` | `audit_tools.py` | Chapter quality metrics |
 | `get_cache_stats` | `server.py` | Cache hit/miss rates, memory usage, cached counts |
 | `clear_cache` | `server.py` | Clear caches (`cache_type`: `chapters`/`embeddings`/`summary_embeddings`/`all`) |
-| `get_summary` | `server.py` | Book summary |
+| `get_summary` | `server.py` | Summary for a specific chapter (`chapter_id`, `force`) |
 | `summarize_book` | `server.py` | Generate/fetch book summary |
 | `refresh_embeddings` | `server.py` | Regenerate chapter embeddings |
 | `generate_summary_embeddings` | `server.py` | Generate summary-level embeddings |

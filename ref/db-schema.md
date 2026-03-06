@@ -16,7 +16,7 @@ Primary pipeline state record for each book.
 |--------|------|-------|
 | `id` | TEXT PK | UUID |
 | `source_path` | TEXT NOT NULL | Original file path |
-| `content_hash` | TEXT NOT NULL UNIQUE | SHA256 — dedup key |
+| `content_hash` | TEXT NOT NULL | SHA256 — dedup key; enforced unique via table constraint |
 | `state` | TEXT NOT NULL | `PipelineState` enum value |
 | `book_profile` | JSON | Classification result: `{book_type, confidence, suggested_tags, ...}` |
 | `strategy_config` | JSON | Processing strategy selected |
@@ -130,7 +130,7 @@ Periodic rollup of processing outcomes.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PK | Auto-increment |
-| `period_start` | DATE NOT NULL | UNIQUE with period_end |
+| `period_start` | DATE NOT NULL | UNIQUE(period_start, period_end) composite constraint |
 | `period_end` | DATE NOT NULL | |
 | `total_processed` | INTEGER | Default 0 |
 | `auto_approved` | INTEGER | Default 0 |
@@ -231,8 +231,8 @@ Expected duration per state (for stuck detection).
 
 ## Embedding Table
 
-### `chunks` (in book-library DB)
-Chapter/section chunks with embeddings for semantic search.
+### `chunks`
+Chapter/section chunks with embeddings for semantic search. Created by pipeline migrations (`run_migrations()`); lives in the shared library DB.
 
 | Column | Type | Notes |
 |--------|------|-------|
