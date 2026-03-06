@@ -6,6 +6,7 @@ chapter detection fallback when the book-ingestion library has low confidence.
 """
 
 import logging
+import re
 from typing import Optional
 
 import openai
@@ -156,8 +157,6 @@ Respond in this JSON format:
                 return None
 
             # Strip single-line comments (// ...) which OpenAI models sometimes include
-            import re
-
             json_str = re.sub(r"//[^\n]*", "", content[start:end])
             data = json.loads(json_str)
 
