@@ -481,8 +481,8 @@ def _generate_business_impact(concept: str, sources: list) -> str:
             break
 
     if impact_sentences:
-        attribution = f"(from *{sources[0]['book_title']}*)"
-        return "\n\n".join(impact_sentences) + f"\n\n{attribution}"
+        attribution = f"(from *{sources[0]['book_title']}*)" if sources else ""
+        return "\n\n".join(impact_sentences) + (f"\n\n{attribution}" if attribution else "")
 
     return f"Understanding {concept} helps you make informed decisions about technical approaches, evaluate vendor solutions, and communicate effectively with engineering teams."
 
@@ -602,8 +602,8 @@ def _generate_tradeoffs(concept: str, sources: list) -> str:
             break
 
     if tradeoff_sentences:
-        attribution = f"(from *{sources[0]['book_title']}*)"
-        return "\n\n".join(tradeoff_sentences) + f"\n\n{attribution}"
+        attribution = f"(from *{sources[0]['book_title']}*)" if sources else ""
+        return "\n\n".join(tradeoff_sentences) + (f"\n\n{attribution}" if attribution else "")
 
     return f"Review the source chapters above for specific tradeoffs the authors discuss about {concept}."
 
