@@ -1266,5 +1266,69 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
         conn.close()
 
 
+@main.command("library-issues")
+def library_issues():
+    """Report library data quality issues (empty titles, duplicates, etc.)."""
+    from .db.config import get_db_path
+
+    import sqlite3
+
+    db_path = get_db_path()
+    conn = sqlite3.connect(str(db_path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    issues = []
+
+    try:
+        # Empty or missing titles
+        empty = conn.execute(
+            "SELECT id, title, author FROM books WHERE title IS NULL OR TRIM(title) = '' OR title = '(Title Missing)'"
+        ).fetchall()
+        if empty:
+            issues.append(("Empty/Missing Titles", empty))
+            console.print(f"\n[red]Empty/Missing Titles: {len(empty)}[/red]")
+            for b in empty:
+                console.print(f"  {b['id'][:12]}  author={b['author'] or 'unknown'}")
+
+        # ISBN-as-title (all digits, optionally with hyphens)
+        isbn = conn.execute(
+            "SELECT id, title, author FROM books WHERE title GLOB '[0-9]*' AND length(title) <= 20 AND TRIM(title) != ''"
+        ).fetchall()
+        if isbn:
+            issues.append(("ISBN/Number Titles", isbn))
+            console.print(f"\n[yellow]ISBN/Number Titles: {len(isbn)}[/yellow]")
+            for b in isbn:
+                console.print(f"  {b['id'][:12]}  title='{b['title']}'  author={b['author'] or 'unknown'}")
+
+        # Short titles (likely garbage)
+        short = conn.execute(
+            "SELECT id, title, author FROM books WHERE length(TRIM(title)) BETWEEN 1 AND 3 AND title NOT GLOB '[0-9]*'"
+        ).fetchall()
+        if short:
+            issues.append(("Very Short Titles", short))
+            console.print(f"\n[yellow]Very Short Titles ({'\u2264'}3 chars): {len(short)}[/yellow]")
+            for b in short:
+                console.print(f"  {b['id'][:12]}  title='{b['title']}'")
+
+        # Duplicate titles
+        dupes = conn.execute(
+            "SELECT title, COUNT(*) as cnt FROM books WHERE TRIM(title) != '' GROUP BY title HAVING cnt > 1 ORDER BY cnt DESC"
+        ).fetchall()
+        if dupes:
+            issues.append(("Duplicate Titles", dupes))
+            console.print(f"\n[yellow]Duplicate Titles: {len(dupes)} groups[/yellow]")
+            for d in dupes:
+                console.print(f"  {d['cnt']}x  '{d['title'][:70]}'")
+
+        if not issues:
+            console.print("[green]No issues found — library is clean.[/green]")
+        else:
+            total = sum(len(items) for _, items in issues)
+            console.print(f"\n[bold]{total} issues across {len(issues)} categories[/bold]")
+            console.print("Use [bold]update-title[/bold] to fix chapter titles, or manual SQL for book titles.")
+
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     main()
