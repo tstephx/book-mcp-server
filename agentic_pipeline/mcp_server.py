@@ -140,7 +140,11 @@ def get_pipeline_status(pipeline_id: str) -> dict:
     }
 
     if pipeline.get("book_profile"):
-        profile = json.loads(pipeline["book_profile"]) if isinstance(pipeline["book_profile"], str) else pipeline["book_profile"]
+        profile = (
+            json.loads(pipeline["book_profile"])
+            if isinstance(pipeline["book_profile"], str)
+            else pipeline["book_profile"]
+        )
         result["book_type"] = profile.get("book_type")
         result["confidence"] = profile.get("confidence")
         result["suggested_tags"] = profile.get("suggested_tags")
@@ -152,6 +156,7 @@ def get_pipeline_status(pipeline_id: str) -> dict:
 
 
 # Phase 4: Production Hardening Tools
+
 
 def get_pipeline_health() -> dict:
     """
@@ -289,6 +294,7 @@ def get_audit_log(
 
 # Phase 5: Autonomy Tools
 
+
 def get_autonomy_status() -> dict:
     """
     Get current autonomy mode, thresholds, and metrics summary.
@@ -388,6 +394,7 @@ def get_autonomy_readiness() -> dict:
 
 
 # Phase 6: Backfill & Validation Tools
+
 
 def backfill_library(
     db_path: Optional[str] = None,

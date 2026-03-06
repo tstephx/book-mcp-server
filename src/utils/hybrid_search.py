@@ -14,11 +14,7 @@ from .vector_store import batch_cosine_similarity
 logger = logging.getLogger(__name__)
 
 
-def reciprocal_rank_fusion(
-    fts_results: list[dict],
-    semantic_results: list[dict],
-    k: int = 60
-) -> list[dict]:
+def reciprocal_rank_fusion(fts_results: list[dict], semantic_results: list[dict], k: int = 60) -> list[dict]:
     """Fuse FTS and semantic search results using Reciprocal Rank Fusion.
 
     RRF assigns each result a score based on its rank position in each
@@ -45,51 +41,48 @@ def reciprocal_rank_fusion(
 
     # Process FTS results (already sorted by rank — higher BM25 = better match)
     for position, result in enumerate(fts_results, start=1):
-        cid = result['chapter_id']
+        cid = result["chapter_id"]
         rrf_contribution = 1.0 / (k + position)
 
         chapter_data[cid] = {
-            'chapter_id': cid,
-            'book_id': result.get('book_id', ''),
-            'book_title': result.get('book_title', ''),
-            'chapter_number': result.get('chapter_number', 0),
-            'chapter_title': result.get('chapter_title', ''),
-            'rrf_score': rrf_contribution,
-            'fts_rank': result.get('rank'),
-            'semantic_sim': None,
-            'sources': ['fts'],
+            "chapter_id": cid,
+            "book_id": result.get("book_id", ""),
+            "book_title": result.get("book_title", ""),
+            "chapter_number": result.get("chapter_number", 0),
+            "chapter_title": result.get("chapter_title", ""),
+            "rrf_score": rrf_contribution,
+            "fts_rank": result.get("rank"),
+            "semantic_sim": None,
+            "sources": ["fts"],
         }
 
     # Process semantic results (already sorted by similarity descending)
     for position, result in enumerate(semantic_results, start=1):
-        cid = result['chapter_id']
+        cid = result["chapter_id"]
         rrf_contribution = 1.0 / (k + position)
 
         if cid in chapter_data:
             # Chapter found in both — add semantic contribution
-            chapter_data[cid]['rrf_score'] += rrf_contribution
-            chapter_data[cid]['semantic_sim'] = result.get('similarity')
-            chapter_data[cid]['sources'].append('semantic')
+            chapter_data[cid]["rrf_score"] += rrf_contribution
+            chapter_data[cid]["semantic_sim"] = result.get("similarity")
+            chapter_data[cid]["sources"].append("semantic")
         else:
             chapter_data[cid] = {
-                'chapter_id': cid,
-                'book_id': result.get('book_id', ''),
-                'book_title': result.get('book_title', ''),
-                'chapter_number': result.get('chapter_number', 0),
-                'chapter_title': result.get('chapter_title', ''),
-                'rrf_score': rrf_contribution,
-                'fts_rank': None,
-                'semantic_sim': result.get('similarity'),
-                'sources': ['semantic'],
+                "chapter_id": cid,
+                "book_id": result.get("book_id", ""),
+                "book_title": result.get("book_title", ""),
+                "chapter_number": result.get("chapter_number", 0),
+                "chapter_title": result.get("chapter_title", ""),
+                "rrf_score": rrf_contribution,
+                "fts_rank": None,
+                "semantic_sim": result.get("similarity"),
+                "sources": ["semantic"],
             }
 
     # Sort by rrf_score descending
-    fused = sorted(chapter_data.values(), key=lambda x: x['rrf_score'], reverse=True)
+    fused = sorted(chapter_data.values(), key=lambda x: x["rrf_score"], reverse=True)
 
-    logger.debug(
-        f"RRF fusion: {len(fts_results)} FTS + {len(semantic_results)} semantic "
-        f"= {len(fused)} unique results"
-    )
+    logger.debug(f"RRF fusion: {len(fts_results)} FTS + {len(semantic_results)} semantic = {len(fused)} unique results")
 
     return fused
 
@@ -100,7 +93,7 @@ def maximal_marginal_relevance(
     metadata: list[dict],
     query_embedding: np.ndarray,
     lambda_param: float = 0.7,
-    top_k: int = 10
+    top_k: int = 10,
 ) -> list[dict]:
     """Re-rank results using Maximal Marginal Relevance for diversity.
 
@@ -133,13 +126,13 @@ def maximal_marginal_relevance(
     # Build index mapping: chapter_id -> row index in embeddings_matrix
     metadata_index = {}
     for idx, meta in enumerate(metadata):
-        metadata_index[meta['id']] = idx
+        metadata_index[meta["id"]] = idx
 
     # Filter to results that have embeddings
     candidate_indices = []
     candidate_results = []
     for r in results:
-        emb_idx = metadata_index.get(r['chapter_id'])
+        emb_idx = metadata_index.get(r["chapter_id"])
         if emb_idx is not None:
             candidate_indices.append(emb_idx)
             candidate_results.append(r)
@@ -163,7 +156,7 @@ def maximal_marginal_relevance(
         if not remaining:
             break
 
-        best_score = -float('inf')
+        best_score = -float("inf")
         best_idx = -1
 
         for idx in remaining:
@@ -172,9 +165,7 @@ def maximal_marginal_relevance(
 
             # Diversity: max similarity to any already-selected result
             if n_selected > 0:
-                inter_sims = batch_cosine_similarity(
-                    candidate_embeddings[idx], selected_buffer[:n_selected]
-                )
+                inter_sims = batch_cosine_similarity(candidate_embeddings[idx], selected_buffer[:n_selected])
                 max_inter_sim = float(np.max(inter_sims))
             else:
                 max_inter_sim = 0.0

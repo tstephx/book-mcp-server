@@ -22,11 +22,7 @@ def test_record_approval_decision(db_path):
 
     collector = MetricsCollector(db_path)
     collector.record_decision(
-        book_id="book123",
-        book_type="technical_tutorial",
-        confidence=0.92,
-        decision="approved",
-        actor="human:taylor"
+        book_id="book123", book_type="technical_tutorial", confidence=0.92, decision="approved", actor="human:taylor"
     )
 
     metrics = collector.get_metrics(days=1)
@@ -43,7 +39,7 @@ def test_record_auto_approval(db_path):
         book_type="technical_tutorial",
         confidence=0.95,
         decision="approved",
-        actor="auto:high_confidence"
+        actor="auto:high_confidence",
     )
 
     metrics = collector.get_metrics(days=1)

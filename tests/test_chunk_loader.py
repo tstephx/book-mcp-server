@@ -38,13 +38,10 @@ class TestChunkLoader:
     def test_loads_chunk_embeddings(self):
         db_path, conn = self._setup_db()
         conn.execute("INSERT INTO books VALUES ('b1', 'Test Book', 'Test Author')")
-        conn.execute(
-            "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)"
-        )
+        conn.execute("INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)")
         blob, arr = self._make_embedding_blob()
         conn.execute(
-            "INSERT INTO chunks VALUES ('ch1:0', 'ch1', 'b1', 0, 'content', "
-            "100, ?, 'text-embedding-3-small', 'hash1')",
+            "INSERT INTO chunks VALUES ('ch1:0', 'ch1', 'b1', 0, 'content', 100, ?, 'text-embedding-3-small', 'hash1')",
             (blob,),
         )
         conn.commit()

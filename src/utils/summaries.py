@@ -21,11 +21,7 @@ from .file_utils import read_chapter_content
 logger = logging.getLogger(__name__)
 
 
-def extract_summary(
-    content: str,
-    max_sentences: int = 5,
-    include_intro: bool = True
-) -> str:
+def extract_summary(content: str, max_sentences: int = 5, include_intro: bool = True) -> str:
     """Extract summary from chapter content using extractive method
 
     Strategy:
@@ -47,7 +43,7 @@ def extract_summary(
         return ""
 
     # Split into paragraphs
-    paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+    paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
     if not paragraphs:
         return ""
@@ -59,7 +55,7 @@ def extract_summary(
     if include_intro and paragraphs:
         intro = paragraphs[0]
         # Skip if intro looks like a header or is too short
-        if len(intro) > 50 and not intro.startswith('#'):
+        if len(intro) > 50 and not intro.startswith("#"):
             summary_parts.append(intro)
             # Count sentences used
             intro_sentences = len(_split_sentences(intro))
@@ -67,13 +63,13 @@ def extract_summary(
             paragraphs = paragraphs[1:]
 
     if remaining_sentences <= 0 or not paragraphs:
-        return '\n\n'.join(summary_parts)
+        return "\n\n".join(summary_parts)
 
     # Collect and score all sentences from remaining paragraphs
     all_sentences = []
     for para_idx, para in enumerate(paragraphs):
         # Skip headers and very short paragraphs
-        if para.startswith('#') or len(para) < 30:
+        if para.startswith("#") or len(para) < 30:
             continue
 
         sentences = _split_sentences(para)
@@ -93,24 +89,19 @@ def extract_summary(
 
     summary_parts.extend([sent for _, sent, _ in selected])
 
-    return '\n\n'.join(summary_parts)
+    return "\n\n".join(summary_parts)
 
 
 def _split_sentences(text: str) -> List[str]:
     """Split text into sentences"""
     # Simple sentence splitter - handles common cases
     # Split on .!? followed by space and capital letter
-    pattern = r'(?<=[.!?])\s+(?=[A-Z])'
+    pattern = r"(?<=[.!?])\s+(?=[A-Z])"
     sentences = re.split(pattern, text)
     return [s.strip() for s in sentences if s.strip()]
 
 
-def _score_sentence(
-    sentence: str,
-    para_idx: int,
-    sent_idx: int,
-    total_paras: int
-) -> float:
+def _score_sentence(sentence: str, para_idx: int, sent_idx: int, total_paras: int) -> float:
     """Score sentence for summary inclusion
 
     Higher scores = more likely to include
@@ -144,19 +135,19 @@ def _score_sentence(
     lower_sent = sentence.lower()
 
     # Definition patterns
-    if any(marker in lower_sent for marker in [' is ', ' are ', ' means ', ' refers to ']):
+    if any(marker in lower_sent for marker in [" is ", " are ", " means ", " refers to "]):
         score += 1.0
 
     # Conclusion/summary patterns
-    if any(marker in lower_sent for marker in ['in summary', 'in conclusion', 'importantly', 'key ', 'essential']):
+    if any(marker in lower_sent for marker in ["in summary", "in conclusion", "importantly", "key ", "essential"]):
         score += 1.5
 
     # Example patterns (slightly lower, but still useful)
-    if any(marker in lower_sent for marker in ['for example', 'for instance', 'such as']):
+    if any(marker in lower_sent for marker in ["for example", "for instance", "such as"]):
         score += 0.5
 
     # Technical content indicators
-    if any(marker in lower_sent for marker in ['function', 'method', 'class', 'pattern', 'approach']):
+    if any(marker in lower_sent for marker in ["function", "method", "class", "pattern", "approach"]):
         score += 0.5
 
     return score
@@ -174,16 +165,9 @@ def generate_chapter_summary(chapter_id: str, force: bool = False) -> dict:
     """
     # Check for existing summary
     if not force:
-        existing = execute_query(
-            "SELECT summary FROM chapter_summaries WHERE chapter_id = ?",
-            (chapter_id,)
-        )
-        if existing and existing[0]['summary']:
-            return {
-                'chapter_id': chapter_id,
-                'summary': existing[0]['summary'],
-                'status': 'cached'
-            }
+        existing = execute_query("SELECT summary FROM chapter_summaries WHERE chapter_id = ?", (chapter_id,))
+        if existing and existing[0]["summary"]:
+            return {"chapter_id": chapter_id, "summary": existing[0]["summary"], "status": "cached"}
 
     # Get chapter info
     chapter = execute_query(
@@ -191,48 +175,51 @@ def generate_chapter_summary(chapter_id: str, force: bool = False) -> dict:
            FROM chapters c
            JOIN books b ON c.book_id = b.id
            WHERE c.id = ?""",
-        (chapter_id,)
+        (chapter_id,),
     )
 
     if not chapter:
-        return {'error': f'Chapter not found: {chapter_id}'}
+        return {"error": f"Chapter not found: {chapter_id}"}
 
     chapter = chapter[0]
 
     # Read content
     try:
-        content = read_chapter_content(chapter['file_path'])
+        content = read_chapter_content(chapter["file_path"])
     except Exception as e:
-        return {'error': f'Failed to read chapter: {e}'}
+        return {"error": f"Failed to read chapter: {e}"}
 
     # Generate summary
     summary = extract_summary(content, max_sentences=5)
 
     if not summary:
-        return {'error': 'Could not generate summary (chapter may be too short)'}
+        return {"error": "Could not generate summary (chapter may be too short)"}
 
     # Store in database
     now = datetime.now().isoformat()
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO chapter_summaries
                 (chapter_id, summary, generated_at)
                 VALUES (?, ?, ?)
-            """, (chapter_id, summary, now))
+            """,
+                (chapter_id, summary, now),
+            )
             conn.commit()
     except Exception as e:
         logger.warning(f"Failed to store summary: {e}")
         # Return summary anyway, just not cached
 
     return {
-        'chapter_id': chapter_id,
-        'chapter_number': chapter['chapter_number'],
-        'chapter_title': chapter['title'],
-        'book_title': chapter['book_title'],
-        'summary': summary,
-        'status': 'generated'
+        "chapter_id": chapter_id,
+        "chapter_number": chapter["chapter_number"],
+        "chapter_title": chapter["title"],
+        "book_title": chapter["book_title"],
+        "summary": summary,
+        "status": "generated",
     }
 
 
@@ -252,7 +239,7 @@ def get_chapter_summary(chapter_id: str) -> Optional[dict]:
            JOIN chapters c ON cs.chapter_id = c.id
            JOIN books b ON c.book_id = b.id
            WHERE cs.chapter_id = ?""",
-        (chapter_id,)
+        (chapter_id,),
     )
 
     if not row:
@@ -260,12 +247,12 @@ def get_chapter_summary(chapter_id: str) -> Optional[dict]:
 
     row = row[0]
     return {
-        'chapter_id': row['chapter_id'],
-        'chapter_number': row['chapter_number'],
-        'chapter_title': row['title'],
-        'book_title': row['book_title'],
-        'summary': row['summary'],
-        'generated_at': row['generated_at']
+        "chapter_id": row["chapter_id"],
+        "chapter_number": row["chapter_number"],
+        "chapter_title": row["title"],
+        "book_title": row["book_title"],
+        "summary": row["summary"],
+        "generated_at": row["generated_at"],
     }
 
 
@@ -284,33 +271,23 @@ def generate_book_summaries(book_id: str, force: bool = False) -> dict:
            FROM chapters
            WHERE book_id = ?
            ORDER BY chapter_number""",
-        (book_id,)
+        (book_id,),
     )
 
     if not chapters:
-        return {'error': f'No chapters found for book: {book_id}'}
+        return {"error": f"No chapters found for book: {book_id}"}
 
-    results = {
-        'book_id': book_id,
-        'total': len(chapters),
-        'generated': 0,
-        'cached': 0,
-        'errors': []
-    }
+    results = {"book_id": book_id, "total": len(chapters), "generated": 0, "cached": 0, "errors": []}
 
     for chapter in chapters:
-        result = generate_chapter_summary(chapter['id'], force=force)
+        result = generate_chapter_summary(chapter["id"], force=force)
 
-        if 'error' in result:
-            results['errors'].append({
-                'chapter_id': chapter['id'],
-                'title': chapter['title'],
-                'error': result['error']
-            })
-        elif result.get('status') == 'cached':
-            results['cached'] += 1
+        if "error" in result:
+            results["errors"].append({"chapter_id": chapter["id"], "title": chapter["title"], "error": result["error"]})
+        elif result.get("status") == "cached":
+            results["cached"] += 1
         else:
-            results['generated'] += 1
+            results["generated"] += 1
 
     logger.info(
         f"Book {book_id} summaries: {results['generated']} generated, "
@@ -331,15 +308,12 @@ def generate_summary_embedding(chapter_id: str, generator) -> bool:
         True if embedding was generated and stored successfully
     """
     # Read summary from DB
-    rows = execute_query(
-        "SELECT summary FROM chapter_summaries WHERE chapter_id = ?",
-        (chapter_id,)
-    )
-    if not rows or not rows[0]['summary']:
+    rows = execute_query("SELECT summary FROM chapter_summaries WHERE chapter_id = ?", (chapter_id,))
+    if not rows or not rows[0]["summary"]:
         logger.warning(f"No summary found for chapter {chapter_id}")
         return False
 
-    summary_text = rows[0]['summary']
+    summary_text = rows[0]["summary"]
 
     # Generate embedding
     try:
@@ -353,17 +327,20 @@ def generate_summary_embedding(chapter_id: str, generator) -> bool:
     np.save(buf, embedding)
     embedding_blob = buf.getvalue()
 
-    model_name = 'text-embedding-3-large'
+    model_name = "text-embedding-3-large"
 
     # Store in DB
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE chapter_summaries
                 SET embedding = ?, embedding_model = ?
                 WHERE chapter_id = ?
-            """, (embedding_blob, model_name, chapter_id))
+            """,
+                (embedding_blob, model_name, chapter_id),
+            )
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to store summary embedding for {chapter_id}: {e}")
@@ -382,29 +359,25 @@ def batch_generate_summary_embeddings(force: bool = False) -> dict:
         Stats dict: {generated, skipped, errors, total}
     """
     # Count total summaries and those already with embeddings
-    all_summaries = execute_query(
-        "SELECT chapter_id FROM chapter_summaries WHERE summary IS NOT NULL"
-    )
+    all_summaries = execute_query("SELECT chapter_id FROM chapter_summaries WHERE summary IS NOT NULL")
     total = len(all_summaries)
 
     if force:
         rows = all_summaries
         skipped = 0
     else:
-        rows = execute_query(
-            "SELECT chapter_id FROM chapter_summaries WHERE summary IS NOT NULL AND embedding IS NULL"
-        )
+        rows = execute_query("SELECT chapter_id FROM chapter_summaries WHERE summary IS NOT NULL AND embedding IS NULL")
         skipped = total - len(rows)
 
     if not rows:
-        return {'generated': 0, 'skipped': skipped, 'errors': 0, 'total': total, 'status': 'no_updates_needed'}
+        return {"generated": 0, "skipped": skipped, "errors": 0, "total": total, "status": "no_updates_needed"}
 
     generated = 0
     errors = 0
 
     with embedding_model_context() as generator:
         for row in rows:
-            if generate_summary_embedding(row['chapter_id'], generator):
+            if generate_summary_embedding(row["chapter_id"], generator):
                 generated += 1
             else:
                 errors += 1
@@ -415,9 +388,9 @@ def batch_generate_summary_embeddings(force: bool = False) -> dict:
     logger.info(f"Summary embeddings: {generated} generated, {skipped} skipped, {errors} errors")
 
     return {
-        'generated': generated,
-        'skipped': skipped,
-        'errors': errors,
-        'total': total,
-        'status': 'updated' if generated > 0 else 'no_updates_needed'
+        "generated": generated,
+        "skipped": skipped,
+        "errors": errors,
+        "total": total,
+        "status": "updated" if generated > 0 else "no_updates_needed",
     }

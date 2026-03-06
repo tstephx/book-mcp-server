@@ -56,8 +56,7 @@ def test_data():
 
     book = conn.execute("SELECT id FROM books ORDER BY title LIMIT 1").fetchone()
     chapter = conn.execute(
-        "SELECT id, chapter_number FROM chapters "
-        "WHERE book_id = ? ORDER BY chapter_number LIMIT 1",
+        "SELECT id, chapter_number FROM chapters WHERE book_id = ? ORDER BY chapter_number LIMIT 1",
         (book["id"],),
     ).fetchone()
 
@@ -142,48 +141,79 @@ BOOK_TOOLS = [
 
 BOOK_TOOLS_OPENAI = [
     # --- Search (needs OpenAI) ---
-    pytest.param("semantic_search", {"query": "docker containers", "limit": 3},
-                 marks=[needs_openai], id="semantic_search"),
-    pytest.param("hybrid_search", {"query": "docker containers", "limit": 5},
-                 marks=[needs_openai], id="hybrid_search"),
+    pytest.param(
+        "semantic_search", {"query": "docker containers", "limit": 3}, marks=[needs_openai], id="semantic_search"
+    ),
+    pytest.param("hybrid_search", {"query": "docker containers", "limit": 5}, marks=[needs_openai], id="hybrid_search"),
     # --- Discovery (needs OpenAI) ---
-    pytest.param("find_related_content",
-                 {"text_snippet": "container networking fundamentals", "limit": 3},
-                 marks=[needs_openai, slow], id="find_related_content"),
-    pytest.param("get_topic_coverage", {"topic": "docker", "include_excerpts": False},
-                 marks=[needs_openai, slow], id="get_topic_coverage"),
+    pytest.param(
+        "find_related_content",
+        {"text_snippet": "container networking fundamentals", "limit": 3},
+        marks=[needs_openai, slow],
+        id="find_related_content",
+    ),
+    pytest.param(
+        "get_topic_coverage",
+        {"topic": "docker", "include_excerpts": False},
+        marks=[needs_openai, slow],
+        id="get_topic_coverage",
+    ),
     # --- Search (OpenAI + slow) ---
-    pytest.param("search_all_books",
-                 {"query": "docker containers", "max_per_book": 1},
-                 marks=[needs_openai, slow], id="search_all_books"),
+    pytest.param(
+        "search_all_books",
+        {"query": "docker containers", "max_per_book": 1},
+        marks=[needs_openai, slow],
+        id="search_all_books",
+    ),
     # --- Learning (OpenAI + slow) ---
-    pytest.param("teach_concept",
-                 {"concept": "git branching", "depth": "executive"},
-                 marks=[needs_openai, slow], id="teach_concept"),
-    pytest.param("generate_learning_path",
-                 {"goal": "Build a VPS on Hetzner", "depth": "quick", "include_concepts": False},
-                 marks=[needs_openai, slow], id="generate_learning_path"),
+    pytest.param(
+        "teach_concept",
+        {"concept": "git branching", "depth": "executive"},
+        marks=[needs_openai, slow],
+        id="teach_concept",
+    ),
+    pytest.param(
+        "generate_learning_path",
+        {"goal": "Build a VPS on Hetzner", "depth": "quick", "include_concepts": False},
+        marks=[needs_openai, slow],
+        id="generate_learning_path",
+    ),
     # --- Planning (OpenAI + slow) ---
-    pytest.param("generate_implementation_plan",
-                 {"goal": "Build a VPS on Hetzner"},
-                 marks=[needs_openai, slow], id="generate_implementation_plan"),
-    pytest.param("generate_brd",
-                 {"goal": "Build a VPS on Hetzner", "template_style": "lean"},
-                 marks=[needs_openai, slow], id="generate_brd"),
-    pytest.param("generate_wireframe_brief",
-                 {"goal": "Build a VPS on Hetzner", "audience": "executive"},
-                 marks=[needs_openai, slow], id="generate_wireframe_brief"),
-    pytest.param("analyze_project",
-                 {"goal": "Build a VPS on Hetzner", "mode": "overview"},
-                 marks=[needs_openai, slow], id="analyze_project"),
+    pytest.param(
+        "generate_implementation_plan",
+        {"goal": "Build a VPS on Hetzner"},
+        marks=[needs_openai, slow],
+        id="generate_implementation_plan",
+    ),
+    pytest.param(
+        "generate_brd",
+        {"goal": "Build a VPS on Hetzner", "template_style": "lean"},
+        marks=[needs_openai, slow],
+        id="generate_brd",
+    ),
+    pytest.param(
+        "generate_wireframe_brief",
+        {"goal": "Build a VPS on Hetzner", "audience": "executive"},
+        marks=[needs_openai, slow],
+        id="generate_wireframe_brief",
+    ),
+    pytest.param(
+        "analyze_project",
+        {"goal": "Build a VPS on Hetzner", "mode": "overview"},
+        marks=[needs_openai, slow],
+        id="analyze_project",
+    ),
 ]
 
 BOOK_TOOLS_SLOW = [
     # --- Analytics (slow, no OpenAI) ---
-    pytest.param("find_duplicate_coverage", {"similarity_threshold": 0.8, "max_results": 5},
-                 marks=[slow], id="find_duplicate_coverage"),
-    pytest.param("summarize_book", {"book_id": _BOOK_ID},
-                 marks=[slow], id="summarize_book"),
+    pytest.param(
+        "find_duplicate_coverage",
+        {"similarity_threshold": 0.8, "max_results": 5},
+        marks=[slow],
+        id="find_duplicate_coverage",
+    ),
+    pytest.param("summarize_book", {"book_id": _BOOK_ID}, marks=[slow], id="summarize_book"),
 ]
 
 ALL_BOOK_TOOLS = BOOK_TOOLS + BOOK_TOOLS_OPENAI + BOOK_TOOLS_SLOW
@@ -214,9 +244,7 @@ def test_reading_progress_lifecycle(server, test_data):
     result = _call_tool(server, "mark_as_reading", book_id=bid, chapter_number=ch)
     assert result is not None
 
-    result = _call_tool(
-        server, "mark_as_read", book_id=bid, chapter_number=ch, notes="SMOKE_TEST"
-    )
+    result = _call_tool(server, "mark_as_read", book_id=bid, chapter_number=ch, notes="SMOKE_TEST")
     assert result is not None
 
     progress = _call_tool(server, "get_reading_progress", book_id=bid)
@@ -229,8 +257,12 @@ def test_bookmark_lifecycle(server, test_data):
     ch = test_data["chapter_number"]
 
     added = _call_tool(
-        server, "add_bookmark",
-        book_id=bid, chapter_number=ch, title="SMOKE_TEST", note="auto-cleanup",
+        server,
+        "add_bookmark",
+        book_id=bid,
+        chapter_number=ch,
+        title="SMOKE_TEST",
+        note="auto-cleanup",
     )
     assert added is not None
 
@@ -259,6 +291,7 @@ def test_clear_cache(server):
 
 
 # Embedding management tools — skipped by default (OpenAI + slow + known issues)
+
 
 @pytest.mark.skipif(not HAS_OPENAI, reason="No OPENAI_API_KEY")
 @pytest.mark.slow
@@ -339,7 +372,4 @@ def test_cli_smoke(args):
     """Each CLI command exits with code 0."""
     cmd = [sys.executable, "-m", "agentic_pipeline.cli"] + args[0]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, (
-        f"CLI command failed: {' '.join(cmd)}\n"
-        f"stderr: {result.stderr[:500]}"
-    )
+    assert result.returncode == 0, f"CLI command failed: {' '.join(cmd)}\nstderr: {result.stderr[:500]}"

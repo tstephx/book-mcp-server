@@ -53,17 +53,19 @@ class LibraryStatus:
 
             embedding_pct = (embedded / chapters * 100) if chapters > 0 else 0.0
 
-            book_list.append({
-                "id": row["id"],
-                "title": row["title"],
-                "author": row["author"],
-                "chapters": chapters,
-                "embedded_chapters": embedded,
-                "embedding_pct": round(embedding_pct, 1),
-                "pipeline_state": row["pipeline_state"],
-                "source": "pipeline" if row["pipeline_state"] else "direct",
-                "status": status,
-            })
+            book_list.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"],
+                    "author": row["author"],
+                    "chapters": chapters,
+                    "embedded_chapters": embedded,
+                    "embedding_pct": round(embedding_pct, 1),
+                    "pipeline_state": row["pipeline_state"],
+                    "source": "pipeline" if row["pipeline_state"] else "direct",
+                    "status": status,
+                }
+            )
 
         coverage_pct = (embedded_chapters / total_chapters * 100) if total_chapters > 0 else 0.0
 

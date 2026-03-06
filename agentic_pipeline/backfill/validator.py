@@ -35,26 +35,32 @@ class LibraryValidator:
                 embedded = book["embedded_count"] or 0
 
                 if chapters == 0:
-                    issues.append({
-                        "book_id": book["id"],
-                        "title": book["title"],
-                        "issue": "no_chapters",
-                        "detail": "Book has no chapters",
-                    })
+                    issues.append(
+                        {
+                            "book_id": book["id"],
+                            "title": book["title"],
+                            "issue": "no_chapters",
+                            "detail": "Book has no chapters",
+                        }
+                    )
                 elif embedded < chapters:
-                    issues.append({
-                        "book_id": book["id"],
-                        "title": book["title"],
-                        "issue": "missing_embeddings",
-                        "detail": f"{embedded}/{chapters} chapters embedded",
-                    })
+                    issues.append(
+                        {
+                            "book_id": book["id"],
+                            "title": book["title"],
+                            "issue": "missing_embeddings",
+                            "detail": f"{embedded}/{chapters} chapters embedded",
+                        }
+                    )
 
                 if chapters > 0 and (book["word_count"] or 0) < 1000:
-                    issues.append({
-                        "book_id": book["id"],
-                        "title": book["title"],
-                        "issue": "low_word_count",
-                        "detail": f"{book['word_count'] or 0} words",
-                    })
+                    issues.append(
+                        {
+                            "book_id": book["id"],
+                            "title": book["title"],
+                            "issue": "low_word_count",
+                            "detail": f"{book['word_count'] or 0} words",
+                        }
+                    )
 
             return issues

@@ -31,7 +31,7 @@ class BatchOperations:
             return {
                 "would_approve": len(matches),
                 "approved": 0,
-                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
             }
 
         from agentic_pipeline.approval.actions import _complete_approved
@@ -41,19 +41,17 @@ class BatchOperations:
 
         for pipeline in matches:
             self.repo.update_state(pipeline["id"], PipelineState.APPROVED)
-            self.repo.mark_approved(
-                pipeline["id"],
-                approved_by=f"batch:{actor}",
-                confidence=None
-            )
+            self.repo.mark_approved(pipeline["id"], approved_by=f"batch:{actor}", confidence=None)
             embed_result = _complete_approved(self.db_path, pipeline["id"], pipeline)
             if embed_result["state"] == PipelineState.COMPLETE.value:
                 embedded += 1
             else:
-                embedding_failures.append({
-                    "id": pipeline["id"],
-                    "error": embed_result.get("embedding_error", "unknown"),
-                })
+                embedding_failures.append(
+                    {
+                        "id": pipeline["id"],
+                        "error": embed_result.get("embedding_error", "unknown"),
+                    }
+                )
 
         # Log batch operation to audit
         self.audit.log(
@@ -68,7 +66,7 @@ class BatchOperations:
             "would_approve": len(matches),
             "embedded": embedded,
             "embedding_failures": embedding_failures,
-            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
         }
 
     def reject(
@@ -86,14 +84,12 @@ class BatchOperations:
             return {
                 "would_reject": len(matches),
                 "rejected": 0,
-                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
             }
 
         for pipeline in matches:
             self.repo.update_state(
-                pipeline["id"],
-                PipelineState.REJECTED,
-                error_details={"reason": reason, "actor": actor}
+                pipeline["id"], PipelineState.REJECTED, error_details={"reason": reason, "actor": actor}
             )
 
         self.audit.log(
@@ -107,7 +103,7 @@ class BatchOperations:
         return {
             "rejected": len(matches),
             "would_reject": len(matches),
-            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
         }
 
     def set_priority(
@@ -124,7 +120,7 @@ class BatchOperations:
             return {
                 "would_update": len(matches),
                 "updated": 0,
-                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+                "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
             }
 
         for pipeline in matches:
@@ -135,11 +131,11 @@ class BatchOperations:
             action="BATCH_PRIORITY_CHANGED",
             actor=actor,
             filter_used=filter.to_dict(),
-            adjustments={"new_priority": priority}
+            adjustments={"new_priority": priority},
         )
 
         return {
             "updated": len(matches),
             "would_update": len(matches),
-            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches]
+            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
         }

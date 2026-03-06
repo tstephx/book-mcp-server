@@ -18,6 +18,7 @@ def main():
 def version():
     """Show version."""
     from . import __version__
+
     console.print(f"agentic-pipeline v{__version__}")
 
 
@@ -216,10 +217,13 @@ def process(book_path: str):
 
 
 @main.command()
-@click.option("--watch-dir", type=click.Path(exists=True), default=None,
-              help="Directory to watch for new book files (.epub, .pdf)")
-@click.option("--processed-dir", type=click.Path(), default=None,
-              help="Directory to move processed book files into")
+@click.option(
+    "--watch-dir",
+    type=click.Path(exists=True),
+    default=None,
+    help="Directory to watch for new book files (.epub, .pdf)",
+)
+@click.option("--processed-dir", type=click.Path(), default=None, help="Directory to move processed book files into")
 def worker(watch_dir, processed_dir):
     """Run the queue worker (processes books continuously)."""
     from .config import OrchestratorConfig
@@ -276,8 +280,12 @@ def retry(max_attempts: int):
 
 @main.command()
 @click.argument("book_id")
-@click.option("--force-fallback", is_flag=True, default=False,
-              help="Skip anchor detection and use LLM-assisted chapter detection.")
+@click.option(
+    "--force-fallback",
+    is_flag=True,
+    default=False,
+    help="Skip anchor detection and use LLM-assisted chapter detection.",
+)
 def reingest(book_id: str, force_fallback: bool):
     """Reprocess a book through the full pipeline.
 
@@ -350,7 +358,11 @@ def status(pipeline_id: str):
     console.print(f"  Source: {pipeline['source_path']}")
 
     if pipeline.get("book_profile"):
-        profile = json.loads(pipeline["book_profile"]) if isinstance(pipeline["book_profile"], str) else pipeline["book_profile"]
+        profile = (
+            json.loads(pipeline["book_profile"])
+            if isinstance(pipeline["book_profile"], str)
+            else pipeline["book_profile"]
+        )
         console.print(f"  Type: {profile.get('book_type')}")
         conf = profile.get("confidence", 0)
         conf_style = "green" if conf >= 0.8 else "yellow" if conf >= 0.5 else "red"
@@ -364,6 +376,7 @@ def status(pipeline_id: str):
 
 
 # Phase 4: Production Hardening Commands
+
 
 @main.command()
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
@@ -388,7 +401,7 @@ def health(as_json: bool):
     console.print("-" * 35)
     console.print(f"  Active:     {report['active']} (processing now)")
 
-    stuck_count = len(report['stuck'])
+    stuck_count = len(report["stuck"])
     if stuck_count > 0:
         console.print(f"  Stuck:      [red]{stuck_count} [!][/red]")
     else:
@@ -400,9 +413,9 @@ def health(as_json: bool):
     console.print(f"  Perm.failed:  {report['permanently_failed']} (max retries exhausted)")
     console.print("-" * 35)
 
-    if report['alerts']:
+    if report["alerts"]:
         console.print("\n[yellow]Alerts:[/yellow]")
-        for alert in report['alerts']:
+        for alert in report["alerts"]:
             console.print(f"  [{alert['severity']}] {alert['message']}")
 
 
@@ -450,8 +463,8 @@ def batch_approve(min_confidence: float, book_type: str, max_count: int, execute
     result = ops.approve(filter, actor="human:cli", execute=execute)
 
     if execute:
-        embedded = result.get('embedded', 0)
-        failures = result.get('embedding_failures', [])
+        embedded = result.get("embedded", 0)
+        failures = result.get("embedding_failures", [])
         console.print(f"[green]Approved {result['approved']} books, embedded {embedded}[/green]")
         if failures:
             console.print(f"[yellow]  {len(failures)} embedding failure(s):[/yellow]")
@@ -459,9 +472,9 @@ def batch_approve(min_confidence: float, book_type: str, max_count: int, execute
                 console.print(f"    {f['id'][:8]}... {f.get('error', 'unknown')}")
     else:
         console.print(f"[yellow]Would approve {result['would_approve']} books (dry-run)[/yellow]")
-        for book in result['books'][:10]:
+        for book in result["books"][:10]:
             console.print(f"  {book['id'][:8]}... {Path(book['source_path']).name}")
-        if len(result['books']) > 10:
+        if len(result["books"]) > 10:
             console.print(f"  ... and {len(result['books']) - 10} more")
 
 
@@ -558,7 +571,9 @@ def library_status(as_json: bool):
     console.print(f"  Books:          {overview['total_books']}")
     console.print(f"  Chapters:       {overview['total_chapters']}")
     console.print(f"  Total words:    {overview['total_words']:,}")
-    console.print(f"  Embedded:       {overview['embedded_chapters']}/{overview['total_chapters']} ({overview['embedding_coverage_pct']}%)")
+    console.print(
+        f"  Embedded:       {overview['embedded_chapters']}/{overview['total_chapters']} ({overview['embedding_coverage_pct']}%)"
+    )
     console.print()
     console.print(f"  [green]Ready:          {overview['books_fully_ready']}[/green]")
     console.print(f"  [yellow]Partial:        {overview['books_partially_ready']}[/yellow]")
@@ -671,6 +686,7 @@ def backfill(dry_run: bool, execute: bool):
 
 
 # Phase 5: Autonomy Commands
+
 
 @main.group()
 def autonomy():
@@ -918,8 +934,9 @@ def _print_spot_check_summary(reviewed: int, correct: int) -> None:
         return
     accuracy = correct / reviewed
     color = "green" if accuracy >= 0.9 else "yellow" if accuracy >= 0.75 else "red"
-    console.print(f"[bold]Session summary:[/bold] {reviewed} reviewed, "
-                  f"[{color}]{correct} correct ({accuracy:.0%})[/{color}]")
+    console.print(
+        f"[bold]Session summary:[/bold] {reviewed} reviewed, [{color}]{correct} correct ({accuracy:.0%})[/{color}]"
+    )
 
 
 @main.command()
@@ -979,12 +996,17 @@ def audit_quality(as_json: bool):
     total, results = find_flagged_books(db_path)
 
     if as_json:
-        print(json_module.dumps({
-            "total": total,
-            "passed": total - len(results),
-            "flagged": len(results),
-            "books": results,
-        }, indent=2))
+        print(
+            json_module.dumps(
+                {
+                    "total": total,
+                    "passed": total - len(results),
+                    "flagged": len(results),
+                    "books": results,
+                },
+                indent=2,
+            )
+        )
         return
 
     console.print(f"\n[bold]Quality Audit: {total} books[/bold]")
@@ -1077,12 +1099,17 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
     total, flagged_books = find_flagged_books(db_path)
 
     if as_json and not execute:
-        print(json_module.dumps({
-            "total": total,
-            "flagged": len(flagged_books),
-            "mode": "dry_run",
-            "books": flagged_books,
-        }, indent=2))
+        print(
+            json_module.dumps(
+                {
+                    "total": total,
+                    "flagged": len(flagged_books),
+                    "mode": "dry_run",
+                    "books": flagged_books,
+                },
+                indent=2,
+            )
+        )
         return
 
     if not flagged_books:
@@ -1134,9 +1161,9 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
 
         with get_pipeline_db(db_path) as conn:
             # Get chapter IDs for cleaning up related tables
-            ch_ids = [r[0] for r in conn.execute(
-                "SELECT id FROM chapters WHERE book_id = ?", (book["book_id"],)
-            ).fetchall()]
+            ch_ids = [
+                r[0] for r in conn.execute("SELECT id FROM chapters WHERE book_id = ?", (book["book_id"],)).fetchall()
+            ]
             if ch_ids:
                 placeholders = ",".join("?" * len(ch_ids))
                 for table in ("chapters_fts", "chapter_summaries", "chunks"):
@@ -1146,7 +1173,10 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
                         pass  # Table may not exist in all environments
             conn.execute("DELETE FROM chapters WHERE book_id = ?", (book["book_id"],))
             conn.execute("DELETE FROM books WHERE id = ?", (book["book_id"],))
-            conn.execute("DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)", (source_file,))
+            conn.execute(
+                "DELETE FROM pipeline_state_history WHERE pipeline_id IN (SELECT id FROM processing_pipelines WHERE source_path = ?)",
+                (source_file,),
+            )
             conn.execute("DELETE FROM processing_pipelines WHERE source_path = ?", (source_file,))
             conn.commit()
 
@@ -1163,13 +1193,18 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
         requeued += 1
 
     if as_json:
-        print(json_module.dumps({
-            "total": total,
-            "flagged": len(flagged_books),
-            "mode": "execute",
-            "requeued": requeued,
-            "skipped": skipped,
-        }, indent=2))
+        print(
+            json_module.dumps(
+                {
+                    "total": total,
+                    "flagged": len(flagged_books),
+                    "mode": "execute",
+                    "requeued": requeued,
+                    "skipped": skipped,
+                },
+                indent=2,
+            )
+        )
     else:
         console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
 

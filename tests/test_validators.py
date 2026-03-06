@@ -1,4 +1,5 @@
 """Tests for resolve_book_id slug resolution and did-you-mean errors."""
+
 from unittest.mock import patch
 import pytest
 from src.utils.validators import resolve_book_id, ValidationError
@@ -19,9 +20,7 @@ def test_resolve_book_id_passes_valid_uuid_through():
 def test_resolve_book_id_slug_resolves_to_uuid():
     """A slug is converted to spaces and matched against book titles."""
     with patch("src.database.execute_query") as mock_query:
-        mock_query.return_value = [
-            {"id": VALID_UUID, "title": "Agentic Design Patterns A Hands On Guide"}
-        ]
+        mock_query.return_value = [{"id": VALID_UUID, "title": "Agentic Design Patterns A Hands On Guide"}]
         result = resolve_book_id("agentic-design-patterns-a-hands-on-guide")
     assert result == VALID_UUID
 
@@ -29,9 +28,7 @@ def test_resolve_book_id_slug_resolves_to_uuid():
 def test_resolve_book_id_slug_single_match_returns_uuid():
     """Single fuzzy match returns that book's UUID."""
     with patch("src.database.execute_query") as mock_query:
-        mock_query.return_value = [
-            {"id": VALID_UUID_2, "title": "Arduino Programming Essentials"}
-        ]
+        mock_query.return_value = [{"id": VALID_UUID_2, "title": "Arduino Programming Essentials"}]
         result = resolve_book_id("arduino-programming-essentials")
     assert result == VALID_UUID_2
 
@@ -102,22 +99,33 @@ def test_resolve_book_id_multiple_matches_returns_first():
 
 def test_get_book_info_accepts_slug(tmp_path):
     """get_book_info should resolve slug IDs, not reject them."""
-    with patch("src.tools.book_tools.resolve_book_id", return_value=VALID_UUID) as mock_resolve, \
-         patch("src.tools.book_tools.execute_single") as mock_db, \
-         patch("src.tools.book_tools.execute_query") as mock_chapters:
+    with (
+        patch("src.tools.book_tools.resolve_book_id", return_value=VALID_UUID) as mock_resolve,
+        patch("src.tools.book_tools.execute_single") as mock_db,
+        patch("src.tools.book_tools.execute_query") as mock_chapters,
+    ):
         mock_db.return_value = {
-            "id": VALID_UUID, "title": "Docker Deep Dive", "author": "Nigel Poulton",
-            "word_count": 50000, "added_date": "2024-01-01", "processing_status": "complete",
-            "file_path": None, "language": "en", "description": None
+            "id": VALID_UUID,
+            "title": "Docker Deep Dive",
+            "author": "Nigel Poulton",
+            "word_count": 50000,
+            "added_date": "2024-01-01",
+            "processing_status": "complete",
+            "file_path": None,
+            "language": "en",
+            "description": None,
         }
         mock_chapters.return_value = []
         from src.tools.book_tools import register_book_tools
         from unittest.mock import MagicMock
+
         mcp = MagicMock()
         captured = {}
+
         def tool_decorator(func):
             captured[func.__name__] = func
             return func
+
         mcp.tool.return_value = tool_decorator
         register_book_tools(mcp)
         result = captured["get_book_info"]("docker-deep-dive")

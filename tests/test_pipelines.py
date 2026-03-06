@@ -26,10 +26,7 @@ def test_create_pipeline(db_path):
 
     repo = PipelineRepository(db_path)
 
-    pipeline_id = repo.create(
-        source_path="/path/to/book.epub",
-        content_hash="abc123"
-    )
+    pipeline_id = repo.create(source_path="/path/to/book.epub", content_hash="abc123")
 
     assert pipeline_id is not None
 

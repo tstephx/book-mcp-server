@@ -63,10 +63,7 @@ class TestReranker:
         results = self._make_results(10)
 
         mock_response = MagicMock()
-        mock_response.results = [
-            MagicMock(index=i, relevance_score=1.0 - i * 0.1)
-            for i in range(5)
-        ]
+        mock_response.results = [MagicMock(index=i, relevance_score=1.0 - i * 0.1) for i in range(5)]
 
         with patch("src.utils.reranker.cohere") as mock_cohere:
             mock_cohere.ClientV2.return_value.rerank.return_value = mock_response

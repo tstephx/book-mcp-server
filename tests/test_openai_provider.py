@@ -39,14 +39,16 @@ def test_openai_provider_parses_valid_response():
 
     mock_response = Mock()
     mock_response.choices = [Mock()]
-    mock_response.choices[0].message.content = json.dumps({
-        "book_type": "technical_tutorial",
-        "confidence": 0.92,
-        "suggested_tags": ["python", "programming"],
-        "reasoning": "Contains code examples and exercises"
-    })
+    mock_response.choices[0].message.content = json.dumps(
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.92,
+            "suggested_tags": ["python", "programming"],
+            "reasoning": "Contains code examples and exercises",
+        }
+    )
 
-    with patch.object(provider, '_client') as mock_client:
+    with patch.object(provider, "_client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_response
         result = provider.classify("sample text")
 
@@ -65,7 +67,7 @@ def test_openai_provider_handles_malformed_json():
     mock_response.choices = [Mock()]
     mock_response.choices[0].message.content = "This is not JSON"
 
-    with patch.object(provider, '_client') as mock_client:
+    with patch.object(provider, "_client") as mock_client:
         mock_client.chat.completions.create.return_value = mock_response
 
         with pytest.raises(ValueError, match="Failed to parse"):

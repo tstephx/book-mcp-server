@@ -19,19 +19,19 @@ logger = logging.getLogger(__name__)
 
 # Shared topic detection keywords
 TOPIC_KEYWORDS = {
-    'Python': ['python', 'django', 'flask', 'fastapi', 'pytest', 'pip'],
-    'Data Science': ['data', 'analytics', 'pandas', 'numpy', 'visualization', 'matplotlib'],
-    'Machine Learning': ['ml', 'machine learning', 'deep learning', 'neural', 'ai', 'llm', 'tensorflow', 'pytorch'],
-    'Architecture': ['architecture', 'design patterns', 'clean code', 'solid', 'refactoring'],
-    'DevOps': ['docker', 'kubernetes', 'k8s', 'devops', 'ci/cd', 'cloud', 'container'],
-    'Linux': ['linux', 'ubuntu', 'systemd', 'kernel', 'bash', 'shell'],
-    'Networking': ['networking', 'network', 'firewall', 'vpn', 'tcp', 'ip', 'http'],
-    'Web Development': ['web', 'api', 'rest', 'frontend', 'backend', 'node', 'javascript'],
-    'Databases': ['database', 'sql', 'nosql', 'postgresql', 'mongodb', 'redis'],
-    'Security': ['security', 'encryption', 'authentication', 'oauth', 'ssl', 'tls'],
-    'Quantum': ['quantum', 'qubit'],
-    'Forecasting': ['forecasting', 'time series', 'prediction', 'arima'],
-    'Async/Concurrency': ['async', 'await', 'concurrent', 'parallel', 'threading', 'multiprocessing'],
+    "Python": ["python", "django", "flask", "fastapi", "pytest", "pip"],
+    "Data Science": ["data", "analytics", "pandas", "numpy", "visualization", "matplotlib"],
+    "Machine Learning": ["ml", "machine learning", "deep learning", "neural", "ai", "llm", "tensorflow", "pytorch"],
+    "Architecture": ["architecture", "design patterns", "clean code", "solid", "refactoring"],
+    "DevOps": ["docker", "kubernetes", "k8s", "devops", "ci/cd", "cloud", "container"],
+    "Linux": ["linux", "ubuntu", "systemd", "kernel", "bash", "shell"],
+    "Networking": ["networking", "network", "firewall", "vpn", "tcp", "ip", "http"],
+    "Web Development": ["web", "api", "rest", "frontend", "backend", "node", "javascript"],
+    "Databases": ["database", "sql", "nosql", "postgresql", "mongodb", "redis"],
+    "Security": ["security", "encryption", "authentication", "oauth", "ssl", "tls"],
+    "Quantum": ["quantum", "qubit"],
+    "Forecasting": ["forecasting", "time series", "prediction", "arima"],
+    "Async/Concurrency": ["async", "await", "concurrent", "parallel", "threading", "multiprocessing"],
 }
 
 
@@ -42,7 +42,7 @@ def _detect_topics(text: str) -> list:
     for topic, keywords in TOPIC_KEYWORDS.items():
         if any(kw in text_lower for kw in keywords):
             detected.append(topic)
-    return detected if detected else ['General']
+    return detected if detected else ["General"]
 
 
 def register_analytics_tools(mcp: "FastMCP") -> None:
@@ -97,53 +97,49 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
             topic_chapters = Counter()
 
             for book in books:
-                topics = _detect_topics(book['title'])
+                topics = _detect_topics(book["title"])
                 for topic in topics:
-                    topic_words[topic] += book['word_count'] or 0
+                    topic_words[topic] += book["word_count"] or 0
                     topic_books[topic] += 1
 
             # Get chapter-level topic distribution
             chapters = execute_query("SELECT title, word_count FROM chapters")
             for chapter in chapters:
-                topics = _detect_topics(chapter['title'])
+                topics = _detect_topics(chapter["title"])
                 for topic in topics:
                     topic_chapters[topic] += 1
 
             # Author distribution
             author_stats = {}
             for book in books:
-                author = book['author'] or 'Unknown'
+                author = book["author"] or "Unknown"
                 if author not in author_stats:
-                    author_stats[author] = {'books': 0, 'words': 0, 'chapters': 0}
-                author_stats[author]['books'] += 1
-                author_stats[author]['words'] += book['word_count'] or 0
-                author_stats[author]['chapters'] += book['chapter_count']
+                    author_stats[author] = {"books": 0, "words": 0, "chapters": 0}
+                author_stats[author]["books"] += 1
+                author_stats[author]["words"] += book["word_count"] or 0
+                author_stats[author]["chapters"] += book["chapter_count"]
 
             # Sort authors by word count
-            sorted_authors = sorted(
-                author_stats.items(),
-                key=lambda x: x[1]['words'],
-                reverse=True
-            )
+            sorted_authors = sorted(author_stats.items(), key=lambda x: x[1]["words"], reverse=True)
 
             # Book size distribution
-            word_counts = [b['word_count'] or 0 for b in books]
+            word_counts = [b["word_count"] or 0 for b in books]
             size_distribution = {
-                'smallest': min(word_counts) if word_counts else 0,
-                'largest': max(word_counts) if word_counts else 0,
-                'average': sum(word_counts) // len(word_counts) if word_counts else 0,
-                'median': sorted(word_counts)[len(word_counts)//2] if word_counts else 0,
+                "smallest": min(word_counts) if word_counts else 0,
+                "largest": max(word_counts) if word_counts else 0,
+                "average": sum(word_counts) // len(word_counts) if word_counts else 0,
+                "median": sorted(word_counts)[len(word_counts) // 2] if word_counts else 0,
             }
 
             # Categorize by size
-            size_categories = {'short': 0, 'medium': 0, 'long': 0}
+            size_categories = {"short": 0, "medium": 0, "long": 0}
             for wc in word_counts:
                 if wc < 50000:
-                    size_categories['short'] += 1
+                    size_categories["short"] += 1
                 elif wc < 150000:
-                    size_categories['medium'] += 1
+                    size_categories["medium"] += 1
                 else:
-                    size_categories['long'] += 1
+                    size_categories["long"] += 1
 
             # Reading progress (if tables exist)
             try:
@@ -154,70 +150,64 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
                         (SELECT COUNT(*) FROM bookmarks) as total_bookmarks
                 """)
                 reading_stats = {
-                    'chapters_read': progress['chapters_read'] or 0,
-                    'books_started': progress['books_started'] or 0,
-                    'bookmarks': progress['total_bookmarks'] or 0,
-                    'percent_complete': round((progress['chapters_read'] or 0) / basic['total_chapters'] * 100, 1) if basic['total_chapters'] > 0 else 0
+                    "chapters_read": progress["chapters_read"] or 0,
+                    "books_started": progress["books_started"] or 0,
+                    "bookmarks": progress["total_bookmarks"] or 0,
+                    "percent_complete": round((progress["chapters_read"] or 0) / basic["total_chapters"] * 100, 1)
+                    if basic["total_chapters"] > 0
+                    else 0,
                 }
             except Exception:
-                reading_stats = {'chapters_read': 0, 'books_started': 0, 'bookmarks': 0, 'percent_complete': 0}
+                reading_stats = {"chapters_read": 0, "books_started": 0, "bookmarks": 0, "percent_complete": 0}
 
             # Embedding coverage
-            embedding_coverage = round(basic['embedded_chapters'] / basic['total_chapters'] * 100, 1) if basic['total_chapters'] > 0 else 0
+            embedding_coverage = (
+                round(basic["embedded_chapters"] / basic["total_chapters"] * 100, 1)
+                if basic["total_chapters"] > 0
+                else 0
+            )
 
             logger.info("Generated library statistics")
 
             return {
                 "summary": {
-                    "total_books": basic['total_books'],
-                    "total_chapters": basic['total_chapters'],
-                    "total_words": basic['total_words'],
-                    "estimated_reading_hours": basic['total_words'] // 15000,  # ~250 wpm
+                    "total_books": basic["total_books"],
+                    "total_chapters": basic["total_chapters"],
+                    "total_words": basic["total_words"],
+                    "estimated_reading_hours": basic["total_words"] // 15000,  # ~250 wpm
                 },
                 "topic_distribution": {
                     "by_word_count": [
-                        {"topic": topic, "words": count, "percent": round(count / basic['total_words'] * 100, 1)}
+                        {"topic": topic, "words": count, "percent": round(count / basic["total_words"] * 100, 1)}
                         for topic, count in topic_words.most_common()
                     ],
-                    "by_book_count": [
-                        {"topic": topic, "books": count}
-                        for topic, count in topic_books.most_common()
-                    ],
+                    "by_book_count": [{"topic": topic, "books": count} for topic, count in topic_books.most_common()],
                     "by_chapter_count": [
-                        {"topic": topic, "chapters": count}
-                        for topic, count in topic_chapters.most_common(10)
-                    ]
+                        {"topic": topic, "chapters": count} for topic, count in topic_chapters.most_common(10)
+                    ],
                 },
                 "author_distribution": [
-                    {
-                        "author": author,
-                        "books": stats['books'],
-                        "words": stats['words'],
-                        "chapters": stats['chapters']
-                    }
+                    {"author": author, "books": stats["books"], "words": stats["words"], "chapters": stats["chapters"]}
                     for author, stats in sorted_authors[:10]
                 ],
                 "book_sizes": {
                     "distribution": size_distribution,
                     "categories": {
-                        "short_under_50k": size_categories['short'],
-                        "medium_50k_150k": size_categories['medium'],
-                        "long_over_150k": size_categories['long']
+                        "short_under_50k": size_categories["short"],
+                        "medium_50k_150k": size_categories["medium"],
+                        "long_over_150k": size_categories["long"],
                     },
-                    "largest_books": [
-                        {"title": b['title'], "words": b['word_count']}
-                        for b in books[:5]
-                    ]
+                    "largest_books": [{"title": b["title"], "words": b["word_count"]} for b in books[:5]],
                 },
                 "embedding_coverage": {
-                    "chapters_with_embeddings": basic['embedded_chapters'],
-                    "total_chapters": basic['total_chapters'],
+                    "chapters_with_embeddings": basic["embedded_chapters"],
+                    "total_chapters": basic["total_chapters"],
                     "percent_covered": embedding_coverage,
-                    "books_fully_embedded": sum(1 for b in books if b['embedded_count'] == b['chapter_count']),
-                    "books_partially_embedded": sum(1 for b in books if 0 < b['embedded_count'] < b['chapter_count']),
-                    "books_not_embedded": sum(1 for b in books if b['embedded_count'] == 0)
+                    "books_fully_embedded": sum(1 for b in books if b["embedded_count"] == b["chapter_count"]),
+                    "books_partially_embedded": sum(1 for b in books if 0 < b["embedded_count"] < b["chapter_count"]),
+                    "books_not_embedded": sum(1 for b in books if b["embedded_count"] == 0),
                 },
-                "reading_progress": reading_stats
+                "reading_progress": reading_stats,
             }
 
         except Exception as e:
@@ -225,11 +215,7 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    def find_duplicate_coverage(
-        similarity_threshold: float = 0.7,
-        min_results: int = 5,
-        max_results: int = 50
-    ) -> dict:
+    def find_duplicate_coverage(similarity_threshold: float = 0.7, min_results: int = 5, max_results: int = 50) -> dict:
         """Find chapters covering similar topics across different books
 
         Identifies potential duplicate or overlapping coverage by comparing
@@ -278,17 +264,19 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
             embeddings = []
             metadata = []
             for ch in chapters:
-                emb = np.load(io.BytesIO(ch['embedding']))
+                emb = np.load(io.BytesIO(ch["embedding"]))
                 embeddings.append(emb)
-                metadata.append({
-                    'id': ch['id'],
-                    'book_id': ch['book_id'],
-                    'book_title': ch['book_title'],
-                    'author': ch['author'],
-                    'chapter_number': ch['chapter_number'],
-                    'chapter_title': ch['chapter_title'],
-                    'word_count': ch['word_count']
-                })
+                metadata.append(
+                    {
+                        "id": ch["id"],
+                        "book_id": ch["book_id"],
+                        "book_title": ch["book_title"],
+                        "author": ch["author"],
+                        "chapter_number": ch["chapter_number"],
+                        "chapter_title": ch["chapter_title"],
+                        "word_count": ch["word_count"],
+                    }
+                )
 
             # Find similar pairs (only across different books)
             similar_pairs = []
@@ -297,23 +285,25 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
             for i in range(n):
                 for j in range(i + 1, n):
                     # Skip if same book
-                    if metadata[i]['book_id'] == metadata[j]['book_id']:
+                    if metadata[i]["book_id"] == metadata[j]["book_id"]:
                         continue
 
                     similarity = cosine_similarity(embeddings[i], embeddings[j])
 
                     if similarity >= similarity_threshold:
-                        similar_pairs.append({
-                            'similarity': round(float(similarity), 3),
-                            'chapter_1': metadata[i],
-                            'chapter_2': metadata[j],
-                            'detected_topic': _detect_topics(
-                                metadata[i]['chapter_title'] + ' ' + metadata[j]['chapter_title']
-                            )[0]
-                        })
+                        similar_pairs.append(
+                            {
+                                "similarity": round(float(similarity), 3),
+                                "chapter_1": metadata[i],
+                                "chapter_2": metadata[j],
+                                "detected_topic": _detect_topics(
+                                    metadata[i]["chapter_title"] + " " + metadata[j]["chapter_title"]
+                                )[0],
+                            }
+                        )
 
             # Sort by similarity (highest first)
-            similar_pairs.sort(key=lambda x: x['similarity'], reverse=True)
+            similar_pairs.sort(key=lambda x: x["similarity"], reverse=True)
 
             # Limit results
             if len(similar_pairs) > max_results:
@@ -325,28 +315,30 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
             # Group by detected topic
             by_topic = {}
             for pair in similar_pairs:
-                topic = pair['detected_topic']
+                topic = pair["detected_topic"]
                 if topic not in by_topic:
                     by_topic[topic] = []
-                by_topic[topic].append({
-                    'similarity': pair['similarity'],
-                    'chapter_1': {
-                        'book': pair['chapter_1']['book_title'],
-                        'author': pair['chapter_1']['author'],
-                        'chapter': f"Ch.{pair['chapter_1']['chapter_number']}: {pair['chapter_1']['chapter_title']}"
-                    },
-                    'chapter_2': {
-                        'book': pair['chapter_2']['book_title'],
-                        'author': pair['chapter_2']['author'],
-                        'chapter': f"Ch.{pair['chapter_2']['chapter_number']}: {pair['chapter_2']['chapter_title']}"
+                by_topic[topic].append(
+                    {
+                        "similarity": pair["similarity"],
+                        "chapter_1": {
+                            "book": pair["chapter_1"]["book_title"],
+                            "author": pair["chapter_1"]["author"],
+                            "chapter": f"Ch.{pair['chapter_1']['chapter_number']}: {pair['chapter_1']['chapter_title']}",
+                        },
+                        "chapter_2": {
+                            "book": pair["chapter_2"]["book_title"],
+                            "author": pair["chapter_2"]["author"],
+                            "chapter": f"Ch.{pair['chapter_2']['chapter_number']}: {pair['chapter_2']['chapter_title']}",
+                        },
                     }
-                })
+                )
 
             # Summary statistics
             books_with_overlap = set()
             for pair in similar_pairs:
-                books_with_overlap.add(pair['chapter_1']['book_title'])
-                books_with_overlap.add(pair['chapter_2']['book_title'])
+                books_with_overlap.add(pair["chapter_1"]["book_title"])
+                books_with_overlap.add(pair["chapter_2"]["book_title"])
 
             logger.info(f"Found {len(similar_pairs)} similar chapter pairs")
 
@@ -355,31 +347,29 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
                     "total_pairs_found": len(similar_pairs),
                     "similarity_threshold": similarity_threshold,
                     "topics_with_overlap": len(by_topic),
-                    "books_with_overlap": len(books_with_overlap)
+                    "books_with_overlap": len(books_with_overlap),
                 },
                 "by_topic": [
                     {
                         "topic": topic,
                         "overlap_count": len(pairs),
-                        "pairs": pairs[:10]  # Limit per topic
+                        "pairs": pairs[:10],  # Limit per topic
                     }
                     for topic, pairs in sorted(by_topic.items(), key=lambda x: len(x[1]), reverse=True)
                 ],
                 "top_similar_pairs": [
                     {
-                        "similarity": p['similarity'],
+                        "similarity": p["similarity"],
                         "chapter_1": f"{p['chapter_1']['book_title']} - Ch.{p['chapter_1']['chapter_number']}",
                         "chapter_2": f"{p['chapter_2']['book_title']} - Ch.{p['chapter_2']['chapter_number']}",
-                        "topic": p['detected_topic']
+                        "topic": p["detected_topic"],
                     }
                     for p in similar_pairs[:10]
                 ],
                 "recommendations": {
-                    "high_overlap_topics": [
-                        topic for topic, pairs in by_topic.items() if len(pairs) >= 3
-                    ],
-                    "suggestion": "Topics with high overlap offer multiple perspectives - great for cross-referencing and deeper understanding."
-                }
+                    "high_overlap_topics": [topic for topic, pairs in by_topic.items() if len(pairs) >= 3],
+                    "suggestion": "Topics with high overlap offer multiple perspectives - great for cross-referencing and deeper understanding.",
+                },
             }
 
         except Exception as e:
@@ -405,7 +395,8 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
         try:
             if author_name:
                 # Specific author analysis
-                books = execute_query("""
+                books = execute_query(
+                    """
                     SELECT
                         b.id,
                         b.title,
@@ -417,27 +408,32 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
                     WHERE b.author LIKE ?
                     GROUP BY b.id
                     ORDER BY b.title
-                """, (f"%{author_name}%",))
+                """,
+                    (f"%{author_name}%",),
+                )
 
                 if not books:
                     return {"error": f"No books found for author: {author_name}"}
 
                 # Get all chapter titles for topic analysis
-                chapters = execute_query("""
+                chapters = execute_query(
+                    """
                     SELECT c.title, c.word_count
                     FROM chapters c
                     JOIN books b ON c.book_id = b.id
                     WHERE b.author LIKE ?
-                """, (f"%{author_name}%",))
+                """,
+                    (f"%{author_name}%",),
+                )
 
                 # Analyze topics covered
                 topic_coverage = Counter()
                 for ch in chapters:
-                    for topic in _detect_topics(ch['title']):
+                    for topic in _detect_topics(ch["title"]):
                         topic_coverage[topic] += 1
 
-                total_words = sum(b['word_count'] or 0 for b in books)
-                total_chapters = sum(b['chapter_count'] for b in books)
+                total_words = sum(b["word_count"] or 0 for b in books)
+                total_chapters = sum(b["chapter_count"] for b in books)
 
                 return {
                     "author": author_name,
@@ -446,21 +442,20 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
                         "total_chapters": total_chapters,
                         "total_words": total_words,
                         "avg_book_length": total_words // len(books) if books else 0,
-                        "avg_chapter_length": total_words // total_chapters if total_chapters else 0
+                        "avg_chapter_length": total_words // total_chapters if total_chapters else 0,
                     },
                     "books": [
                         {
-                            "title": b['title'],
-                            "chapters": b['chapter_count'],
-                            "words": b['word_count'],
-                            "avg_chapter_words": round(b['avg_chapter_words'] or 0)
+                            "title": b["title"],
+                            "chapters": b["chapter_count"],
+                            "words": b["word_count"],
+                            "avg_chapter_words": round(b["avg_chapter_words"] or 0),
                         }
                         for b in books
                     ],
                     "topic_expertise": [
-                        {"topic": topic, "chapters": count}
-                        for topic, count in topic_coverage.most_common()
-                    ]
+                        {"topic": topic, "chapters": count} for topic, count in topic_coverage.most_common()
+                    ],
                 }
 
             else:
@@ -481,18 +476,18 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
                     "total_authors": len(authors),
                     "authors": [
                         {
-                            "name": a['author'],
-                            "books": a['book_count'],
-                            "chapters": a['chapter_count'],
-                            "words": a['total_words'],
-                            "avg_words_per_book": a['total_words'] // a['book_count'] if a['book_count'] else 0
+                            "name": a["author"],
+                            "books": a["book_count"],
+                            "chapters": a["chapter_count"],
+                            "words": a["total_words"],
+                            "avg_words_per_book": a["total_words"] // a["book_count"] if a["book_count"] else 0,
                         }
                         for a in authors
                     ],
                     "insights": {
-                        "most_prolific": authors[0]['author'] if authors else None,
-                        "total_unique_authors": len([a for a in authors if a['author'] != 'Unknown'])
-                    }
+                        "most_prolific": authors[0]["author"] if authors else None,
+                        "total_unique_authors": len([a for a in authors if a["author"] != "Unknown"]),
+                    },
                 }
 
         except Exception as e:

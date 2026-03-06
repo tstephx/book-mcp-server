@@ -6,9 +6,12 @@ Follows MCP best practices for input validation
 import re
 from typing import Optional
 
+
 class ValidationError(Exception):
     """Custom exception for validation errors"""
+
     pass
+
 
 def validate_book_id(book_id: str) -> str:
     """
@@ -29,11 +32,12 @@ def validate_book_id(book_id: str) -> str:
         raise ValidationError("Book ID cannot be empty")
 
     # UUID format: 8-4-4-4-12 hex digits
-    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     if not re.match(uuid_pattern, book_id, re.IGNORECASE):
         raise ValidationError(f"Invalid book ID format: {book_id}")
 
     return book_id
+
 
 def validate_chapter_number(chapter_number: int) -> int:
     """
@@ -55,6 +59,7 @@ def validate_chapter_number(chapter_number: int) -> int:
         raise ValidationError("Chapter number too large (max: 1000)")
 
     return chapter_number
+
 
 def validate_search_query(query: str) -> str:
     """
@@ -82,6 +87,7 @@ def validate_search_query(query: str) -> str:
 
     return query
 
+
 def validate_limit(limit: int, max_limit: Optional[int] = None) -> int:
     """
     Validate result limit
@@ -107,7 +113,7 @@ def validate_limit(limit: int, max_limit: Optional[int] = None) -> int:
 
 def _escape_like(value: str) -> str:
     """Escape LIKE special characters (%, _) to prevent unintended wildcard matching."""
-    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def resolve_book_id(book_id: str) -> str:
@@ -141,29 +147,29 @@ def resolve_book_id(book_id: str) -> str:
         raise ValidationError("Book ID too long (max: 200 characters)")
 
     # Fast path: already a valid UUID
-    uuid_pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     if re.match(uuid_pattern, book_id, re.IGNORECASE):
         return book_id
 
     # Slug fallback: convert hyphens to spaces for title matching
-    search_term = book_id.replace('-', ' ').strip()
+    search_term = book_id.replace("-", " ").strip()
     escaped_term = _escape_like(search_term)
 
     # Try fuzzy LIKE match against titles
     matches = execute_query(
         "SELECT id, title FROM books WHERE LOWER(title) LIKE LOWER(?) ESCAPE '\\' ORDER BY title LIMIT 5",
-        (f"%{escaped_term}%",)
+        (f"%{escaped_term}%",),
     )
 
     if matches:
-        return matches[0]['id']
+        return matches[0]["id"]
 
     # No match — fetch candidates for did-you-mean using first word of slug
     first_word = search_term.split()[0] if search_term.split() else search_term
     escaped_word = _escape_like(first_word)
     candidates = execute_query(
         "SELECT id, title FROM books WHERE LOWER(title) LIKE LOWER(?) ESCAPE '\\' ORDER BY title LIMIT 3",
-        (f"%{escaped_word}%",)
+        (f"%{escaped_word}%",),
     )
 
     if candidates:
@@ -174,6 +180,5 @@ def resolve_book_id(book_id: str) -> str:
         )
 
     raise ValidationError(
-        f"Book not found for: '{book_id}'. "
-        f"Use search_titles() to find available books and their IDs."
+        f"Book not found for: '{book_id}'. Use search_titles() to find available books and their IDs."
     )

@@ -27,7 +27,8 @@ class CalibrationEngine:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct,
@@ -35,7 +36,9 @@ class CalibrationEngine:
                 FROM autonomy_feedback
                 WHERE original_book_type = ?
                 AND created_at > ?
-            """, (book_type, cutoff))
+            """,
+                (book_type, cutoff),
+            )
 
             row = cursor.fetchone()
 
@@ -63,7 +66,8 @@ class CalibrationEngine:
 
             # Try progressively lower thresholds
             for threshold in [0.95, 0.92, 0.90, 0.88, 0.85, 0.82, 0.80]:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT
                         COUNT(*) as total,
                         SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
@@ -71,7 +75,9 @@ class CalibrationEngine:
                     WHERE original_book_type = ?
                     AND original_confidence >= ?
                     AND created_at > ?
-                """, (book_type, threshold, cutoff))
+                """,
+                    (book_type, threshold, cutoff),
+                )
 
                 row = cursor.fetchone()
                 total = row["total"] or 0
@@ -105,17 +111,20 @@ class CalibrationEngine:
                 threshold = self.calculate_threshold(book_type)
 
                 if calibration:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT OR REPLACE INTO autonomy_thresholds
                         (book_type, auto_approve_threshold, sample_count, measured_accuracy, last_calculated)
                         VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        book_type,
-                        threshold,
-                        calibration["sample_count"],
-                        calibration["accuracy"],
-                        datetime.now(timezone.utc).isoformat()
-                    ))
+                    """,
+                        (
+                            book_type,
+                            threshold,
+                            calibration["sample_count"],
+                            calibration["accuracy"],
+                            datetime.now(timezone.utc).isoformat(),
+                        ),
+                    )
 
                     results[book_type] = {
                         "threshold": threshold,

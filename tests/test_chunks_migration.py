@@ -17,9 +17,7 @@ class TestChunksMigration:
             conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='chunks'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chunks'")
             assert cursor.fetchone() is not None
             conn.close()
 
@@ -35,9 +33,16 @@ class TestChunksMigration:
             columns = {row[1] for row in cursor.fetchall()}
 
             expected = {
-                "id", "chapter_id", "book_id", "chunk_index",
-                "content", "word_count", "embedding", "embedding_model",
-                "content_hash", "created_at",
+                "id",
+                "chapter_id",
+                "book_id",
+                "chunk_index",
+                "content",
+                "word_count",
+                "embedding",
+                "embedding_model",
+                "content_hash",
+                "created_at",
             }
             assert expected.issubset(columns)
             conn.close()
@@ -50,9 +55,7 @@ class TestChunksMigration:
 
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_chunks%'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_chunks%'")
             indexes = {row[0] for row in cursor.fetchall()}
             assert "idx_chunks_chapter" in indexes
             assert "idx_chunks_book" in indexes

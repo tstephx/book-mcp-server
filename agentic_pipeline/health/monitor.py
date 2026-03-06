@@ -40,54 +40,75 @@ class HealthMonitor:
             # Count active (processing)
             active_states = [s.value for s in ACTIVE_STATES]
             placeholders = ",".join("?" * len(active_states))
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state IN ({placeholders})
-            """, active_states)
+            """,
+                active_states,
+            )
             active = cursor.fetchone()[0]
 
             # Count queued (detected)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
-            """, (PipelineState.DETECTED.value,))
+            """,
+                (PipelineState.DETECTED.value,),
+            )
             queued = cursor.fetchone()[0]
 
             # Count failed (needs_retry)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
-            """, (PipelineState.NEEDS_RETRY.value,))
+            """,
+                (PipelineState.NEEDS_RETRY.value,),
+            )
             failed = cursor.fetchone()[0]
 
             # Count permanently failed (max retries exhausted) — all-time for reporting
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
-            """, (PipelineState.FAILED.value,))
+            """,
+                (PipelineState.FAILED.value,),
+            )
             permanently_failed = cursor.fetchone()[0]
 
             # Count completed in last 24h
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
                 AND updated_at > datetime('now', '-24 hours')
-            """, (PipelineState.COMPLETE.value,))
+            """,
+                (PipelineState.COMPLETE.value,),
+            )
             completed_24h = cursor.fetchone()[0]
 
             # 24h-scoped counts for failure rate (consistent time window)
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
                 AND updated_at > datetime('now', '-24 hours')
-            """, (PipelineState.NEEDS_RETRY.value,))
+            """,
+                (PipelineState.NEEDS_RETRY.value,),
+            )
             failed_24h = cursor.fetchone()[0]
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT COUNT(*) FROM processing_pipelines
                 WHERE state = ?
                 AND updated_at > datetime('now', '-24 hours')
-            """, (PipelineState.FAILED.value,))
+            """,
+                (PipelineState.FAILED.value,),
+            )
             permanently_failed_24h = cursor.fetchone()[0]
 
             # Queue by priority
@@ -118,26 +139,32 @@ class HealthMonitor:
             "status": status,
         }
 
-    def _generate_alerts(self, queued: int, failed_24h: int, permanently_failed_24h: int, completed_24h: int) -> list[dict]:
+    def _generate_alerts(
+        self, queued: int, failed_24h: int, permanently_failed_24h: int, completed_24h: int
+    ) -> list[dict]:
         """Generate alerts based on current state."""
         alerts = []
 
         if queued > self.alert_queue_threshold:
-            alerts.append({
-                "type": "queue_backup",
-                "severity": "info",
-                "message": f"Queue has {queued} books waiting (threshold: {self.alert_queue_threshold})"
-            })
+            alerts.append(
+                {
+                    "type": "queue_backup",
+                    "severity": "info",
+                    "message": f"Queue has {queued} books waiting (threshold: {self.alert_queue_threshold})",
+                }
+            )
 
         # Check failure rate (includes permanently_failed — terminal failures are worst-case)
         total_recent = completed_24h + failed_24h + permanently_failed_24h
         if total_recent > 10:  # Only check if enough data
             failure_rate = (failed_24h + permanently_failed_24h) / total_recent
             if failure_rate > self.alert_failure_rate:
-                alerts.append({
-                    "type": "high_failure_rate",
-                    "severity": "warning",
-                    "message": f"Failure rate is {failure_rate:.0%} (threshold: {self.alert_failure_rate:.0%})"
-                })
+                alerts.append(
+                    {
+                        "type": "high_failure_rate",
+                        "severity": "warning",
+                        "message": f"Failure rate is {failure_rate:.0%} (threshold: {self.alert_failure_rate:.0%})",
+                    }
+                )
 
         return alerts

@@ -104,7 +104,8 @@ def backfill_from_pipeline(conn: sqlite3.Connection, dry_run: bool = False) -> i
         try:
             profile = json.loads(profile_json) if isinstance(profile_json, str) else profile_json
             tags = json.dumps(profile.get("suggested_tags", []))
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE books SET
                     book_type = ?,
                     classification_confidence = ?,
@@ -113,15 +114,17 @@ def backfill_from_pipeline(conn: sqlite3.Connection, dry_run: bool = False) -> i
                     classified_at = ?,
                     classified_by = ?
                 WHERE id = ?
-            """, (
-                profile.get("book_type", "unknown"),
-                profile.get("confidence", 0.0),
-                tags,
-                profile.get("reasoning", ""),
-                now,
-                "pipeline_backfill",
-                book_id,
-            ))
+            """,
+                (
+                    profile.get("book_type", "unknown"),
+                    profile.get("confidence", 0.0),
+                    tags,
+                    profile.get("reasoning", ""),
+                    now,
+                    "pipeline_backfill",
+                    book_id,
+                ),
+            )
             updated += 1
             logger.info(f"Backfilled: {title} -> {profile.get('book_type')}")
         except Exception as e:
@@ -205,9 +208,11 @@ def classify_books(
     # Initialize provider
     if provider_name == "openai":
         from agentic_pipeline.agents.providers.openai_provider import OpenAIProvider
+
         provider = OpenAIProvider()
     elif provider_name == "anthropic":
         from agentic_pipeline.agents.providers.anthropic_provider import AnthropicProvider
+
         provider = AnthropicProvider()
     else:
         raise ValueError(f"Unknown provider: {provider_name}")
@@ -224,7 +229,8 @@ def classify_books(
             profile: BookProfile = provider.classify(text)
             tags = json.dumps(profile.suggested_tags)
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE books SET
                     book_type = ?,
                     classification_confidence = ?,
@@ -233,15 +239,17 @@ def classify_books(
                     classified_at = ?,
                     classified_by = ?
                 WHERE id = ?
-            """, (
-                profile.book_type.value,
-                profile.confidence,
-                tags,
-                profile.reasoning,
-                now,
-                f"{provider_name}:{provider.model if hasattr(provider, 'model') else 'unknown'}",
-                book_id,
-            ))
+            """,
+                (
+                    profile.book_type.value,
+                    profile.confidence,
+                    tags,
+                    profile.reasoning,
+                    now,
+                    f"{provider_name}:{provider.model if hasattr(provider, 'model') else 'unknown'}",
+                    book_id,
+                ),
+            )
             conn.commit()
             classified += 1
             logger.info(f"  -> {profile.book_type.value} (confidence: {profile.confidence:.2f})")
@@ -287,12 +295,11 @@ def print_summary(conn: sqlite3.Connection) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Classify all library books")
     parser.add_argument("--dry-run", action="store_true", help="Preview without making changes")
-    parser.add_argument("--provider", choices=["openai", "anthropic"], default="openai",
-                        help="LLM provider (default: openai)")
-    parser.add_argument("--limit", type=int, default=None,
-                        help="Max books to classify in this run")
-    parser.add_argument("--skip-backfill", action="store_true",
-                        help="Skip pipeline backfill step")
+    parser.add_argument(
+        "--provider", choices=["openai", "anthropic"], default="openai", help="LLM provider (default: openai)"
+    )
+    parser.add_argument("--limit", type=int, default=None, help="Max books to classify in this run")
+    parser.add_argument("--skip-backfill", action="store_true", help="Skip pipeline backfill step")
     args = parser.parse_args()
 
     db_path = get_db_path()

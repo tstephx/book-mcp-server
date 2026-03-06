@@ -30,21 +30,24 @@ class MetricsCollector:
             # Determine original decision type
             original_decision = "auto_approved" if actor.startswith("auto:") else "human_review"
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO autonomy_feedback
                 (book_id, pipeline_id, original_decision, original_confidence, original_book_type,
                  human_decision, human_adjustments, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                book_id,
-                pipeline_id,
-                original_decision,
-                confidence,
-                book_type,
-                decision,
-                json.dumps(adjustments) if adjustments else None,
-                datetime.now(timezone.utc).isoformat()
-            ))
+            """,
+                (
+                    book_id,
+                    pipeline_id,
+                    original_decision,
+                    confidence,
+                    book_type,
+                    decision,
+                    json.dumps(adjustments) if adjustments else None,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
 
             conn.commit()
 
@@ -55,7 +58,8 @@ class MetricsCollector:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN original_decision = 'auto_approved' AND human_decision = 'approved' THEN 1 ELSE 0 END) as auto_approved,
@@ -66,7 +70,9 @@ class MetricsCollector:
                     AVG(CASE WHEN original_decision = 'human_review' THEN original_confidence END) as avg_conf_human
                 FROM autonomy_feedback
                 WHERE created_at > ?
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
 
             row = cursor.fetchone()
 
@@ -87,14 +93,17 @@ class MetricsCollector:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
                 FROM autonomy_feedback
                 WHERE original_book_type = ?
                 AND created_at > ?
-            """, (book_type, cutoff))
+            """,
+                (book_type, cutoff),
+            )
 
             row = cursor.fetchone()
 

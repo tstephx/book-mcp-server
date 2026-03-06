@@ -15,74 +15,44 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 
 # UUID validation pattern
-UUID_PATTERN = r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
+UUID_PATTERN = r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+
 
 class SearchInput(BaseModel):
     """Schema for keyword search operations
 
     Used by: search_titles tool
     """
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "query": "docker networking",
-            "limit": 10
-        }
-    })
 
-    query: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Search query text"
-    )
-    limit: int = Field(
-        default=10,
-        ge=1,
-        le=20,
-        description="Maximum number of results"
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"query": "docker networking", "limit": 10}})
 
-    @field_validator('query')
+    query: str = Field(..., min_length=1, max_length=500, description="Search query text")
+    limit: int = Field(default=10, ge=1, le=20, description="Maximum number of results")
+
+    @field_validator("query")
     @classmethod
     def validate_query(cls, v):
         """Ensure query is not just whitespace"""
         if not v.strip():
             raise ValueError("Query cannot be empty or whitespace only")
         return v.strip()
+
 
 class SemanticSearchInput(BaseModel):
     """Schema for semantic search operations
 
     Used by: semantic_search tool
     """
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "query": "container orchestration concepts",
-            "limit": 5,
-            "min_similarity": 0.4
-        }
-    })
 
-    query: str = Field(
-        ...,
-        min_length=1,
-        max_length=500,
-        description="Semantic search query"
-    )
-    limit: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Maximum number of results"
-    )
-    min_similarity: float = Field(
-        default=0.3,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity threshold (0.0-1.0)"
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"query": "container orchestration concepts", "limit": 5, "min_similarity": 0.4}}
     )
 
-    @field_validator('query')
+    query: str = Field(..., min_length=1, max_length=500, description="Semantic search query")
+    limit: int = Field(default=5, ge=1, le=20, description="Maximum number of results")
+    min_similarity: float = Field(default=0.3, ge=0.0, le=1.0, description="Minimum similarity threshold (0.0-1.0)")
+
+    @field_validator("query")
     @classmethod
     def validate_query(cls, v):
         """Ensure query is not just whitespace"""
@@ -90,7 +60,7 @@ class SemanticSearchInput(BaseModel):
             raise ValueError("Query cannot be empty or whitespace only")
         return v.strip()
 
-    @field_validator('min_similarity')
+    @field_validator("min_similarity")
     @classmethod
     def validate_similarity(cls, v):
         """Ensure similarity is in valid range"""
@@ -98,59 +68,43 @@ class SemanticSearchInput(BaseModel):
             raise ValueError("min_similarity must be between 0.0 and 1.0")
         return v
 
+
 class BookIdInput(BaseModel):
     """Schema for book ID operations
 
     Used by: get_book_info, get_table_of_contents tools
     """
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75"
-        }
-    })
 
-    book_id: str = Field(
-        ...,
-        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75"}})
 
-    @field_validator('book_id')
+    book_id: str = Field(..., description="Book ID (UUID or slug, e.g. 'docker-deep-dive')")
+
+    @field_validator("book_id")
     @classmethod
     def validate_book_id(cls, v):
         """Accept UUID or slug-style book identifier"""
         if not v or not v.strip():
             raise ValueError("book_id cannot be empty")
         return v
+
 
 class ChapterInput(BaseModel):
     """Schema for chapter retrieval operations
 
     Used by: get_chapter, get_section tools
     """
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75",
-            "chapter_number": 6,
-            "section_number": 2
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75", "chapter_number": 6, "section_number": 2}
         }
-    })
-
-    book_id: str = Field(
-        ...,
-        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
-    )
-    chapter_number: int = Field(
-        ...,
-        ge=1,
-        description="Chapter number (1-indexed)"
-    )
-    section_number: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Section number within chapter (optional)"
     )
 
-    @field_validator('book_id')
+    book_id: str = Field(..., description="Book ID (UUID or slug, e.g. 'docker-deep-dive')")
+    chapter_number: int = Field(..., ge=1, description="Chapter number (1-indexed)")
+    section_number: Optional[int] = Field(None, ge=1, description="Section number within chapter (optional)")
+
+    @field_validator("book_id")
     @classmethod
     def validate_book_id(cls, v):
         """Accept UUID or slug-style book identifier"""
@@ -158,7 +112,7 @@ class ChapterInput(BaseModel):
             raise ValueError("book_id cannot be empty")
         return v
 
-    @field_validator('chapter_number')
+    @field_validator("chapter_number")
     @classmethod
     def validate_chapter_number(cls, v):
         """Ensure chapter number is positive"""
@@ -166,35 +120,28 @@ class ChapterInput(BaseModel):
             raise ValueError("chapter_number must be >= 1")
         return v
 
+
 class ChapterRangeInput(BaseModel):
     """Schema for chapter range operations
 
     Used by: list_sections tool
     """
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75",
-            "chapter_number": 6
-        }
-    })
 
-    book_id: str = Field(
-        ...,
-        description="Book ID (UUID or slug, e.g. 'docker-deep-dive')"
-    )
-    chapter_number: int = Field(
-        ...,
-        ge=1,
-        description="Chapter number (1-indexed)"
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"book_id": "4e7e9727-d82d-49ca-a32c-990a6619cd75", "chapter_number": 6}}
     )
 
-    @field_validator('book_id')
+    book_id: str = Field(..., description="Book ID (UUID or slug, e.g. 'docker-deep-dive')")
+    chapter_number: int = Field(..., ge=1, description="Chapter number (1-indexed)")
+
+    @field_validator("book_id")
     @classmethod
     def validate_book_id(cls, v):
         """Accept UUID or slug-style book identifier"""
         if not v or not v.strip():
             raise ValueError("book_id cannot be empty")
         return v
+
 
 # Validation helper functions
 def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
@@ -220,6 +167,7 @@ def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
         return max_val
     return limit
 
+
 def validate_book_id(book_id: str) -> str:
     """Validate book ID — accepts UUID or slug-style identifier.
 
@@ -239,6 +187,7 @@ def validate_book_id(book_id: str) -> str:
         raise ValueError("book_id cannot be empty")
 
     return book_id
+
 
 def validate_chapter_number(chapter_number: int) -> int:
     """Validate chapter number

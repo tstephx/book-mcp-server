@@ -103,6 +103,7 @@ class ClassifierAgent:
         if existing and existing.get("book_profile"):
             try:
                 import json
+
                 profile_data = existing["book_profile"]
                 if isinstance(profile_data, str):
                     profile_data = json.loads(profile_data)

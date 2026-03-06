@@ -46,17 +46,18 @@ def test_reingest_force_fallback_passes_flag_to_orchestrator(db_path, tmp_path):
     runner = CliRunner()
     mock_result = {"state": "complete"}
 
-    with patch("agentic_pipeline.db.config.get_db_path", return_value=str(db_path)), \
-         patch("agentic_pipeline.orchestrator.orchestrator.Orchestrator._process_book",
-               return_value=mock_result) as mock_process:
+    with (
+        patch("agentic_pipeline.db.config.get_db_path", return_value=str(db_path)),
+        patch(
+            "agentic_pipeline.orchestrator.orchestrator.Orchestrator._process_book", return_value=mock_result
+        ) as mock_process,
+    ):
         result = runner.invoke(main, ["reingest", book_id, "--force-fallback"])
 
     assert result.exit_code == 0, result.output
     mock_process.assert_called_once()
     _, kwargs = mock_process.call_args
-    assert kwargs.get("force_fallback") is True, (
-        f"Expected force_fallback=True, got: {mock_process.call_args}"
-    )
+    assert kwargs.get("force_fallback") is True, f"Expected force_fallback=True, got: {mock_process.call_args}"
 
 
 def test_reingest_without_force_fallback_does_not_pass_flag(db_path, tmp_path):
@@ -69,9 +70,12 @@ def test_reingest_without_force_fallback_does_not_pass_flag(db_path, tmp_path):
     runner = CliRunner()
     mock_result = {"state": "complete"}
 
-    with patch("agentic_pipeline.db.config.get_db_path", return_value=str(db_path)), \
-         patch("agentic_pipeline.orchestrator.orchestrator.Orchestrator._process_book",
-               return_value=mock_result) as mock_process:
+    with (
+        patch("agentic_pipeline.db.config.get_db_path", return_value=str(db_path)),
+        patch(
+            "agentic_pipeline.orchestrator.orchestrator.Orchestrator._process_book", return_value=mock_result
+        ) as mock_process,
+    ):
         result = runner.invoke(main, ["reingest", book_id])
 
     assert result.exit_code == 0, result.output

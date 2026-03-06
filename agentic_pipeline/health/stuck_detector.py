@@ -9,15 +9,15 @@ from agentic_pipeline.pipeline.states import PipelineState
 
 # Default timeout thresholds in seconds
 DEFAULT_STATE_TIMEOUTS = {
-    "DETECTED": 300,          # 5 minutes
-    "HASHING": 60,            # 1 minute
-    "CLASSIFYING": 120,       # 2 minutes
-    "SELECTING_STRATEGY": 30, # 30 seconds
-    "PROCESSING": 900,        # 15 minutes
-    "VALIDATING": 60,         # 1 minute
-    "PENDING_APPROVAL": None, # No timeout - waiting for human
-    "APPROVED": 60,           # 1 minute
-    "EMBEDDING": 600,         # 10 minutes
+    "DETECTED": 300,  # 5 minutes
+    "HASHING": 60,  # 1 minute
+    "CLASSIFYING": 120,  # 2 minutes
+    "SELECTING_STRATEGY": 30,  # 30 seconds
+    "PROCESSING": 900,  # 15 minutes
+    "VALIDATING": 60,  # 1 minute
+    "PENDING_APPROVAL": None,  # No timeout - waiting for human
+    "APPROVED": 60,  # 1 minute
+    "EMBEDDING": 600,  # 10 minutes
 }
 
 # States that should be checked for stuck
@@ -63,11 +63,14 @@ class StuckDetector:
                 stuck_threshold = threshold_seconds * self.stuck_multiplier
                 cutoff = (now - timedelta(seconds=stuck_threshold)).isoformat()
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT * FROM processing_pipelines
                     WHERE state = ?
                     AND updated_at < ?
-                """, (state.value, cutoff))
+                """,
+                    (state.value, cutoff),
+                )
 
                 for row in cursor.fetchall():
                     pipeline = dict(row)
@@ -89,13 +92,15 @@ class StuckDetector:
 
                     stuck_duration = now - updated_at
 
-                    stuck.append({
-                        "id": pipeline["id"],
-                        "state": pipeline["state"],
-                        "source_path": pipeline["source_path"],
-                        "stuck_since": pipeline["updated_at"],
-                        "stuck_minutes": int(stuck_duration.total_seconds() / 60),
-                        "expected_minutes": int(threshold_seconds / 60),
-                    })
+                    stuck.append(
+                        {
+                            "id": pipeline["id"],
+                            "state": pipeline["state"],
+                            "source_path": pipeline["source_path"],
+                            "stuck_since": pipeline["updated_at"],
+                            "stuck_minutes": int(stuck_duration.total_seconds() / 60),
+                            "expected_minutes": int(threshold_seconds / 60),
+                        }
+                    )
 
             return stuck

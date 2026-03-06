@@ -1,4 +1,5 @@
 """Tests for get_topic_coverage result limiting."""
+
 from unittest.mock import patch, MagicMock
 import numpy as np
 
@@ -29,10 +30,11 @@ def test_get_topic_coverage_respects_limit():
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / norms
 
-    with patch("src.tools.discovery_tools._load_chunk_data") as mock_data, \
-         patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx, \
-         patch("src.tools.discovery_tools.cosine_similarity") as mock_sim:
-
+    with (
+        patch("src.tools.discovery_tools._load_chunk_data") as mock_data,
+        patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx,
+        patch("src.tools.discovery_tools.cosine_similarity") as mock_sim,
+    ):
         mock_data.return_value = (embeddings, meta)
         mock_gen = MagicMock()
         mock_gen.generate.return_value = np.random.rand(3072)
@@ -41,6 +43,7 @@ def test_get_topic_coverage_respects_limit():
         mock_sim.return_value = 0.9  # all chunks pass threshold
 
         from src.tools.discovery_tools import register_discovery_tools
+
         mcp = MagicMock()
         captured = {}
 
@@ -65,10 +68,11 @@ def test_get_topic_coverage_default_limit_is_20():
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / norms
 
-    with patch("src.tools.discovery_tools._load_chunk_data") as mock_data, \
-         patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx, \
-         patch("src.tools.discovery_tools.cosine_similarity") as mock_sim:
-
+    with (
+        patch("src.tools.discovery_tools._load_chunk_data") as mock_data,
+        patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx,
+        patch("src.tools.discovery_tools.cosine_similarity") as mock_sim,
+    ):
         mock_data.return_value = (embeddings, meta)
         mock_gen = MagicMock()
         mock_gen.generate.return_value = np.random.rand(3072)
@@ -77,6 +81,7 @@ def test_get_topic_coverage_default_limit_is_20():
         mock_sim.return_value = 0.9
 
         from src.tools.discovery_tools import register_discovery_tools
+
         mcp = MagicMock()
         captured = {}
 
@@ -101,10 +106,11 @@ def test_get_topic_coverage_limit_zero_returns_one():
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     embeddings = embeddings / norms
 
-    with patch("src.tools.discovery_tools._load_chunk_data") as mock_data, \
-         patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx, \
-         patch("src.tools.discovery_tools.cosine_similarity") as mock_sim:
-
+    with (
+        patch("src.tools.discovery_tools._load_chunk_data") as mock_data,
+        patch("src.tools.discovery_tools.embedding_model_context") as mock_ctx,
+        patch("src.tools.discovery_tools.cosine_similarity") as mock_sim,
+    ):
         mock_data.return_value = (embeddings, meta)
         mock_gen = MagicMock()
         mock_gen.generate.return_value = np.random.rand(3072)
@@ -113,6 +119,7 @@ def test_get_topic_coverage_limit_zero_returns_one():
         mock_sim.return_value = 0.9
 
         from src.tools.discovery_tools import register_discovery_tools
+
         mcp = MagicMock()
         captured = {}
 

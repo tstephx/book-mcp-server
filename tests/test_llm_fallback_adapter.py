@@ -45,14 +45,16 @@ def test_improve_detection_calls_openai_chat_completions():
     """improve_detection must call client.chat.completions.create, not client.messages.create."""
     adapter = LLMFallbackAdapter()
 
-    payload = json.dumps({
-        "chapters_look_correct": True,
-        "confidence_improvement": 0.1,
-        "merge_pairs": [],
-        "split_chapters": [],
-        "corrections": [],
-        "improved_chapters": [],
-    })
+    payload = json.dumps(
+        {
+            "chapters_look_correct": True,
+            "confidence_improvement": 0.1,
+            "merge_pairs": [],
+            "split_chapters": [],
+            "corrections": [],
+            "improved_chapters": [],
+        }
+    )
 
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value = _openai_response(payload)
@@ -70,14 +72,16 @@ def test_parse_response_reads_openai_format():
     """_parse_response must read response.choices[0].message.content."""
     adapter = LLMFallbackAdapter()
 
-    payload = json.dumps({
-        "chapters_look_correct": False,
-        "confidence_improvement": 0.2,
-        "merge_pairs": [[0, 1]],
-        "split_chapters": [],
-        "corrections": ["Merged intro fragments"],
-        "improved_chapters": [{"chapter_number": 1, "title": "Introduction", "word_count": 4000}],
-    })
+    payload = json.dumps(
+        {
+            "chapters_look_correct": False,
+            "confidence_improvement": 0.2,
+            "merge_pairs": [[0, 1]],
+            "split_chapters": [],
+            "corrections": ["Merged intro fragments"],
+            "improved_chapters": [{"chapter_number": 1, "title": "Introduction", "word_count": 4000}],
+        }
+    )
 
     response = _openai_response(payload)
     result = adapter._parse_response(response, _make_request())

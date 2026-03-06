@@ -53,7 +53,7 @@ def test_orchestrator_idempotency_skips_complete(db_path, config):
     orchestrator = Orchestrator(config)
 
     # Mock file hashing to return same hash
-    with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
+    with patch.object(orchestrator, "_compute_hash", return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
     assert result["skipped"]
@@ -72,7 +72,7 @@ def test_orchestrator_idempotency_skips_in_progress(db_path, config):
 
     orchestrator = Orchestrator(config)
 
-    with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
+    with patch.object(orchestrator, "_compute_hash", return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
     assert result["skipped"]
@@ -91,7 +91,7 @@ def test_orchestrator_idempotency_skips_failed(db_path, config):
 
     orchestrator = Orchestrator(config)
 
-    with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
+    with patch.object(orchestrator, "_compute_hash", return_value="hash123"):
         result = orchestrator.process_one("/book.epub")
 
     assert result["skipped"]
@@ -108,22 +108,19 @@ def test_orchestrator_classifies_book(db_path, config):
 
     # Mock classifier
     mock_profile = BookProfile(
-        book_type=BookType.TECHNICAL_TUTORIAL,
-        confidence=0.9,
-        suggested_tags=["python"],
-        reasoning="Test"
+        book_type=BookType.TECHNICAL_TUTORIAL, confidence=0.9, suggested_tags=["python"], reasoning="Test"
     )
     orchestrator.classifier = MagicMock()
     orchestrator.classifier.classify.return_value = mock_profile
 
     # Mock subprocess for processing
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
 
         # Mock file reading for text extraction
-        with patch('builtins.open', MagicMock()):
-            with patch.object(orchestrator, '_extract_sample', return_value="Chapter 1..."):
-                with patch.object(orchestrator, '_compute_hash', return_value="newhash"):
+        with patch("builtins.open", MagicMock()):
+            with patch.object(orchestrator, "_extract_sample", return_value="Chapter 1..."):
+                with patch.object(orchestrator, "_compute_hash", return_value="newhash"):
                     orchestrator.process_one("/book.epub")
 
     # Should have called classifier
@@ -140,12 +137,12 @@ def test_orchestrator_handles_processing_timeout(db_path, config):
     orchestrator = Orchestrator(config)
 
     # Mock to raise timeout
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_run.side_effect = subprocess.TimeoutExpired("cmd", 1)
 
-        with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
-            with patch.object(orchestrator, '_extract_sample', return_value="text"):
-                with patch.object(orchestrator, '_run_classifier', return_value={}):
+        with patch.object(orchestrator, "_compute_hash", return_value="hash123"):
+            with patch.object(orchestrator, "_extract_sample", return_value="text"):
+                with patch.object(orchestrator, "_run_classifier", return_value={}):
                     result = orchestrator.process_one("/book.epub")
 
     assert result["state"] == PipelineState.NEEDS_RETRY.value
@@ -164,7 +161,7 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
         book_type=BookType.TECHNICAL_TUTORIAL,
         confidence=0.9,  # Above 0.7 threshold
         suggested_tags=["python"],
-        reasoning="Test"
+        reasoning="Test",
     )
     orchestrator.classifier = MagicMock()
     orchestrator.classifier.classify.return_value = mock_profile
@@ -182,13 +179,17 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     }
 
     from agentic_pipeline.validation import ValidationResult
+
     mock_validation = ValidationResult(passed=True, reasons=[], warnings=[], metrics={"chapter_count": 10})
 
-    with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
-        with patch.object(orchestrator, '_run_embedding', return_value={"chapters_processed": 10}):
-            with patch.object(orchestrator, '_compute_hash', return_value="hash123"):
-                with patch.object(orchestrator, '_extract_sample', return_value="text"):
-                    with patch("agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate", return_value=mock_validation):
+    with patch.object(orchestrator, "_run_processing", return_value=mock_processing_result):
+        with patch.object(orchestrator, "_run_embedding", return_value={"chapters_processed": 10}):
+            with patch.object(orchestrator, "_compute_hash", return_value="hash123"):
+                with patch.object(orchestrator, "_extract_sample", return_value="text"):
+                    with patch(
+                        "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                        return_value=mock_validation,
+                    ):
                         result = orchestrator.process_one("/book.epub")
 
     # Check that it was auto-approved
@@ -290,7 +291,7 @@ def test_scan_directory_idempotency_is_db_backed(db_path, config, tmp_path):
     assert orchestrator._scan_watch_dir() == 1
 
     # Second scan re-hashes (no in-memory cache) but still returns 0 via DB check
-    with patch.object(orchestrator, '_compute_hash', wraps=orchestrator._compute_hash) as mock_hash:
+    with patch.object(orchestrator, "_compute_hash", wraps=orchestrator._compute_hash) as mock_hash:
         assert orchestrator._scan_watch_dir() == 0
         mock_hash.assert_called_once()  # Hash IS computed — DB check prevents duplicate detect
 

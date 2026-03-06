@@ -6,6 +6,7 @@ Follows MCP best practices for environment-based configuration
 import os
 from pathlib import Path
 
+
 class Config:
     """Server configuration with environment variable support"""
 

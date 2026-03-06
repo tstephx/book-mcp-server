@@ -43,7 +43,7 @@ PROJECT_DOMAINS = {
             "SSL TLS certificates HTTPS",
             "systemd services daemon",
             "Ansible automation configuration",
-            "backup monitoring logging"
+            "backup monitoring logging",
         ],
         "phases": [
             {"name": "Foundation", "topics": ["linux basics", "command line", "file system"]},
@@ -51,8 +51,8 @@ PROJECT_DOMAINS = {
             {"name": "Web Infrastructure", "topics": ["nginx", "SSL", "reverse proxy", "domains"]},
             {"name": "Containerization", "topics": ["Docker", "Docker Compose", "volumes"]},
             {"name": "Deployment", "topics": ["application hosting", "databases", "services"]},
-            {"name": "Automation", "topics": ["Ansible", "backups", "monitoring"]}
-        ]
+            {"name": "Automation", "topics": ["Ansible", "backups", "monitoring"]},
+        ],
     },
     "web_app": {
         "name": "Web Application",
@@ -62,14 +62,14 @@ PROJECT_DOMAINS = {
             "database SQL data modeling",
             "authentication security",
             "Docker containerization",
-            "CI/CD deployment pipeline"
+            "CI/CD deployment pipeline",
         ],
         "phases": [
             {"name": "Architecture", "topics": ["design patterns", "API design", "data modeling"]},
             {"name": "Backend", "topics": ["API development", "database", "authentication"]},
             {"name": "Frontend", "topics": ["UI development", "state management"]},
-            {"name": "DevOps", "topics": ["Docker", "CI/CD", "deployment"]}
-        ]
+            {"name": "DevOps", "topics": ["Docker", "CI/CD", "deployment"]},
+        ],
     },
     "data_pipeline": {
         "name": "Data Pipeline / Analytics",
@@ -79,15 +79,15 @@ PROJECT_DOMAINS = {
             "database SQL queries",
             "data visualization analysis",
             "machine learning models",
-            "automation scheduling"
+            "automation scheduling",
         ],
         "phases": [
             {"name": "Data Foundations", "topics": ["Python", "pandas", "data structures"]},
             {"name": "Data Processing", "topics": ["cleaning", "transformation", "ETL"]},
             {"name": "Storage", "topics": ["databases", "SQL", "data modeling"]},
             {"name": "Analysis", "topics": ["visualization", "statistics", "reporting"]},
-            {"name": "Automation", "topics": ["scheduling", "pipelines", "monitoring"]}
-        ]
+            {"name": "Automation", "topics": ["scheduling", "pipelines", "monitoring"]},
+        ],
     },
     "ml_project": {
         "name": "Machine Learning Project",
@@ -97,15 +97,15 @@ PROJECT_DOMAINS = {
             "data preprocessing features",
             "model training evaluation",
             "LLM language models",
-            "deployment inference serving"
+            "deployment inference serving",
         ],
         "phases": [
             {"name": "ML Foundations", "topics": ["statistics", "Python", "numpy"]},
             {"name": "Data Preparation", "topics": ["cleaning", "feature engineering"]},
             {"name": "Modeling", "topics": ["algorithms", "training", "evaluation"]},
             {"name": "Deep Learning", "topics": ["neural networks", "frameworks"]},
-            {"name": "Deployment", "topics": ["serving", "inference", "monitoring"]}
-        ]
+            {"name": "Deployment", "topics": ["serving", "inference", "monitoring"]},
+        ],
     },
     "automation": {
         "name": "Automation / Scripting",
@@ -114,15 +114,15 @@ PROJECT_DOMAINS = {
             "bash shell scripting",
             "Ansible infrastructure automation",
             "API integration webhooks",
-            "scheduling cron jobs"
+            "scheduling cron jobs",
         ],
         "phases": [
             {"name": "Scripting Basics", "topics": ["Python", "bash", "command line"]},
             {"name": "File Operations", "topics": ["file handling", "text processing"]},
             {"name": "API Integration", "topics": ["REST APIs", "web scraping"]},
             {"name": "Infrastructure", "topics": ["Ansible", "configuration management"]},
-            {"name": "Scheduling", "topics": ["cron", "task queues", "monitoring"]}
-        ]
+            {"name": "Scheduling", "topics": ["cron", "task queues", "monitoring"]},
+        ],
     },
     "mcp_server": {
         "name": "MCP Server Development",
@@ -131,23 +131,23 @@ PROJECT_DOMAINS = {
             "Python API development",
             "TypeScript Node.js development",
             "database SQLite integration",
-            "API design patterns"
+            "API design patterns",
         ],
         "phases": [
             {"name": "MCP Fundamentals", "topics": ["MCP protocol", "tools", "resources"]},
             {"name": "Backend Development", "topics": ["Python/TypeScript", "async"]},
             {"name": "Data Layer", "topics": ["database", "caching", "storage"]},
             {"name": "Integration", "topics": ["API design", "error handling"]},
-            {"name": "Deployment", "topics": ["packaging", "distribution"]}
-        ]
-    }
+            {"name": "Deployment", "topics": ["packaging", "distribution"]},
+        ],
+    },
 }
 
 # Time estimates per topic complexity
 TIME_ESTIMATES = {
     "foundational": {"learn": 4, "implement": 2},  # hours
     "intermediate": {"learn": 6, "implement": 4},
-    "advanced": {"learn": 10, "implement": 8}
+    "advanced": {"learn": 10, "implement": 8},
 }
 
 # =============================================================================
@@ -162,42 +162,42 @@ PHASE_CONCEPTS = {
         "Web Infrastructure": ["nginx", "reverse proxy", "SSL certificates"],
         "Containerization": ["docker", "docker compose", "volumes"],
         "Deployment": ["systemd", "process management"],
-        "Automation": ["ansible", "cron", "backup strategies"]
+        "Automation": ["ansible", "cron", "backup strategies"],
     },
     "web_app": {
         "Architecture": ["API", "REST", "microservices"],
         "Backend": ["database", "authentication", "ORM"],
         "Frontend": ["components", "state management"],
-        "DevOps": ["docker", "CI/CD", "deployment"]
+        "DevOps": ["docker", "CI/CD", "deployment"],
     },
     "data_pipeline": {
         "Data Foundations": ["pandas", "data structures"],
         "Data Processing": ["ETL", "data cleaning"],
         "Storage": ["SQL", "database design"],
         "Analysis": ["visualization", "statistics"],
-        "Automation": ["scheduling", "pipelines"]
+        "Automation": ["scheduling", "pipelines"],
     },
     "ml_project": {
         "ML Foundations": ["statistics", "numpy", "linear algebra"],
         "Data Preparation": ["feature engineering", "normalization"],
         "Modeling": ["classification", "regression", "evaluation metrics"],
         "Deep Learning": ["neural networks", "backpropagation"],
-        "Deployment": ["model serving", "inference"]
+        "Deployment": ["model serving", "inference"],
     },
     "automation": {
         "Scripting Basics": ["python", "bash"],
         "File Operations": ["file handling", "text processing"],
         "API Integration": ["REST API", "webhooks"],
         "Infrastructure": ["ansible", "configuration management"],
-        "Scheduling": ["cron", "task queues"]
+        "Scheduling": ["cron", "task queues"],
     },
     "mcp_server": {
         "MCP Fundamentals": ["MCP protocol", "tools", "resources"],
         "Backend Development": ["async programming", "Python"],
         "Data Layer": ["SQLite", "caching"],
         "Integration": ["API design", "error handling"],
-        "Deployment": ["packaging", "distribution"]
-    }
+        "Deployment": ["packaging", "distribution"],
+    },
 }
 
 
@@ -205,24 +205,57 @@ PHASE_CONCEPTS = {
 # HELPER FUNCTIONS
 # =============================================================================
 
+
 def _detect_project_type(goal: str) -> tuple[str, dict]:
     """Detect project type from goal description"""
     goal_lower = goal.lower()
 
     # Keyword matching for project types
     type_keywords = {
-        "vps": ["vps", "server", "hosting", "hetzner", "digitalocean", "linode",
-                "virtual private", "self-host", "deploy server"],
-        "web_app": ["web app", "website", "frontend", "backend", "full stack",
-                    "react", "vue", "django", "flask", "fastapi"],
-        "data_pipeline": ["data pipeline", "etl", "data processing", "analytics",
-                          "data analysis", "data warehouse", "reporting"],
-        "ml_project": ["machine learning", "ml", "deep learning", "neural network",
-                       "model training", "llm", "ai model", "prediction"],
-        "automation": ["automate", "automation", "script", "bot", "workflow",
-                       "scheduled", "cron", "batch"],
-        "mcp_server": ["mcp server", "mcp tool", "model context protocol",
-                       "claude tool", "ai tool"]
+        "vps": [
+            "vps",
+            "server",
+            "hosting",
+            "hetzner",
+            "digitalocean",
+            "linode",
+            "virtual private",
+            "self-host",
+            "deploy server",
+        ],
+        "web_app": [
+            "web app",
+            "website",
+            "frontend",
+            "backend",
+            "full stack",
+            "react",
+            "vue",
+            "django",
+            "flask",
+            "fastapi",
+        ],
+        "data_pipeline": [
+            "data pipeline",
+            "etl",
+            "data processing",
+            "analytics",
+            "data analysis",
+            "data warehouse",
+            "reporting",
+        ],
+        "ml_project": [
+            "machine learning",
+            "ml",
+            "deep learning",
+            "neural network",
+            "model training",
+            "llm",
+            "ai model",
+            "prediction",
+        ],
+        "automation": ["automate", "automation", "script", "bot", "workflow", "scheduled", "cron", "batch"],
+        "mcp_server": ["mcp server", "mcp tool", "model context protocol", "claude tool", "ai tool"],
     }
 
     # Find best match
@@ -246,8 +279,8 @@ def _detect_project_type(goal: str) -> tuple[str, dict]:
             {"name": "Research", "topics": ["requirements", "architecture"]},
             {"name": "Foundation", "topics": ["core concepts", "tools"]},
             {"name": "Implementation", "topics": ["development", "testing"]},
-            {"name": "Deployment", "topics": ["deployment", "monitoring"]}
-        ]
+            {"name": "Deployment", "topics": ["deployment", "monitoring"]},
+        ],
     }
 
 
@@ -264,38 +297,37 @@ def _search_library_for_topics(search_terms: list, limit_per_term: int = 5) -> l
         with embedding_model_context() as generator:
             for term in search_terms:
                 query_embedding = generator.generate(term)
-                top_results = find_top_k(
-                    query_embedding, embeddings_matrix,
-                    k=limit_per_term * 3, min_similarity=0.25
-                )
+                top_results = find_top_k(query_embedding, embeddings_matrix, k=limit_per_term * 3, min_similarity=0.25)
 
                 chunk_results = []
                 for idx, similarity in top_results:
                     meta = chunk_metadata[idx]
-                    chunk_results.append({**meta, 'similarity': similarity})
+                    chunk_results.append({**meta, "similarity": similarity})
 
                 # Aggregate to chapter level
                 chapter_results = best_chunk_per_chapter(chunk_results)
 
                 for r in chapter_results[:limit_per_term]:
-                    chapter_key = (r['book_id'], r['chapter_number'])
+                    chapter_key = (r["book_id"], r["chapter_number"])
                     if chapter_key not in seen_chapters:
                         seen_chapters.add(chapter_key)
-                        all_results.append({
-                            'id': r['chapter_id'],
-                            'book_id': r['book_id'],
-                            'book_title': r['book_title'],
-                            'author': r.get('author', ''),
-                            'chapter_title': r['chapter_title'],
-                            'chapter_number': r['chapter_number'],
-                            'file_path': r.get('file_path', ''),
-                            'word_count': r.get('word_count', 0),
-                            'search_term': term,
-                            'similarity': r['similarity'],
-                            'excerpt': r.get('excerpt', '')
-                        })
+                        all_results.append(
+                            {
+                                "id": r["chapter_id"],
+                                "book_id": r["book_id"],
+                                "book_title": r["book_title"],
+                                "author": r.get("author", ""),
+                                "chapter_title": r["chapter_title"],
+                                "chapter_number": r["chapter_number"],
+                                "file_path": r.get("file_path", ""),
+                                "word_count": r.get("word_count", 0),
+                                "search_term": term,
+                                "similarity": r["similarity"],
+                                "excerpt": r.get("excerpt", ""),
+                            }
+                        )
 
-            all_results.sort(key=lambda x: x['similarity'], reverse=True)
+            all_results.sort(key=lambda x: x["similarity"], reverse=True)
             return all_results
 
     except Exception as e:
@@ -305,22 +337,22 @@ def _search_library_for_topics(search_terms: list, limit_per_term: int = 5) -> l
 
 def _group_results_by_phase(results: list, phases: list) -> dict:
     """Group search results into project phases"""
-    phase_results = {phase['name']: [] for phase in phases}
-    phase_results['Other'] = []
+    phase_results = {phase["name"]: [] for phase in phases}
+    phase_results["Other"] = []
 
     for result in results:
         matched = False
         result_text = f"{result['chapter_title']} {result['search_term']}".lower()
 
         for phase in phases:
-            " ".join(phase['topics']).lower()
-            if any(topic.lower() in result_text for topic in phase['topics']):
-                phase_results[phase['name']].append(result)
+            " ".join(phase["topics"]).lower()
+            if any(topic.lower() in result_text for topic in phase["topics"]):
+                phase_results[phase["name"]].append(result)
                 matched = True
                 break
 
         if not matched:
-            phase_results['Other'].append(result)
+            phase_results["Other"].append(result)
 
     return phase_results
 
@@ -350,7 +382,7 @@ def _generate_concept_briefs(concepts: list, project_type: str) -> dict:
                 briefs[concept] = {
                     "brief": analogy_data.get("analogy", "")[:300],
                     "pm_context": analogy_data.get("pm_context", ""),
-                    "has_analogy": True
+                    "has_analogy": True,
                 }
             else:
                 # Search library for brief
@@ -361,20 +393,20 @@ def _generate_concept_briefs(concepts: list, project_type: str) -> dict:
                         "brief": summary[:300] if summary else f"A key concept in {project_type} projects.",
                         "pm_context": "",
                         "has_analogy": False,
-                        "source": sources[0]['book_title'] if sources else None
+                        "source": sources[0]["book_title"] if sources else None,
                     }
                 else:
                     briefs[concept] = {
                         "brief": f"A key concept for this phase. Use teach_concept('{concept}') to learn more.",
                         "pm_context": "",
-                        "has_analogy": False
+                        "has_analogy": False,
                     }
         except Exception as e:
             logger.debug(f"Could not generate brief for {concept}: {e}")
             briefs[concept] = {
                 "brief": f"Use teach_concept('{concept}') to learn about this.",
                 "pm_context": "",
-                "has_analogy": False
+                "has_analogy": False,
             }
 
     return briefs
@@ -387,17 +419,14 @@ def _estimate_time(phases: list, results_by_phase: dict) -> dict:
     phase_times = {}
 
     for phase in phases:
-        phase_name = phase['name']
+        phase_name = phase["name"]
         result_count = len(results_by_phase.get(phase_name, []))
 
         # More results = more content to cover
         base_hours = 4 + (result_count * 1.5)
         impl_hours = 2 + (result_count * 0.75)
 
-        phase_times[phase_name] = {
-            "learn_hours": round(base_hours),
-            "implement_hours": round(impl_hours)
-        }
+        phase_times[phase_name] = {"learn_hours": round(base_hours), "implement_hours": round(impl_hours)}
         total_learn += base_hours
         total_implement += impl_hours
 
@@ -405,7 +434,7 @@ def _estimate_time(phases: list, results_by_phase: dict) -> dict:
         "phases": phase_times,
         "total_learn_hours": round(total_learn),
         "total_implement_hours": round(total_implement),
-        "total_hours": round(total_learn + total_implement)
+        "total_hours": round(total_learn + total_implement),
     }
 
 
@@ -414,31 +443,19 @@ def _generate_checklist(phases: list, results_by_phase: dict) -> list:
     checklist = []
 
     for phase in phases:
-        phase_name = phase['name']
-        phase_items = {
-            "phase": phase_name,
-            "items": []
-        }
+        phase_name = phase["name"]
+        phase_items = {"phase": phase_name, "items": []}
 
         # Add topic-based items
-        for topic in phase['topics']:
-            phase_items["items"].append({
-                "task": f"Learn {topic}",
-                "type": "learn"
-            })
+        for topic in phase["topics"]:
+            phase_items["items"].append({"task": f"Learn {topic}", "type": "learn"})
 
         # Add implementation items based on results
         results = results_by_phase.get(phase_name, [])
         if results:
-            phase_items["items"].append({
-                "task": f"Review relevant chapters ({len(results)} found)",
-                "type": "read"
-            })
+            phase_items["items"].append({"task": f"Review relevant chapters ({len(results)} found)", "type": "read"})
 
-        phase_items["items"].append({
-            "task": f"Implement {phase_name.lower()} components",
-            "type": "implement"
-        })
+        phase_items["items"].append({"task": f"Implement {phase_name.lower()} components", "type": "implement"})
 
         checklist.append(phase_items)
 
@@ -453,7 +470,7 @@ def _build_markdown_guide(
     results_by_phase: dict,
     time_estimates: dict,
     checklist: list,
-    concept_briefs: dict = None
+    concept_briefs: dict = None,
 ) -> str:
     """Build comprehensive markdown learning guide
 
@@ -482,20 +499,17 @@ def _build_markdown_guide(
     # Books found
     books_used = {}
     for r in results:
-        if r['book_title'] not in books_used:
-            books_used[r['book_title']] = {
-                'author': r.get('author', ''),
-                'chapters': []
-            }
-        books_used[r['book_title']]['chapters'].append(r['chapter_title'])
+        if r["book_title"] not in books_used:
+            books_used[r["book_title"]] = {"author": r.get("author", ""), "chapters": []}
+        books_used[r["book_title"]]["chapters"].append(r["chapter_title"])
 
     lines.append("## 📚 Library Resources")
     lines.append("")
     lines.append(f"Found **{len(results)}** relevant chapters across **{len(books_used)}** books:")
     lines.append("")
 
-    for book, info in sorted(books_used.items(), key=lambda x: -len(x[1]['chapters'])):
-        author_str = f" by {info['author']}" if info['author'] else ""
+    for book, info in sorted(books_used.items(), key=lambda x: -len(x[1]["chapters"])):
+        author_str = f" by {info['author']}" if info["author"] else ""
         lines.append(f"| **{book}**{author_str} | {len(info['chapters'])} chapters |")
 
     lines.append("")
@@ -506,10 +520,10 @@ def _build_markdown_guide(
     lines.append("## 🗺️ Learning Path")
     lines.append("")
     lines.append("```")
-    for i, phase in enumerate(project_config['phases'], 1):
-        phase_name = phase['name']
-        topics = ", ".join(phase['topics'])
-        time = time_estimates['phases'].get(phase_name, {})
+    for i, phase in enumerate(project_config["phases"], 1):
+        phase_name = phase["name"]
+        topics = ", ".join(phase["topics"])
+        time = time_estimates["phases"].get(phase_name, {})
         lines.append(f"PHASE {i}: {phase_name.upper()} ({time.get('learn_hours', 4)} hrs)")
         lines.append(f"├── Topics: {topics}")
         lines.append(f"└── Chapters: {len(results_by_phase.get(phase_name, []))} relevant")
@@ -520,10 +534,10 @@ def _build_markdown_guide(
     lines.append("")
 
     # Detailed phases
-    for i, phase in enumerate(project_config['phases'], 1):
-        phase_name = phase['name']
+    for i, phase in enumerate(project_config["phases"], 1):
+        phase_name = phase["name"]
         phase_results = results_by_phase.get(phase_name, [])
-        time = time_estimates['phases'].get(phase_name, {})
+        time = time_estimates["phases"].get(phase_name, {})
 
         lines.append(f"## Phase {i}: {phase_name}")
         lines.append("")
@@ -539,12 +553,12 @@ def _build_markdown_guide(
                 lines.append("")
                 for concept, brief_data in phase_concepts.items():
                     lines.append(f"**{concept.title()}**")
-                    if brief_data.get('brief'):
+                    if brief_data.get("brief"):
                         lines.append(f"> {brief_data['brief']}")
-                    if brief_data.get('pm_context'):
+                    if brief_data.get("pm_context"):
                         lines.append(">")
                         lines.append(f"> *PM Context: {brief_data['pm_context']}*")
-                    if brief_data.get('source'):
+                    if brief_data.get("source"):
                         lines.append(">")
                         lines.append(f"> *Source: {brief_data['source']}*")
                     lines.append("")
@@ -555,14 +569,14 @@ def _build_markdown_guide(
             for r in phase_results[:5]:  # Top 5 per phase
                 lines.append(f"**{r['book_title']}** — Chapter {r['chapter_number']}: {r['chapter_title']}")
                 lines.append(f"- Relevance: {r['similarity']:.0%}")
-                if r.get('excerpt'):
-                    excerpt = r['excerpt'][:200].replace('\n', ' ')
+                if r.get("excerpt"):
+                    excerpt = r["excerpt"][:200].replace("\n", " ")
                     lines.append(f"- Preview: *{excerpt}...*")
                 lines.append("")
 
         lines.append("### ✅ Checklist")
         lines.append("")
-        for topic in phase['topics']:
+        for topic in phase["topics"]:
             lines.append(f"- [ ] Learn: {topic}")
         if phase_results:
             lines.append(f"- [ ] Read: Review {len(phase_results)} relevant chapters")
@@ -578,7 +592,9 @@ def _build_markdown_guide(
     lines.append("")
 
     for i, r in enumerate(results[:20], 1):  # Top 20
-        lines.append(f"{i}. **{r['book_title']}** — Ch. {r['chapter_number']}: {r['chapter_title']} ({r['similarity']:.0%})")
+        lines.append(
+            f"{i}. **{r['book_title']}** — Ch. {r['chapter_number']}: {r['chapter_title']} ({r['similarity']:.0%})"
+        )
 
     if len(results) > 20:
         lines.append(f"\n*...and {len(results) - 20} more chapters*")
@@ -593,7 +609,7 @@ def _build_markdown_guide(
 
     for phase_check in checklist:
         lines.append(f"### {phase_check['phase']}")
-        for item in phase_check['items']:
+        for item in phase_check["items"]:
             lines.append(f"- [ ] {item['task']}")
         lines.append("")
 
@@ -611,6 +627,7 @@ def _build_markdown_guide(
 # MAIN TOOL REGISTRATION
 # =============================================================================
 
+
 def register_project_learning_tools(mcp):
     """Register project learning path tools with MCP server"""
 
@@ -620,7 +637,7 @@ def register_project_learning_tools(mcp):
         depth: str = "comprehensive",
         include_concepts: bool = True,
         save_to_file: bool = False,
-        output_path: str = ""
+        output_path: str = "",
     ) -> dict:
         """Generate a project-based learning path from your book library
 
@@ -669,7 +686,7 @@ def register_project_learning_tools(mcp):
             if depth not in valid_depths:
                 return {
                     "error": f"Invalid depth '{depth}'. Use: {', '.join(valid_depths)}",
-                    "valid_depths": valid_depths
+                    "valid_depths": valid_depths,
                 }
 
             logger.info(f"Generating learning path for: {goal}")
@@ -682,7 +699,7 @@ def register_project_learning_tools(mcp):
             limit_per_term = {"quick": 3, "comprehensive": 5, "deep": 8}[depth]
 
             # Expand search terms with the goal itself
-            search_terms = [goal] + project_config['search_terms']
+            search_terms = [goal] + project_config["search_terms"]
 
             # Search library
             results = _search_library_for_topics(search_terms, limit_per_term)
@@ -692,36 +709,39 @@ def register_project_learning_tools(mcp):
                     "goal": goal,
                     "project_type": project_type,
                     "message": "No relevant content found in your library for this goal.",
-                    "suggestion": "Try rephrasing your goal or check your library with list_books()"
+                    "suggestion": "Try rephrasing your goal or check your library with list_books()",
                 }
 
             # Group by phase
-            results_by_phase = _group_results_by_phase(results, project_config['phases'])
+            results_by_phase = _group_results_by_phase(results, project_config["phases"])
 
             # Estimate time
-            time_estimates = _estimate_time(project_config['phases'], results_by_phase)
+            time_estimates = _estimate_time(project_config["phases"], results_by_phase)
 
             # Generate checklist
-            checklist = _generate_checklist(project_config['phases'], results_by_phase)
+            checklist = _generate_checklist(project_config["phases"], results_by_phase)
 
             # Generate concept briefs if requested
             concept_briefs = None
             if include_concepts:
                 logger.info("Generating concept briefs for phases...")
                 concept_briefs = {}
-                for phase in project_config['phases']:
-                    phase_name = phase['name']
+                for phase in project_config["phases"]:
+                    phase_name = phase["name"]
                     phase_concepts = _get_phase_concepts(project_type, phase_name)
                     if phase_concepts:
-                        concept_briefs[phase_name] = _generate_concept_briefs(
-                            phase_concepts, project_type
-                        )
+                        concept_briefs[phase_name] = _generate_concept_briefs(phase_concepts, project_type)
 
             # Build guide
             guide = _build_markdown_guide(
-                goal, project_type, project_config,
-                results, results_by_phase, time_estimates, checklist,
-                concept_briefs=concept_briefs
+                goal,
+                project_type,
+                project_config,
+                results,
+                results_by_phase,
+                time_estimates,
+                checklist,
+                concept_briefs=concept_briefs,
             )
 
             # Save to file if requested
@@ -729,12 +749,12 @@ def register_project_learning_tools(mcp):
             if save_to_file:
                 if not output_path:
                     # Generate filename from goal
-                    safe_name = re.sub(r'[^\w\s-]', '', goal.lower())
-                    safe_name = re.sub(r'[\s]+', '-', safe_name)[:50]
+                    safe_name = re.sub(r"[^\w\s-]", "", goal.lower())
+                    safe_name = re.sub(r"[\s]+", "-", safe_name)[:50]
                     output_path = f"learning-path-{safe_name}.md"
 
                 try:
-                    with open(output_path, 'w') as f:
+                    with open(output_path, "w") as f:
                         f.write(guide)
                     file_path = output_path
                     logger.info(f"Saved learning path to: {output_path}")
@@ -742,48 +762,47 @@ def register_project_learning_tools(mcp):
                     logger.warning(f"Could not save file: {e}")
 
             # Get unique books
-            books_found = len(set(r['book_title'] for r in results))
+            books_found = len(set(r["book_title"] for r in results))
 
             # Build reading list summary
             reading_list = [
                 {
-                    "book": r['book_title'],
-                    "chapter": r['chapter_number'],
-                    "title": r['chapter_title'],
-                    "relevance": f"{r['similarity']:.0%}"
+                    "book": r["book_title"],
+                    "chapter": r["chapter_number"],
+                    "title": r["chapter_title"],
+                    "relevance": f"{r['similarity']:.0%}",
                 }
                 for r in results[:10]
             ]
 
             return {
                 "goal": goal,
-                "project_type": project_config['name'],
+                "project_type": project_config["name"],
                 "detected_type": project_type,
                 "phases": [
                     {
-                        "name": p['name'],
-                        "topics": p['topics'],
-                        "chapters_found": len(results_by_phase.get(p['name'], []))
+                        "name": p["name"],
+                        "topics": p["topics"],
+                        "chapters_found": len(results_by_phase.get(p["name"], [])),
                     }
-                    for p in project_config['phases']
+                    for p in project_config["phases"]
                 ],
                 "time_estimate": {
-                    "learn_hours": time_estimates['total_learn_hours'],
-                    "implement_hours": time_estimates['total_implement_hours'],
-                    "total_hours": time_estimates['total_hours']
+                    "learn_hours": time_estimates["total_learn_hours"],
+                    "implement_hours": time_estimates["total_implement_hours"],
+                    "total_hours": time_estimates["total_hours"],
                 },
                 "books_found": books_found,
                 "chapters_found": len(results),
                 "reading_list": reading_list,
                 "concept_briefs": concept_briefs,
                 "guide": guide,
-                "file_path": file_path
+                "file_path": file_path,
             }
 
         except Exception as e:
             logger.error(f"generate_learning_path error: {e}", exc_info=True)
             return {"error": str(e)}
-
 
     @mcp.tool()
     def list_project_templates() -> dict:
@@ -803,17 +822,19 @@ def register_project_learning_tools(mcp):
         templates = []
 
         for template_id, config in PROJECT_DOMAINS.items():
-            templates.append({
-                "id": template_id,
-                "name": config['name'],
-                "phases": [p['name'] for p in config['phases']],
-                "example_goals": _get_example_goals(template_id)
-            })
+            templates.append(
+                {
+                    "id": template_id,
+                    "name": config["name"],
+                    "phases": [p["name"] for p in config["phases"]],
+                    "example_goals": _get_example_goals(template_id),
+                }
+            )
 
         return {
             "templates": templates,
             "usage_tip": "Use generate_learning_path('your goal here') - the system will auto-detect the best template",
-            "custom_goals": "You can also use completely custom goals - the system will search your library semantically"
+            "custom_goals": "You can also use completely custom goals - the system will search your library semantically",
         }
 
 
@@ -823,32 +844,32 @@ def _get_example_goals(template_id: str) -> list:
         "vps": [
             "Build a VPS on Hetzner to host my portfolio",
             "Set up a self-hosted server for my side projects",
-            "Deploy my Python apps to a cloud server"
+            "Deploy my Python apps to a cloud server",
         ],
         "web_app": [
             "Build a full-stack web application",
             "Create a REST API with authentication",
-            "Develop a React frontend with Python backend"
+            "Develop a React frontend with Python backend",
         ],
         "data_pipeline": [
             "Create an ETL pipeline for CSV data",
             "Build a data analytics dashboard",
-            "Automate data processing and reporting"
+            "Automate data processing and reporting",
         ],
         "ml_project": [
             "Train a machine learning model",
             "Build an LLM-powered application",
-            "Create a prediction system"
+            "Create a prediction system",
         ],
         "automation": [
             "Automate my daily workflows with Python",
             "Build a web scraper and data collector",
-            "Create scheduled automation scripts"
+            "Create scheduled automation scripts",
         ],
         "mcp_server": [
             "Build an MCP server for my notes",
             "Create custom Claude tools",
-            "Develop an AI-integrated application"
-        ]
+            "Develop an AI-integrated application",
+        ],
     }
     return examples.get(template_id, ["Custom project goal"])

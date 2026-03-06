@@ -42,7 +42,7 @@ def test_calculate_calibration_with_data(db_path):
             book_type="technical_tutorial",
             confidence=confidence,
             decision=decision,
-            actor="auto:test"
+            actor="auto:test",
         )
 
     engine = CalibrationEngine(db_path, min_samples=50)
@@ -61,11 +61,7 @@ def test_calculate_threshold(db_path):
     # Record 100 high-confidence correct decisions
     for i in range(100):
         collector.record_decision(
-            book_id=f"book{i}",
-            book_type="technical_tutorial",
-            confidence=0.92,
-            decision="approved",
-            actor="auto:test"
+            book_id=f"book{i}", book_type="technical_tutorial", confidence=0.92, decision="approved", actor="auto:test"
         )
 
     engine = CalibrationEngine(db_path, min_samples=50, target_accuracy=0.95)

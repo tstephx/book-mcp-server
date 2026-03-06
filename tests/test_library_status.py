@@ -48,8 +48,7 @@ def db_path():
     path.unlink(missing_ok=True)
 
 
-def _add_book(db_path, book_id, title, author=None, word_count=1000,
-              chapters=None, pipeline_state=None):
+def _add_book(db_path, book_id, title, author=None, word_count=1000, chapters=None, pipeline_state=None):
     """Helper to add a book with chapters."""
     conn = sqlite3.connect(db_path)
     conn.execute(
@@ -133,8 +132,7 @@ def test_no_embeddings_book(db_path):
 def test_book_with_pipeline_record(db_path):
     from agentic_pipeline.library import LibraryStatus
 
-    _add_book(db_path, "book1", "Pipeline Book",
-              chapters=[True], pipeline_state="complete")
+    _add_book(db_path, "book1", "Pipeline Book", chapters=[True], pipeline_state="complete")
 
     result = LibraryStatus(db_path).get_status()
     book = result["books"][0]

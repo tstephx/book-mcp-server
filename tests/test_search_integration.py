@@ -17,8 +17,7 @@ def test_full_search_pipeline():
 
     conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT)")
     conn.execute(
-        "CREATE TABLE chapters (id TEXT PRIMARY KEY, book_id TEXT, title TEXT, "
-        "chapter_number INTEGER, file_path TEXT)"
+        "CREATE TABLE chapters (id TEXT PRIMARY KEY, book_id TEXT, title TEXT, chapter_number INTEGER, file_path TEXT)"
     )
     conn.execute(
         "CREATE TABLE chunks (id TEXT PRIMARY KEY, chapter_id TEXT, book_id TEXT, "
@@ -27,9 +26,7 @@ def test_full_search_pipeline():
     )
 
     conn.execute("INSERT INTO books VALUES ('b1', 'Docker Deep Dive')")
-    conn.execute(
-        "INSERT INTO chapters VALUES ('ch1', 'b1', 'Networking', 5, 'ch1.md')"
-    )
+    conn.execute("INSERT INTO chapters VALUES ('ch1', 'b1', 'Networking', 5, 'ch1.md')")
 
     # Chunk a chapter
     chapter_text = (
@@ -48,9 +45,17 @@ def test_full_search_pipeline():
         np.save(buf, emb)
         conn.execute(
             "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (chunk_id, "ch1", "b1", chunk["chunk_index"],
-             chunk["content"], chunk["word_count"],
-             buf.getvalue(), "text-embedding-3-small", "hash"),
+            (
+                chunk_id,
+                "ch1",
+                "b1",
+                chunk["chunk_index"],
+                chunk["content"],
+                chunk["word_count"],
+                buf.getvalue(),
+                "text-embedding-3-small",
+                "hash",
+            ),
         )
 
     conn.commit()
@@ -95,9 +100,7 @@ def test_load_chunk_embeddings_round_trip():
     )
 
     conn.execute("INSERT INTO books VALUES ('b1', 'Test Book', 'Author')")
-    conn.execute(
-        "INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)"
-    )
+    conn.execute("INSERT INTO chapters VALUES ('ch1', 'b1', 'Chapter 1', 1, 'ch1.md', 500)")
 
     # Insert 3 chunks with known embeddings
     np.random.seed(99)
@@ -109,9 +112,17 @@ def test_load_chunk_embeddings_round_trip():
         np.save(buf, emb)
         conn.execute(
             "INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (f"ch1:{i}", "ch1", "b1", i,
-             f"Chunk {i} content", 10,
-             buf.getvalue(), "text-embedding-3-small", f"hash{i}"),
+            (
+                f"ch1:{i}",
+                "ch1",
+                "b1",
+                i,
+                f"Chunk {i} content",
+                10,
+                buf.getvalue(),
+                "text-embedding-3-small",
+                f"hash{i}",
+            ),
         )
 
     conn.commit()

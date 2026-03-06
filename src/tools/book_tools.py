@@ -12,6 +12,7 @@ from ..utils.logging import logger
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+
 def register_book_tools(mcp: "FastMCP") -> None:
     """
     Register all book-related tools
@@ -34,13 +35,13 @@ def register_book_tools(mcp: "FastMCP") -> None:
             if not books:
                 return "No books found in library."
 
-            result = "📚 Book Library\n" + "="*50 + "\n\n"
+            result = "📚 Book Library\n" + "=" * 50 + "\n\n"
 
             for book in books:
                 result += f"📖 {book['title']}\n"
-                if book['author']:
+                if book["author"]:
                     result += f"   Author: {book['author']}\n"
-                if book['book_type']:
+                if book["book_type"]:
                     result += f"   Type: {book['book_type']}\n"
                 result += f"   Words: {book['word_count']:,}\n"
                 result += f"   Chapters: {book['chapter_count']}\n"
@@ -75,45 +76,49 @@ def register_book_tools(mcp: "FastMCP") -> None:
                 return f"Book with ID {book_id} not found."
 
             # Get chapters
-            chapters = execute_query("""
+            chapters = execute_query(
+                """
                 SELECT chapter_number, title, word_count
                 FROM chapters
                 WHERE book_id = ?
                 ORDER BY chapter_number
-            """, (book_id,))
+            """,
+                (book_id,),
+            )
 
             result = f"📖 {book['title']}\n"
-            result += "="*50 + "\n\n"
+            result += "=" * 50 + "\n\n"
 
-            if book['author']:
+            if book["author"]:
                 result += f"Author: {book['author']}\n"
             result += f"Total Words: {book['word_count']:,}\n"
             result += f"Chapters: {len(chapters)}\n"
             result += f"Status: {book['processing_status']}\n"
 
             # Classification info
-            book_type = book['book_type'] if 'book_type' in book.keys() else None
+            book_type = book["book_type"] if "book_type" in book.keys() else None
             if book_type:
                 result += "\nClassification:\n"
                 result += f"  Type: {book_type}\n"
-                confidence = book['classification_confidence'] if 'classification_confidence' in book.keys() else None
+                confidence = book["classification_confidence"] if "classification_confidence" in book.keys() else None
                 if confidence is not None:
                     result += f"  Confidence: {confidence:.0%}\n"
-                tags_raw = book['suggested_tags'] if 'suggested_tags' in book.keys() else None
+                tags_raw = book["suggested_tags"] if "suggested_tags" in book.keys() else None
                 if tags_raw:
                     try:
                         import json
+
                         tags = json.loads(tags_raw)
                         if tags:
                             result += f"  Tags: {', '.join(tags)}\n"
                     except (json.JSONDecodeError, TypeError):
                         pass
-                reasoning = book['classification_reasoning'] if 'classification_reasoning' in book.keys() else None
+                reasoning = book["classification_reasoning"] if "classification_reasoning" in book.keys() else None
                 if reasoning:
                     result += f"  Reasoning: {reasoning}\n"
 
             result += "\n"
-            result += "Table of Contents:\n" + "-"*50 + "\n"
+            result += "Table of Contents:\n" + "-" * 50 + "\n"
             for chapter in chapters:
                 result += f"{chapter['chapter_number']:2d}. {chapter['title']} ({chapter['word_count']:,} words)\n"
 
@@ -149,18 +154,21 @@ def register_book_tools(mcp: "FastMCP") -> None:
                 return f"Book with ID {book_id} not found."
 
             # Get chapters
-            chapters = execute_query("""
+            chapters = execute_query(
+                """
                 SELECT chapter_number, title, word_count
                 FROM chapters
                 WHERE book_id = ?
                 ORDER BY chapter_number
-            """, (book_id,))
+            """,
+                (book_id,),
+            )
 
             result = "📑 Table of Contents\n"
             result += f"{book['title']}\n"
-            if book['author']:
+            if book["author"]:
                 result += f"by {book['author']}\n"
-            result += "="*50 + "\n\n"
+            result += "=" * 50 + "\n\n"
 
             for chapter in chapters:
                 result += f"{chapter['chapter_number']:2d}. {chapter['title']}\n"

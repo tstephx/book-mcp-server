@@ -47,7 +47,6 @@ MIGRATIONS = [
         UNIQUE(content_hash)
     )
     """,
-
     # State history
     """
     CREATE TABLE IF NOT EXISTS pipeline_state_history (
@@ -62,7 +61,6 @@ MIGRATIONS = [
         FOREIGN KEY (pipeline_id) REFERENCES processing_pipelines(id)
     )
     """,
-
     # Strategy configurations
     """
     CREATE TABLE IF NOT EXISTS processing_strategies (
@@ -74,7 +72,6 @@ MIGRATIONS = [
         is_active BOOLEAN DEFAULT TRUE
     )
     """,
-
     # Pipeline config
     """
     CREATE TABLE IF NOT EXISTS pipeline_config (
@@ -83,7 +80,6 @@ MIGRATIONS = [
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Audit trail
     """
     CREATE TABLE IF NOT EXISTS approval_audit (
@@ -103,7 +99,6 @@ MIGRATIONS = [
         performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Retention policies
     """
     CREATE TABLE IF NOT EXISTS audit_retention (
@@ -112,7 +107,6 @@ MIGRATIONS = [
         last_cleanup TIMESTAMP
     )
     """,
-
     # Autonomy metrics
     """
     CREATE TABLE IF NOT EXISTS autonomy_metrics (
@@ -135,7 +129,6 @@ MIGRATIONS = [
         UNIQUE(period_start, period_end)
     )
     """,
-
     # Autonomy feedback
     """
     CREATE TABLE IF NOT EXISTS autonomy_feedback (
@@ -152,7 +145,6 @@ MIGRATIONS = [
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Autonomy config (singleton)
     """
     CREATE TABLE IF NOT EXISTS autonomy_config (
@@ -170,7 +162,6 @@ MIGRATIONS = [
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Health metrics cache (Phase 4)
     """
     CREATE TABLE IF NOT EXISTS health_metrics (
@@ -187,7 +178,6 @@ MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # State duration stats for stuck detection (Phase 4)
     """
     CREATE TABLE IF NOT EXISTS state_duration_stats (
@@ -199,7 +189,6 @@ MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Per-type thresholds - Phase 5
     """
     CREATE TABLE IF NOT EXISTS autonomy_thresholds (
@@ -213,7 +202,6 @@ MIGRATIONS = [
         override_reason TEXT
     )
     """,
-
     # Spot-check tracking - Phase 5
     """
     CREATE TABLE IF NOT EXISTS spot_checks (
@@ -230,7 +218,6 @@ MIGRATIONS = [
         checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
-
     # Chunks for sub-chapter retrieval (embedding quality overhaul)
     """
     CREATE TABLE IF NOT EXISTS chunks (
@@ -298,21 +285,17 @@ def run_migrations(db_path: Path) -> None:
             cursor.execute("PRAGMA table_info(processing_pipelines)")
             existing_columns = {row[1] for row in cursor.fetchall()}
             if "processing_result" not in existing_columns:
-                cursor.execute(
-                    "ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON"
-                )
+                cursor.execute("ALTER TABLE processing_pipelines ADD COLUMN processing_result JSON")
             _record_migration(cursor, "add_processing_result_column")
 
         # Insert default autonomy config if not exists
-        cursor.execute(
-            "INSERT OR IGNORE INTO autonomy_config (id) VALUES (1)"
-        )
+        cursor.execute("INSERT OR IGNORE INTO autonomy_config (id) VALUES (1)")
 
         # Insert default retention policies
         for audit_type, retain_days in DEFAULT_RETENTION:
             cursor.execute(
                 "INSERT OR IGNORE INTO audit_retention (audit_type, retain_days) VALUES (?, ?)",
-                (audit_type, retain_days)
+                (audit_type, retain_days),
             )
 
         conn.commit()

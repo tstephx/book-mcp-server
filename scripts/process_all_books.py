@@ -64,7 +64,7 @@ def main():
             print(f"✗ Error: {str(e)[:40]}", flush=True)
             failed += 1
 
-    print(f"\n{'='*50}", flush=True)
+    print(f"\n{'=' * 50}", flush=True)
     print(f"DONE! Completed: {completed}, Skipped: {skipped}, Failed: {failed}", flush=True)
 
 

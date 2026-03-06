@@ -19,6 +19,7 @@ from agentic_pipeline.validation.extraction_validator import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _hash(text: str) -> str:
     """Return a unique content hash for test data."""
     return hashlib.sha256(text.encode()).hexdigest()
@@ -200,17 +201,20 @@ class TestCheckExtractionQuality:
 
     # --- Check 7: Suspicious chapter titles ---
 
-    @pytest.mark.parametrize("title", [
-        "chapter1.zip",
-        "book.exe",
-        "archive.rar",
-        "setup.msi",
-        "installer.dmg",
-        "package.pkg",
-        "data.tar",
-        "backup.gz",
-        "files.7z",
-    ])
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "chapter1.zip",
+            "book.exe",
+            "archive.rar",
+            "setup.msi",
+            "installer.dmg",
+            "package.pkg",
+            "data.tar",
+            "backup.gz",
+            "files.7z",
+        ],
+    )
     def test_reject_file_extension_titles(self, title):
         titles = [f"Ch {i}" for i in range(9)] + [title]
         result = check_extraction_quality(

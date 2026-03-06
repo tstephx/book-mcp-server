@@ -19,11 +19,7 @@ def register_reading_tools(mcp: "FastMCP") -> None:
     """Register reading management tools with the MCP server"""
 
     @mcp.tool()
-    def mark_as_read(
-        book_id: str,
-        chapter_number: int,
-        notes: str = ""
-    ) -> dict:
+    def mark_as_read(book_id: str, chapter_number: int, notes: str = "") -> dict:
         """Mark a chapter as read
 
         Tracks reading progress for personal library management.
@@ -43,12 +39,15 @@ def register_reading_tools(mcp: "FastMCP") -> None:
         """
         try:
             # Verify chapter exists
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT c.id, c.title, b.title as book_title
                 FROM chapters c
                 JOIN books b ON c.book_id = b.id
                 WHERE c.book_id = ? AND c.chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return {"error": f"Chapter {chapter_number} not found in book {book_id}"}
@@ -59,37 +58,43 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                 cursor = conn.cursor()
 
                 # Upsert reading progress
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO reading_progress (book_id, chapter_number, status, completed_at, notes)
                     VALUES (?, ?, 'read', ?, ?)
                     ON CONFLICT(book_id, chapter_number)
                     DO UPDATE SET status = 'read', completed_at = ?, notes = COALESCE(?, notes)
-                """, (book_id, chapter_number, now, notes, now, notes if notes else None))
+                """,
+                    (book_id, chapter_number, now, notes, now, notes if notes else None),
+                )
 
                 conn.commit()
 
             # Get updated stats for this book
-            stats = execute_single("""
+            stats = execute_single(
+                """
                 SELECT
                     COUNT(*) as total_chapters,
                     SUM(CASE WHEN rp.status = 'read' THEN 1 ELSE 0 END) as read_chapters
                 FROM chapters c
                 LEFT JOIN reading_progress rp ON c.book_id = rp.book_id AND c.chapter_number = rp.chapter_number
                 WHERE c.book_id = ?
-            """, (book_id,))
+            """,
+                (book_id,),
+            )
 
             logger.info(f"Marked as read: {chapter['book_title']} Ch.{chapter_number}")
 
             return {
                 "success": True,
-                "book_title": chapter['book_title'],
-                "chapter_title": chapter['title'],
+                "book_title": chapter["book_title"],
+                "chapter_title": chapter["title"],
                 "chapter_number": chapter_number,
                 "progress": {
-                    "read": stats['read_chapters'] or 0,
-                    "total": stats['total_chapters'],
-                    "percent": round((stats['read_chapters'] or 0) / stats['total_chapters'] * 100, 1)
-                }
+                    "read": stats["read_chapters"] or 0,
+                    "total": stats["total_chapters"],
+                    "percent": round((stats["read_chapters"] or 0) / stats["total_chapters"] * 100, 1),
+                },
             }
 
         except Exception as e:
@@ -97,10 +102,7 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    def mark_as_reading(
-        book_id: str,
-        chapter_number: int
-    ) -> dict:
+    def mark_as_reading(book_id: str, chapter_number: int) -> dict:
         """Mark a chapter as currently being read
 
         Tracks what you're currently reading. Useful for resuming later.
@@ -113,12 +115,15 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             Confirmation with chapter details
         """
         try:
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT c.id, c.title, b.title as book_title
                 FROM chapters c
                 JOIN books b ON c.book_id = b.id
                 WHERE c.book_id = ? AND c.chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return {"error": f"Chapter {chapter_number} not found in book {book_id}"}
@@ -127,12 +132,15 @@ def register_reading_tools(mcp: "FastMCP") -> None:
 
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO reading_progress (book_id, chapter_number, status, started_at)
                     VALUES (?, ?, 'reading', ?)
                     ON CONFLICT(book_id, chapter_number)
                     DO UPDATE SET status = 'reading', started_at = COALESCE(started_at, ?)
-                """, (book_id, chapter_number, now, now))
+                """,
+                    (book_id, chapter_number, now, now),
+                )
                 conn.commit()
 
             logger.info(f"Started reading: {chapter['book_title']} Ch.{chapter_number}")
@@ -140,9 +148,9 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             return {
                 "success": True,
                 "status": "reading",
-                "book_title": chapter['book_title'],
-                "chapter_title": chapter['title'],
-                "chapter_number": chapter_number
+                "book_title": chapter["book_title"],
+                "chapter_title": chapter["title"],
+                "chapter_number": chapter_number,
             }
 
         except Exception as e:
@@ -172,7 +180,8 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                 if not book:
                     return {"error": f"Book not found: {book_id}"}
 
-                chapters = execute_query("""
+                chapters = execute_query(
+                    """
                     SELECT
                         c.chapter_number,
                         c.title,
@@ -184,33 +193,35 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     LEFT JOIN reading_progress rp ON c.book_id = rp.book_id AND c.chapter_number = rp.chapter_number
                     WHERE c.book_id = ?
                     ORDER BY c.chapter_number
-                """, (book_id,))
+                """,
+                    (book_id,),
+                )
 
-                read_count = sum(1 for c in chapters if c['status'] == 'read')
-                reading_count = sum(1 for c in chapters if c['status'] == 'reading')
+                read_count = sum(1 for c in chapters if c["status"] == "read")
+                reading_count = sum(1 for c in chapters if c["status"] == "reading")
                 total = len(chapters)
 
                 return {
-                    "book_title": book['title'],
-                    "author": book['author'],
+                    "book_title": book["title"],
+                    "author": book["author"],
                     "progress": {
                         "read": read_count,
                         "reading": reading_count,
                         "unread": total - read_count - reading_count,
                         "total": total,
-                        "percent_complete": round(read_count / total * 100, 1) if total > 0 else 0
+                        "percent_complete": round(read_count / total * 100, 1) if total > 0 else 0,
                     },
                     "chapters": [
                         {
-                            "number": c['chapter_number'],
-                            "title": c['title'],
-                            "status": c['status'],
-                            "word_count": c['word_count'],
-                            "completed_at": c['completed_at'],
-                            "notes": c['notes']
+                            "number": c["chapter_number"],
+                            "title": c["title"],
+                            "status": c["status"],
+                            "word_count": c["word_count"],
+                            "completed_at": c["completed_at"],
+                            "notes": c["notes"],
                         }
                         for c in chapters
-                    ]
+                    ],
                 }
 
             else:
@@ -230,8 +241,8 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     ORDER BY b.title
                 """)
 
-                total_read = sum(b['read_chapters'] or 0 for b in books)
-                total_chapters = sum(b['total_chapters'] for b in books)
+                total_read = sum(b["read_chapters"] or 0 for b in books)
+                total_chapters = sum(b["total_chapters"] for b in books)
 
                 # Currently reading
                 currently_reading = execute_query("""
@@ -247,28 +258,30 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     "library_progress": {
                         "total_chapters_read": total_read,
                         "total_chapters": total_chapters,
-                        "percent_complete": round(total_read / total_chapters * 100, 1) if total_chapters > 0 else 0
+                        "percent_complete": round(total_read / total_chapters * 100, 1) if total_chapters > 0 else 0,
                     },
                     "currently_reading": [
                         {
-                            "book_title": r['book_title'],
-                            "chapter_number": r['chapter_number'],
-                            "chapter_title": r['chapter_title']
+                            "book_title": r["book_title"],
+                            "chapter_number": r["chapter_number"],
+                            "chapter_title": r["chapter_title"],
                         }
                         for r in currently_reading
                     ],
                     "books": [
                         {
-                            "id": b['id'],
-                            "title": b['title'],
-                            "author": b['author'],
-                            "read": b['read_chapters'] or 0,
-                            "reading": b['reading_chapters'] or 0,
-                            "total": b['total_chapters'],
-                            "percent": round((b['read_chapters'] or 0) / b['total_chapters'] * 100, 1) if b['total_chapters'] > 0 else 0
+                            "id": b["id"],
+                            "title": b["title"],
+                            "author": b["author"],
+                            "read": b["read_chapters"] or 0,
+                            "reading": b["reading_chapters"] or 0,
+                            "total": b["total_chapters"],
+                            "percent": round((b["read_chapters"] or 0) / b["total_chapters"] * 100, 1)
+                            if b["total_chapters"] > 0
+                            else 0,
                         }
                         for b in books
-                    ]
+                    ],
                 }
 
         except Exception as e:
@@ -276,13 +289,7 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             return {"error": str(e)}
 
     @mcp.tool()
-    def add_bookmark(
-        book_id: str,
-        chapter_number: int,
-        title: str = "",
-        note: str = "",
-        position: int = 0
-    ) -> dict:
+    def add_bookmark(book_id: str, chapter_number: int, title: str = "", note: str = "", position: int = 0) -> dict:
         """Add a bookmark to a chapter
 
         Save important passages for later reference.
@@ -302,22 +309,28 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             add_bookmark("abc-123", 5, note="Review this pattern for the project")
         """
         try:
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT c.id, c.title, b.title as book_title
                 FROM chapters c
                 JOIN books b ON c.book_id = b.id
                 WHERE c.book_id = ? AND c.chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return {"error": f"Chapter {chapter_number} not found in book {book_id}"}
 
             with get_db_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO bookmarks (book_id, chapter_number, title, note, position)
                     VALUES (?, ?, ?, ?, ?)
-                """, (book_id, chapter_number, title or chapter['title'], note, position))
+                """,
+                    (book_id, chapter_number, title or chapter["title"], note, position),
+                )
                 bookmark_id = cursor.lastrowid
                 conn.commit()
 
@@ -326,11 +339,11 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             return {
                 "success": True,
                 "bookmark_id": bookmark_id,
-                "book_title": chapter['book_title'],
-                "chapter_title": chapter['title'],
+                "book_title": chapter["book_title"],
+                "chapter_title": chapter["title"],
                 "chapter_number": chapter_number,
-                "title": title or chapter['title'],
-                "note": note
+                "title": title or chapter["title"],
+                "note": note,
             }
 
         except Exception as e:
@@ -359,7 +372,8 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                 if not book:
                     return {"error": f"Book not found: {book_id}"}
 
-                bookmarks = execute_query("""
+                bookmarks = execute_query(
+                    """
                     SELECT
                         bm.id,
                         bm.chapter_number,
@@ -372,23 +386,25 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     JOIN chapters c ON bm.book_id = c.book_id AND bm.chapter_number = c.chapter_number
                     WHERE bm.book_id = ?
                     ORDER BY bm.chapter_number, bm.created_at
-                """, (book_id,))
+                """,
+                    (book_id,),
+                )
 
                 return {
-                    "book_title": book['title'],
+                    "book_title": book["title"],
                     "count": len(bookmarks),
                     "bookmarks": [
                         {
-                            "id": b['id'],
-                            "chapter_number": b['chapter_number'],
-                            "chapter_title": b['chapter_title'],
-                            "title": b['bookmark_title'],
-                            "note": b['note'],
-                            "position": b['position'],
-                            "created_at": b['created_at']
+                            "id": b["id"],
+                            "chapter_number": b["chapter_number"],
+                            "chapter_title": b["chapter_title"],
+                            "title": b["bookmark_title"],
+                            "note": b["note"],
+                            "position": b["position"],
+                            "created_at": b["created_at"],
                         }
                         for b in bookmarks
-                    ]
+                    ],
                 }
 
             else:
@@ -413,20 +429,19 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                 # Group by book
                 by_book = {}
                 for b in bookmarks:
-                    book_id = b['book_id']
+                    book_id = b["book_id"]
                     if book_id not in by_book:
-                        by_book[book_id] = {
-                            "book_title": b['book_title'],
-                            "bookmarks": []
+                        by_book[book_id] = {"book_title": b["book_title"], "bookmarks": []}
+                    by_book[book_id]["bookmarks"].append(
+                        {
+                            "id": b["id"],
+                            "chapter_number": b["chapter_number"],
+                            "chapter_title": b["chapter_title"],
+                            "title": b["bookmark_title"],
+                            "note": b["note"],
+                            "created_at": b["created_at"],
                         }
-                    by_book[book_id]['bookmarks'].append({
-                        "id": b['id'],
-                        "chapter_number": b['chapter_number'],
-                        "chapter_title": b['chapter_title'],
-                        "title": b['bookmark_title'],
-                        "note": b['note'],
-                        "created_at": b['created_at']
-                    })
+                    )
 
                 return {
                     "total_count": len(bookmarks),
@@ -434,13 +449,13 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     "by_book": list(by_book.values()),
                     "recent": [
                         {
-                            "book_title": b['book_title'],
-                            "chapter_number": b['chapter_number'],
-                            "title": b['bookmark_title'],
-                            "created_at": b['created_at']
+                            "book_title": b["book_title"],
+                            "chapter_number": b["chapter_number"],
+                            "title": b["bookmark_title"],
+                            "created_at": b["created_at"],
                         }
                         for b in bookmarks[:10]
-                    ]
+                    ],
                 }
 
         except Exception as e:
@@ -458,12 +473,15 @@ def register_reading_tools(mcp: "FastMCP") -> None:
             Confirmation of removal
         """
         try:
-            bookmark = execute_single("""
+            bookmark = execute_single(
+                """
                 SELECT bm.id, b.title as book_title, bm.chapter_number, bm.title
                 FROM bookmarks bm
                 JOIN books b ON bm.book_id = b.id
                 WHERE bm.id = ?
-            """, (bookmark_id,))
+            """,
+                (bookmark_id,),
+            )
 
             if not bookmark:
                 return {"error": f"Bookmark not found: {bookmark_id}"}
@@ -479,10 +497,10 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                 "success": True,
                 "removed": {
                     "id": bookmark_id,
-                    "book_title": bookmark['book_title'],
-                    "chapter_number": bookmark['chapter_number'],
-                    "title": bookmark['title']
-                }
+                    "book_title": bookmark["book_title"],
+                    "chapter_number": bookmark["chapter_number"],
+                    "title": bookmark["title"],
+                },
             }
 
         except Exception as e:

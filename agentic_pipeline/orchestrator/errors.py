@@ -4,6 +4,7 @@
 
 class OrchestratorError(Exception):
     """Base error for orchestrator operations."""
+
     pass
 
 

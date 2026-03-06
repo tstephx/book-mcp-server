@@ -18,9 +18,7 @@ from agentic_pipeline.db.connection import get_pipeline_db
 # Suspicious title patterns
 # ---------------------------------------------------------------------------
 
-_FILE_EXT_RE = re.compile(
-    r"\.(zip|exe|rar|msi|dmg|pkg|tar|gz|7z)\b", re.IGNORECASE
-)
+_FILE_EXT_RE = re.compile(r"\.(zip|exe|rar|msi|dmg|pkg|tar|gz|7z)\b", re.IGNORECASE)
 _TABLE_REF_RE = re.compile(r"^Table\s+\d+", re.IGNORECASE)
 _BARE_NUMBER_RE = re.compile(r"^\d+$")
 _WINDOWS_PATH_RE = re.compile(r"[/\\][A-Za-z]:[/\\]")
@@ -93,15 +91,11 @@ def check_extraction_quality(
 
     # --- Check 1: Min chapters ---
     if chapter_count < MIN_CHAPTERS:
-        reasons.append(
-            f"Too few chapters: {chapter_count} (minimum {MIN_CHAPTERS} required)"
-        )
+        reasons.append(f"Too few chapters: {chapter_count} (minimum {MIN_CHAPTERS} required)")
 
     # --- Check 2: Max words per chapter ---
     if max_wc > MAX_CHAPTER_WORDS:
-        reasons.append(
-            f"Chapter exceeds max word count: {max_wc:,} words (max {MAX_CHAPTER_WORDS:,})"
-        )
+        reasons.append(f"Chapter exceeds max word count: {max_wc:,} words (max {MAX_CHAPTER_WORDS:,})")
 
     # --- Check 3: Max chapter can't be >Nx median ---
     if med_wc > 0 and max_wc / med_wc > MAX_TO_MEDIAN_RATIO:
@@ -113,15 +107,11 @@ def check_extraction_quality(
     # --- Check 4: Min words per chapter (warning only) ---
     short_chapters = [i for i, wc in enumerate(word_counts) if wc < MIN_CHAPTER_WORDS]
     if short_chapters:
-        warnings.append(
-            f"{len(short_chapters)} chapter(s) under {MIN_CHAPTER_WORDS} words"
-        )
+        warnings.append(f"{len(short_chapters)} chapter(s) under {MIN_CHAPTER_WORDS} words")
 
     # --- Check 5: Min total words ---
     if total_words < MIN_TOTAL_WORDS:
-        reasons.append(
-            f"Total word count too low: {total_words:,} (minimum {MIN_TOTAL_WORDS:,} required)"
-        )
+        reasons.append(f"Total word count too low: {total_words:,} (minimum {MIN_TOTAL_WORDS:,} required)")
 
     # --- Check 6: Duplicate chapters by content_hash ---
     # Exclude NULL/empty hashes — chapters without a hash can't be compared
@@ -146,14 +136,10 @@ def check_extraction_quality(
                 break
     if suspicious:
         examples = suspicious[:5]
-        reasons.append(
-            f"{len(suspicious)} suspicious chapter title(s): {examples}"
-        )
+        reasons.append(f"{len(suspicious)} suspicious chapter title(s): {examples}")
 
     passed = len(reasons) == 0
-    return ValidationResult(
-        passed=passed, reasons=reasons, warnings=warnings, metrics=metrics
-    )
+    return ValidationResult(passed=passed, reasons=reasons, warnings=warnings, metrics=metrics)
 
 
 # ---------------------------------------------------------------------------
@@ -174,8 +160,7 @@ def find_flagged_books(db_path: str) -> tuple[int, list[dict]]:
         flagged = []
         for book in books:
             rows = conn.execute(
-                "SELECT title, word_count, content_hash FROM chapters "
-                "WHERE book_id = ? ORDER BY chapter_number",
+                "SELECT title, word_count, content_hash FROM chapters WHERE book_id = ? ORDER BY chapter_number",
                 (book["id"],),
             ).fetchall()
 
@@ -184,19 +169,19 @@ def find_flagged_books(db_path: str) -> tuple[int, list[dict]]:
             titles = [r["title"] or "" for r in rows]
             content_hashes = [r["content_hash"] or "" for r in rows]
 
-            validation = check_extraction_quality(
-                chapter_count, word_counts, titles, content_hashes
-            )
+            validation = check_extraction_quality(chapter_count, word_counts, titles, content_hashes)
 
             if not validation.passed:
-                flagged.append({
-                    "book_id": book["id"],
-                    "title": book["title"],
-                    "source_file": book["source_file"],
-                    "chapter_count": chapter_count,
-                    "reasons": validation.reasons,
-                    "metrics": validation.metrics,
-                })
+                flagged.append(
+                    {
+                        "book_id": book["id"],
+                        "title": book["title"],
+                        "source_file": book["source_file"],
+                        "chapter_count": chapter_count,
+                        "reasons": validation.reasons,
+                        "metrics": validation.metrics,
+                    }
+                )
 
     return len(books), flagged
 

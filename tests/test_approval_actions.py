@@ -20,6 +20,7 @@ def db_path():
 def _mock_embedding_result(success=True, chapters_processed=5, error=None):
     """Create a mock EmbeddingResult."""
     from agentic_pipeline.adapters.processing_adapter import EmbeddingResult
+
     return EmbeddingResult(
         success=success,
         chapters_processed=chapters_processed,
@@ -52,6 +53,7 @@ def _create_pending_pipeline(db_path, processing_result=None):
 # ---------------------------------------------------------------------------
 # approve_book() — tests the new non-blocking contract
 # ---------------------------------------------------------------------------
+
 
 def test_approve_book(db_path):
     """approve_book() returns immediately with state=approved, embedding=queued."""
@@ -129,14 +131,14 @@ def test_audit_record_reflects_actual_autonomy_mode(db_path):
     conn.close()
 
     assert audit["autonomy_mode"] == "partial", (
-        f"Expected 'partial' but got '{audit['autonomy_mode']}' — "
-        "hardcoded 'supervised' still in place"
+        f"Expected 'partial' but got '{audit['autonomy_mode']}' — hardcoded 'supervised' still in place"
     )
 
 
 # ---------------------------------------------------------------------------
 # _complete_approved() — tests embedding behaviour (runs in background thread)
 # ---------------------------------------------------------------------------
+
 
 def _setup_approved_pipeline(db_path, processing_result=None):
     """Create a pipeline in APPROVED state, return (pipeline_id, pipeline_dict)."""
@@ -148,6 +150,7 @@ def _setup_approved_pipeline(db_path, processing_result=None):
     repo = PipelineRepository(db_path)
     with patch("agentic_pipeline.approval.actions._run_embedding_background"):
         from agentic_pipeline.approval.actions import approve_book
+
         approve_book(db_path, pid, actor="human:taylor")
 
     pipeline = repo.get(pid)
@@ -233,9 +236,7 @@ def test_complete_approved_uses_book_id_from_processing_result(MockAdapter, db_p
     mock_instance = MockAdapter.return_value
     mock_instance.generate_embeddings.return_value = _mock_embedding_result()
 
-    pid, pipeline = _setup_approved_pipeline(
-        db_path, processing_result={"book_id": "my-book-uuid"}
-    )
+    pid, pipeline = _setup_approved_pipeline(db_path, processing_result={"book_id": "my-book-uuid"})
     _complete_approved(db_path, pid, pipeline)
 
     mock_instance.generate_embeddings.assert_called_once_with(book_id="my-book-uuid")

@@ -68,9 +68,7 @@ NON_CHAPTER_PATTERNS = [
     r"^further reading$",
     r"^notes$",
 ]
-NON_CHAPTER_RE = re.compile(
-    "|".join(NON_CHAPTER_PATTERNS), re.IGNORECASE
-)
+NON_CHAPTER_RE = re.compile("|".join(NON_CHAPTER_PATTERNS), re.IGNORECASE)
 
 # Generic / low-quality title patterns
 GENERIC_TITLE_PATTERNS = [
@@ -82,17 +80,15 @@ GENERIC_TITLE_PATTERNS = [
     r"^\d+$",  # bare number
     r"^ch\.?\s*\d+$",
 ]
-GENERIC_TITLE_RE = re.compile(
-    "|".join(GENERIC_TITLE_PATTERNS), re.IGNORECASE
-)
+GENERIC_TITLE_RE = re.compile("|".join(GENERIC_TITLE_PATTERNS), re.IGNORECASE)
 
 # PDF artifact patterns in titles
 ARTIFACT_PATTERNS = [
     r"page\s+\d+",
     r"\bpp?\.\s*\d+",
     r"<[^>]+>",  # HTML/XML tags
-    r"\x0c",     # form feed
-    r"_{3,}",    # underscores (separator lines)
+    r"\x0c",  # form feed
+    r"_{3,}",  # underscores (separator lines)
 ]
 ARTIFACT_RE = re.compile("|".join(ARTIFACT_PATTERNS), re.IGNORECASE)
 
@@ -211,10 +207,18 @@ def audit_book(
     chapter_count = len(word_counts)
     if chapter_count == 0:
         return BookAudit(
-            book_id=book_id, title=title, author=author, book_type=book_type,
-            chapter_count=0, total_words=total_words,
-            avg_words=0, min_words=0, max_words=0, cv=0,
-            severity="bad", issues=["no_chapters"],
+            book_id=book_id,
+            title=title,
+            author=author,
+            book_type=book_type,
+            chapter_count=0,
+            total_words=total_words,
+            avg_words=0,
+            min_words=0,
+            max_words=0,
+            cv=0,
+            severity="bad",
+            issues=["no_chapters"],
             source_file=source_file,
         )
 
@@ -287,14 +291,10 @@ def audit_book(
         if epub_toc_count is not None:
             ratio = chapter_count / epub_toc_count if epub_toc_count > 0 else 0
             if ratio > 1.5:
-                issues.append(
-                    f"epub_over_count (DB:{chapter_count} vs TOC:{epub_toc_count})"
-                )
+                issues.append(f"epub_over_count (DB:{chapter_count} vs TOC:{epub_toc_count})")
                 severity = max(severity, "warning", key=_severity_rank)
             elif ratio < 0.65:
-                issues.append(
-                    f"epub_under_count (DB:{chapter_count} vs TOC:{epub_toc_count})"
-                )
+                issues.append(f"epub_under_count (DB:{chapter_count} vs TOC:{epub_toc_count})")
                 severity = max(severity, "warning", key=_severity_rank)
 
     return BookAudit(
@@ -339,8 +339,7 @@ def run_audit(
     try:
         if book_id:
             books = conn.execute(
-                "SELECT id, title, author, word_count, source_file, book_type "
-                "FROM books WHERE id = ?",
+                "SELECT id, title, author, word_count, source_file, book_type FROM books WHERE id = ?",
                 (book_id,),
             ).fetchall()
             if not books:
@@ -348,15 +347,13 @@ def run_audit(
                 return []
         else:
             books = conn.execute(
-                "SELECT id, title, author, word_count, source_file, book_type "
-                "FROM books ORDER BY title"
+                "SELECT id, title, author, word_count, source_file, book_type FROM books ORDER BY title"
             ).fetchall()
 
         results: list[BookAudit] = []
         for book_row in books:
             chapters = conn.execute(
-                "SELECT chapter_number, title, word_count "
-                "FROM chapters WHERE book_id = ? ORDER BY chapter_number",
+                "SELECT chapter_number, title, word_count FROM chapters WHERE book_id = ? ORDER BY chapter_number",
                 (book_row["id"],),
             ).fetchall()
             results.append(audit_book(book_row, chapters))
@@ -392,10 +389,12 @@ def _print_rich_table(audits: list[BookAudit], severity_filter: str) -> None:
     bad = sum(1 for a in audits if a.severity == "bad")
 
     console.print()
-    console.print(f"[bold]Chapter Quality Audit[/bold]  "
-                  f"({total} books: [green]{good} good[/green], "
-                  f"[yellow]{warning} warning[/yellow], "
-                  f"[red]{bad} bad[/red])")
+    console.print(
+        f"[bold]Chapter Quality Audit[/bold]  "
+        f"({total} books: [green]{good} good[/green], "
+        f"[yellow]{warning} warning[/yellow], "
+        f"[red]{bad} bad[/red])"
+    )
     console.print()
 
     table = Table(show_header=True, header_style="bold")
@@ -454,8 +453,7 @@ def _print_plain_table(audits: list[BookAudit], severity_filter: str) -> None:
     warning = sum(1 for a in audits if a.severity == "warning")
     bad = sum(1 for a in audits if a.severity == "bad")
 
-    print(f"\nChapter Quality Audit  ({total} books: {good} good, "
-          f"{warning} warning, {bad} bad)\n")
+    print(f"\nChapter Quality Audit  ({total} books: {good} good, {warning} warning, {bad} bad)\n")
 
     header = f"{'Title':<42} {'Ch':>3} {'Avg':>7} {'Min':>6} {'Max':>7} {'CV':>5} {'Sev':<8} Issues"
     print(header)
@@ -480,13 +478,12 @@ def print_deep_dive(audit: BookAudit) -> None:
 
         console = Console()
         console.print()
-        console.print(Panel(
-            f"[bold]{audit.title}[/bold]\n"
-            f"Author: {audit.author}\n"
-            f"Type: {audit.book_type}\n"
-            f"ID: {audit.book_id}",
-            title="Book Details",
-        ))
+        console.print(
+            Panel(
+                f"[bold]{audit.title}[/bold]\nAuthor: {audit.author}\nType: {audit.book_type}\nID: {audit.book_id}",
+                title="Book Details",
+            )
+        )
 
         # Stats
         console.print("\n[bold]Chapter Statistics:[/bold]")
@@ -540,12 +537,12 @@ def print_deep_dive(audit: BookAudit) -> None:
 
     except ImportError:
         # Plain fallback
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Book: {audit.title}")
         print(f"Author: {audit.author}")
         print(f"Type: {audit.book_type}")
         print(f"ID: {audit.book_id}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Chapters: {audit.chapter_count}  |  Total words: {audit.total_words:,}")
         print(f"Avg: {audit.avg_words:,.0f}  |  Min: {audit.min_words:,}  |  Max: {audit.max_words:,}")
         print(f"CV: {audit.cv:.2f}  |  Severity: {audit.severity}")
@@ -589,8 +586,7 @@ def print_json(audits: list[BookAudit], severity_filter: str) -> None:
                 "non_chapter_count": a.non_chapter_count,
                 "epub_toc_count": a.epub_toc_count,
                 "title_issues": [
-                    {"chapter": ti.chapter_number, "title": ti.title, "issue": ti.issue}
-                    for ti in a.title_issues
+                    {"chapter": ti.chapter_number, "title": ti.title, "issue": ti.issue} for ti in a.title_issues
                 ],
             }
             for a in filtered
@@ -603,18 +599,43 @@ def print_csv(audits: list[BookAudit], severity_filter: str) -> None:
     filtered = _filter_severity(audits, severity_filter)
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "book_id", "title", "author", "book_type", "chapters", "total_words",
-        "avg_words", "min_words", "max_words", "cv", "severity", "issues",
-        "non_chapter_count", "epub_toc_count",
-    ])
+    writer.writerow(
+        [
+            "book_id",
+            "title",
+            "author",
+            "book_type",
+            "chapters",
+            "total_words",
+            "avg_words",
+            "min_words",
+            "max_words",
+            "cv",
+            "severity",
+            "issues",
+            "non_chapter_count",
+            "epub_toc_count",
+        ]
+    )
     for a in filtered:
-        writer.writerow([
-            a.book_id, a.title, a.author, a.book_type, a.chapter_count,
-            a.total_words, round(a.avg_words, 1), a.min_words, a.max_words,
-            round(a.cv, 2), a.severity, "; ".join(a.issues),
-            a.non_chapter_count, a.epub_toc_count or "",
-        ])
+        writer.writerow(
+            [
+                a.book_id,
+                a.title,
+                a.author,
+                a.book_type,
+                a.chapter_count,
+                a.total_words,
+                round(a.avg_words, 1),
+                a.min_words,
+                a.max_words,
+                round(a.cv, 2),
+                a.severity,
+                "; ".join(a.issues),
+                a.non_chapter_count,
+                a.epub_toc_count or "",
+            ]
+        )
     print(output.getvalue(), end="")
 
 
@@ -675,17 +696,12 @@ def audit_library(
                     "number": ch.chapter_number,
                     "title": ch.title,
                     "word_count": ch.word_count,
-                    "flags": [
-                        ti.issue
-                        for ti in a.title_issues
-                        if ti.chapter_number == ch.chapter_number
-                    ],
+                    "flags": [ti.issue for ti in a.title_issues if ti.chapter_number == ch.chapter_number],
                 }
                 for ch in a.chapters
             ]
             entry["title_issues"] = [
-                {"chapter": ti.chapter_number, "title": ti.title, "issue": ti.issue}
-                for ti in a.title_issues
+                {"chapter": ti.chapter_number, "title": ti.title, "issue": ti.issue} for ti in a.title_issues
             ]
         books.append(entry)
 
@@ -697,12 +713,13 @@ def audit_library(
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="Audit chapter quality across the library")
-    parser.add_argument("--format", choices=["table", "json", "csv"], default="table",
-                        help="Output format (default: table)")
-    parser.add_argument("--severity", choices=["all", "warning", "bad"], default="all",
-                        help="Filter by minimum severity (default: all)")
-    parser.add_argument("--book-id", type=str, default=None,
-                        help="Audit a single book (deep dive mode)")
+    parser.add_argument(
+        "--format", choices=["table", "json", "csv"], default="table", help="Output format (default: table)"
+    )
+    parser.add_argument(
+        "--severity", choices=["all", "warning", "bad"], default="all", help="Filter by minimum severity (default: all)"
+    )
+    parser.add_argument("--book-id", type=str, default=None, help="Audit a single book (deep dive mode)")
     args = parser.parse_args()
 
     db_path = get_db_path()

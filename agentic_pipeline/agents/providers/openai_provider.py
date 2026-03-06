@@ -31,12 +31,12 @@ class OpenAIProvider(LLMProvider):
     def _normalize_text(self, text: str) -> str:
         """Replace smart quotes and other problematic unicode with ASCII equivalents."""
         replacements = {
-            '\u201c': '"',  # Left double quote
-            '\u201d': '"',  # Right double quote
-            '\u2018': "'",  # Left single quote
-            '\u2019': "'",  # Right single quote
-            '\u2013': '-',  # En dash
-            '\u2014': '-',  # Em dash
+            "\u201c": '"',  # Left double quote
+            "\u201d": '"',  # Right double quote
+            "\u2018": "'",  # Left single quote
+            "\u2019": "'",  # Right single quote
+            "\u2013": "-",  # En dash
+            "\u2014": "-",  # Em dash
         }
         for old, new in replacements.items():
             text = text.replace(old, new)

@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 def fts_table_exists() -> bool:
     """Check if FTS table is available"""
     try:
-        rows = execute_query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'"
-        )
+        rows = execute_query("SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'")
         return len(rows) > 0
     except Exception:
         return False
@@ -36,22 +34,17 @@ def escape_fts_query(query: str) -> str:
 
     # Escape special characters that could cause syntax errors
     # But preserve * for prefix matching
-    special_chars = ['-', '^', ':', '(', ')']
+    special_chars = ["-", "^", ":", "(", ")"]
     for char in special_chars:
-        query = query.replace(char, ' ')
+        query = query.replace(char, " ")
 
     # Clean up multiple spaces
-    query = ' '.join(query.split())
+    query = " ".join(query.split())
 
     return query
 
 
-def full_text_search(
-    query: str,
-    limit: int = 10,
-    book_id: Optional[str] = None,
-    highlight: bool = True
-) -> dict:
+def full_text_search(query: str, limit: int = 10, book_id: Optional[str] = None, highlight: bool = True) -> dict:
     """Search chapter content using FTS5 full-text search
 
     Supports:
@@ -72,7 +65,7 @@ def full_text_search(
     if not fts_table_exists():
         return {
             "error": "Full-text search not available. Run migrations/add_fts_and_summaries.py first.",
-            "results": []
+            "results": [],
         }
 
     if not query or not query.strip():
@@ -132,26 +125,22 @@ def full_text_search(
             results = []
             for row in rows:
                 result = {
-                    'chapter_id': row['chapter_id'],
-                    'book_id': row['book_id'],
-                    'book_title': row['book_title'],
-                    'chapter_number': row['chapter_number'],
-                    'chapter_title': row['title'],
-                    'rank': round(abs(row['rank']), 3)  # BM25 returns negative scores
+                    "chapter_id": row["chapter_id"],
+                    "book_id": row["book_id"],
+                    "book_title": row["book_title"],
+                    "chapter_number": row["chapter_number"],
+                    "chapter_title": row["title"],
+                    "rank": round(abs(row["rank"]), 3),  # BM25 returns negative scores
                 }
 
                 if highlight:
-                    result['excerpt'] = row['excerpt']
+                    result["excerpt"] = row["excerpt"]
 
                 results.append(result)
 
             logger.info(f"FTS search '{query}' returned {len(results)} results")
 
-            return {
-                "query": query,
-                "results": results,
-                "total_found": len(results)
-            }
+            return {"query": query, "results": results, "total_found": len(results)}
 
     except Exception as e:
         logger.error(f"FTS search error: {e}", exc_info=True)
@@ -160,7 +149,7 @@ def full_text_search(
             return {
                 "error": "Invalid search syntax. Try simpler terms or use quotes for phrases.",
                 "query": query,
-                "results": []
+                "results": [],
             }
         return {"error": str(e), "results": []}
 
@@ -182,7 +171,7 @@ def rebuild_fts_index() -> dict:
 
             # Get count before
             cursor.execute("SELECT COUNT(*) as count FROM chapters_fts")
-            before_count = cursor.fetchone()['count']
+            before_count = cursor.fetchone()["count"]
 
             # Clear existing FTS data
             cursor.execute("DELETE FROM chapters_fts")
@@ -196,10 +185,10 @@ def rebuild_fts_index() -> dict:
 
             for chapter in chapters:
                 try:
-                    content = read_chapter_content(chapter['file_path'])
+                    content = read_chapter_content(chapter["file_path"])
                     cursor.execute(
                         "INSERT INTO chapters_fts (chapter_id, title, content) VALUES (?, ?, ?)",
-                        (chapter['id'], chapter['title'] or '', content)
+                        (chapter["id"], chapter["title"] or "", content),
                     )
                     indexed += 1
 
@@ -214,12 +203,7 @@ def rebuild_fts_index() -> dict:
             conn.commit()
             logger.info(f"FTS index rebuilt: {indexed} indexed, {errors} errors (was {before_count} entries)")
 
-            return {
-                "status": "rebuilt",
-                "entries_before": before_count,
-                "entries_after": indexed,
-                "errors": errors
-            }
+            return {"status": "rebuilt", "entries_before": before_count, "entries_after": indexed, "errors": errors}
 
     except Exception as e:
         logger.error(f"FTS rebuild error: {e}", exc_info=True)
@@ -247,15 +231,11 @@ def sync_fts_chapter(chapter_id: str, content: str, title: str = "") -> bool:
             cursor = conn.cursor()
 
             # Delete existing entry
-            cursor.execute(
-                "DELETE FROM chapters_fts WHERE chapter_id = ?",
-                (chapter_id,)
-            )
+            cursor.execute("DELETE FROM chapters_fts WHERE chapter_id = ?", (chapter_id,))
 
             # Insert updated entry
             cursor.execute(
-                "INSERT INTO chapters_fts (chapter_id, title, content) VALUES (?, ?, ?)",
-                (chapter_id, title, content)
+                "INSERT INTO chapters_fts (chapter_id, title, content) VALUES (?, ?, ?)", (chapter_id, title, content)
             )
 
             conn.commit()

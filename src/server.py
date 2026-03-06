@@ -31,6 +31,7 @@ from .tools.project_planning_tools import register_project_planning_tools
 from .tools.audit_tools import register_audit_tools
 from .utils.cache import get_cache
 
+
 def create_server() -> FastMCP:
     """
     Create and configure the MCP server
@@ -53,8 +54,10 @@ def create_server() -> FastMCP:
         logger.error(f"Database unhealthy: {health.get('error')}")
         raise RuntimeError(f"Database health check failed: {health.get('error')}")
 
-    logger.info(f"Database healthy: {health['books']} books, {health['chapters']} chapters, "
-               f"{health['total_words']:,} total words")
+    logger.info(
+        f"Database healthy: {health['books']} books, {health['chapters']} chapters, "
+        f"{health['total_words']:,} total words"
+    )
 
     # Ensure library-side tables and columns exist
     ensure_library_schema()
@@ -110,13 +113,7 @@ def create_server() -> FastMCP:
             return result
         except Exception as e:
             logger.error(f"Embedding refresh error: {e}", exc_info=True)
-            return {
-                'status': 'error',
-                'error': str(e),
-                'updated': 0,
-                'skipped': 0,
-                'errors': 1
-            }
+            return {"status": "error", "error": str(e), "updated": 0, "skipped": 0, "errors": 1}
 
     # Register summary embeddings tool
     @mcp.tool()
@@ -148,13 +145,7 @@ def create_server() -> FastMCP:
             return result
         except Exception as e:
             logger.error(f"Summary embedding error: {e}", exc_info=True)
-            return {
-                'status': 'error',
-                'error': str(e),
-                'generated': 0,
-                'skipped': 0,
-                'errors': 1
-            }
+            return {"status": "error", "error": str(e), "generated": 0, "skipped": 0, "errors": 1}
 
     # Register cache management tool
     @mcp.tool()
@@ -205,12 +196,11 @@ def create_server() -> FastMCP:
             cache.clear_all()
             message = "All caches cleared"
         else:
-            return {"error": f"Invalid cache_type: {cache_type}. Use 'chapters', 'embeddings', 'summary_embeddings', or 'all'"}
+            return {
+                "error": f"Invalid cache_type: {cache_type}. Use 'chapters', 'embeddings', 'summary_embeddings', or 'all'"
+            }
 
-        return {
-            "message": message,
-            "stats": cache.stats()
-        }
+        return {"message": message, "stats": cache.stats()}
 
     # Register library status tool
     @mcp.tool()
@@ -235,8 +225,10 @@ def create_server() -> FastMCP:
 
             monitor = LibraryStatus(get_db_path())
             result = monitor.get_status()
-            logger.info(f"Library status: {result['overview']['total_books']} books, "
-                       f"{result['overview']['embedding_coverage_pct']}% embedded")
+            logger.info(
+                f"Library status: {result['overview']['total_books']} books, "
+                f"{result['overview']['embedding_coverage_pct']}% embedded"
+            )
             return result
         except Exception as e:
             logger.error(f"Library status error: {e}", exc_info=True)
@@ -247,11 +239,7 @@ def create_server() -> FastMCP:
     # =========================================================================
 
     @mcp.tool()
-    def text_search(
-        query: str,
-        limit: int = 10,
-        book_id: str = None
-    ) -> dict:
+    def text_search(query: str, limit: int = 10, book_id: str = None) -> dict:
         """Search chapter content using full-text search (FTS5)
 
         Fast keyword/phrase search with BM25 ranking. Complements semantic
@@ -278,6 +266,7 @@ def create_server() -> FastMCP:
         """
         try:
             from .utils.fts_search import full_text_search
+
             return full_text_search(query, limit=limit, book_id=book_id)
         except Exception as e:
             logger.error(f"Text search error: {e}", exc_info=True)
@@ -288,11 +277,7 @@ def create_server() -> FastMCP:
     # =========================================================================
 
     @mcp.tool()
-    def search_all_books(
-        query: str,
-        max_per_book: int = 5,
-        min_similarity: float = 0.3
-    ) -> dict:
+    def search_all_books(query: str, max_per_book: int = 5, min_similarity: float = 0.3) -> dict:
         """Semantic search across ALL books with per-book result limits
 
         Searches your entire library and groups results by book.
@@ -312,11 +297,12 @@ def create_server() -> FastMCP:
         """
         try:
             from .utils.batch_ops import batch_semantic_search
+
             return batch_semantic_search(
                 query,
                 book_ids=None,  # All books
                 max_per_book=max_per_book,
-                min_similarity=min_similarity
+                min_similarity=min_similarity,
             )
         except Exception as e:
             logger.error(f"Batch search error: {e}", exc_info=True)
@@ -340,6 +326,7 @@ def create_server() -> FastMCP:
         """
         try:
             from .utils.batch_ops import get_library_statistics
+
             return get_library_statistics()
         except Exception as e:
             logger.error(f"Stats error: {e}", exc_info=True)
@@ -369,6 +356,7 @@ def create_server() -> FastMCP:
         """
         try:
             from .utils.summaries import generate_chapter_summary
+
             return generate_chapter_summary(chapter_id, force=force)
         except Exception as e:
             logger.error(f"Summary error: {e}", exc_info=True)
@@ -394,6 +382,7 @@ def create_server() -> FastMCP:
         """
         try:
             from .utils.summaries import generate_book_summaries
+
             return generate_book_summaries(book_id, force=force)
         except Exception as e:
             logger.error(f"Book summary error: {e}", exc_info=True)
@@ -439,40 +428,40 @@ def create_server() -> FastMCP:
 
             # Extract topics from titles
             topic_keywords = {
-                'Python': ['python', 'django', 'flask', 'fastapi'],
-                'Data Science': ['data', 'analytics', 'pandas', 'numpy', 'visualization'],
-                'Machine Learning': ['ml', 'machine learning', 'deep learning', 'neural', 'ai', 'llm'],
-                'Architecture': ['architecture', 'design patterns', 'clean code', 'solid'],
-                'DevOps': ['docker', 'kubernetes', 'k8s', 'devops', 'ci/cd', 'cloud'],
-                'Web Development': ['web', 'api', 'rest', 'frontend', 'backend'],
-                'Quantum': ['quantum'],
-                'Forecasting': ['forecasting', 'time series', 'prediction'],
+                "Python": ["python", "django", "flask", "fastapi"],
+                "Data Science": ["data", "analytics", "pandas", "numpy", "visualization"],
+                "Machine Learning": ["ml", "machine learning", "deep learning", "neural", "ai", "llm"],
+                "Architecture": ["architecture", "design patterns", "clean code", "solid"],
+                "DevOps": ["docker", "kubernetes", "k8s", "devops", "ci/cd", "cloud"],
+                "Web Development": ["web", "api", "rest", "frontend", "backend"],
+                "Quantum": ["quantum"],
+                "Forecasting": ["forecasting", "time series", "prediction"],
             }
 
             topic_counts = Counter()
             for book in books:
-                title_lower = book['title'].lower()
+                title_lower = book["title"].lower()
                 matched = False
                 for topic, keywords in topic_keywords.items():
                     if any(kw in title_lower for kw in keywords):
                         topic_counts[topic] += 1
                         matched = True
                 if not matched:
-                    topic_counts['Other'] += 1
+                    topic_counts["Other"] += 1
 
             # Build formatted output
-            result = "📚 Library Catalog\n" + "="*60 + "\n\n"
+            result = "📚 Library Catalog\n" + "=" * 60 + "\n\n"
 
             # Statistics section
-            result += "📊 Statistics\n" + "-"*60 + "\n"
+            result += "📊 Statistics\n" + "-" * 60 + "\n"
             result += f"Total Books: {stats['book_count']}\n"
             result += f"Total Chapters: {stats['chapter_count']}\n"
             result += f"Total Words: {stats['total_words']:,}\n"
-            avg_words = stats['total_words'] // stats['book_count'] if stats['book_count'] > 0 else 0
+            avg_words = stats["total_words"] // stats["book_count"] if stats["book_count"] > 0 else 0
             result += f"Average Words per Book: {avg_words:,}\n\n"
 
             # Topic distribution section
-            result += "🏷️  Topic Distribution\n" + "-"*60 + "\n"
+            result += "🏷️  Topic Distribution\n" + "-" * 60 + "\n"
             for topic, count in topic_counts.most_common():
                 pct = (count / len(books) * 100) if books else 0
                 bar = "█" * int(pct / 5) + "░" * (20 - int(pct / 5))
@@ -480,13 +469,13 @@ def create_server() -> FastMCP:
             result += "\n"
 
             # Books listing section
-            result += "📖 All Books\n" + "-"*60 + "\n"
+            result += "📖 All Books\n" + "-" * 60 + "\n"
             for book in books:
                 result += f"\n• {book['title']}\n"
-                if book['author']:
+                if book["author"]:
                     result += f"  Author: {book['author']}\n"
                 result += f"  Chapters: {book['chapter_count']}"
-                if book['embedded_chapters']:
+                if book["embedded_chapters"]:
                     result += f" ({book['embedded_chapters']} with embeddings)"
                 result += f"\n  Words: {book['word_count']:,}\n"
                 result += f"  ID: {book['id']}\n"
@@ -511,10 +500,10 @@ def create_server() -> FastMCP:
                 ORDER BY title
             """)
 
-            result = "📚 Book Catalog\n" + "="*50 + "\n\n"
+            result = "📚 Book Catalog\n" + "=" * 50 + "\n\n"
             for book in books:
                 result += f"• {book['title']}"
-                if book['author']:
+                if book["author"]:
                     result += f" by {book['author']}"
                 result += f" ({book['word_count']:,} words)\n"
                 result += f"  ID: {book['id']}\n"
@@ -541,16 +530,16 @@ def create_server() -> FastMCP:
 
         # Topic detection keywords (shared with catalog)
         topic_keywords = {
-            'Python': ['python', 'django', 'flask', 'fastapi'],
-            'Data Science': ['data', 'analytics', 'pandas', 'numpy', 'visualization'],
-            'Machine Learning': ['ml', 'machine learning', 'deep learning', 'neural', 'ai', 'llm'],
-            'Architecture': ['architecture', 'design patterns', 'clean code', 'solid'],
-            'DevOps': ['docker', 'kubernetes', 'k8s', 'devops', 'ci/cd', 'cloud'],
-            'Web Development': ['web', 'api', 'rest', 'frontend', 'backend'],
-            'Linux': ['linux', 'ubuntu', 'systemd', 'kernel', 'bash'],
-            'Networking': ['networking', 'network', 'firewall', 'vpn', 'tcp', 'ip'],
-            'Quantum': ['quantum'],
-            'Forecasting': ['forecasting', 'time series', 'prediction'],
+            "Python": ["python", "django", "flask", "fastapi"],
+            "Data Science": ["data", "analytics", "pandas", "numpy", "visualization"],
+            "Machine Learning": ["ml", "machine learning", "deep learning", "neural", "ai", "llm"],
+            "Architecture": ["architecture", "design patterns", "clean code", "solid"],
+            "DevOps": ["docker", "kubernetes", "k8s", "devops", "ci/cd", "cloud"],
+            "Web Development": ["web", "api", "rest", "frontend", "backend"],
+            "Linux": ["linux", "ubuntu", "systemd", "kernel", "bash"],
+            "Networking": ["networking", "network", "firewall", "vpn", "tcp", "ip"],
+            "Quantum": ["quantum"],
+            "Forecasting": ["forecasting", "time series", "prediction"],
         }
 
         try:
@@ -562,29 +551,32 @@ def create_server() -> FastMCP:
                 return f"Book not found: {book_id}"
 
             # Get chapters with embedding status
-            chapters = execute_query("""
+            chapters = execute_query(
+                """
                 SELECT chapter_number, title, word_count,
                        CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding
                 FROM chapters
                 WHERE book_id = ?
                 ORDER BY chapter_number
-            """, (book_id,))
+            """,
+                (book_id,),
+            )
 
             # Detect topics
-            title_lower = book['title'].lower()
+            title_lower = book["title"].lower()
             detected_topics = []
             for topic, keywords in topic_keywords.items():
                 if any(kw in title_lower for kw in keywords):
                     detected_topics.append(topic)
             if not detected_topics:
-                detected_topics = ['General']
+                detected_topics = ["General"]
 
             # Build formatted output
-            result = f"📖 {book['title']}\n" + "="*60 + "\n\n"
+            result = f"📖 {book['title']}\n" + "=" * 60 + "\n\n"
 
             # Basic metadata
-            result += "📋 Metadata\n" + "-"*60 + "\n"
-            if book['author']:
+            result += "📋 Metadata\n" + "-" * 60 + "\n"
+            if book["author"]:
                 result += f"Author: {book['author']}\n"
             result += f"Total Words: {book['word_count']:,}\n"
             result += f"Total Chapters: {len(chapters)}\n"
@@ -593,7 +585,7 @@ def create_server() -> FastMCP:
             result += f"Added: {book['added_date']}\n"
 
             # Embedding status
-            embedded_count = sum(1 for c in chapters if c['has_embedding'])
+            embedded_count = sum(1 for c in chapters if c["has_embedding"])
             if embedded_count == len(chapters):
                 result += f"Embeddings: ✅ Complete ({embedded_count}/{len(chapters)})\n"
             elif embedded_count > 0:
@@ -602,11 +594,11 @@ def create_server() -> FastMCP:
                 result += "Embeddings: ❌ None\n"
 
             # Chapter listing
-            result += "\n📑 Chapters\n" + "-"*60 + "\n"
+            result += "\n📑 Chapters\n" + "-" * 60 + "\n"
             for ch in chapters:
-                embed_icon = "✓" if ch['has_embedding'] else "○"
+                embed_icon = "✓" if ch["has_embedding"] else "○"
                 result += f"{embed_icon} {ch['chapter_number']:2}. {ch['title']}"
-                if ch['word_count']:
+                if ch["word_count"]:
                     result += f" ({ch['word_count']:,} words)"
                 result += "\n"
 
@@ -623,35 +615,35 @@ def create_server() -> FastMCP:
 
     # Curated reading collections for RAG context
     READING_COLLECTIONS = {
-        'python-essentials': {
-            'name': 'Python Essentials',
-            'description': 'Core Python programming books covering fundamentals to advanced topics',
-            'keywords': ['python', 'async', 'clean'],
+        "python-essentials": {
+            "name": "Python Essentials",
+            "description": "Core Python programming books covering fundamentals to advanced topics",
+            "keywords": ["python", "async", "clean"],
         },
-        'devops-stack': {
-            'name': 'DevOps & Infrastructure',
-            'description': 'Docker, Linux, networking, and system administration',
-            'keywords': ['docker', 'linux', 'systemd', 'networking', 'ubuntu'],
+        "devops-stack": {
+            "name": "DevOps & Infrastructure",
+            "description": "Docker, Linux, networking, and system administration",
+            "keywords": ["docker", "linux", "systemd", "networking", "ubuntu"],
         },
-        'ai-ml-track': {
-            'name': 'AI & Machine Learning',
-            'description': 'Deep learning, LLMs, generative AI, and ML patterns',
-            'keywords': ['deep learning', 'llm', 'ai', 'langchain', 'neural'],
+        "ai-ml-track": {
+            "name": "AI & Machine Learning",
+            "description": "Deep learning, LLMs, generative AI, and ML patterns",
+            "keywords": ["deep learning", "llm", "ai", "langchain", "neural"],
         },
-        'data-engineering': {
-            'name': 'Data Engineering & Science',
-            'description': 'Data processing, cleaning, analysis, and forecasting',
-            'keywords': ['data', 'forecasting', 'analytics'],
+        "data-engineering": {
+            "name": "Data Engineering & Science",
+            "description": "Data processing, cleaning, analysis, and forecasting",
+            "keywords": ["data", "forecasting", "analytics"],
         },
-        'architecture': {
-            'name': 'Software Architecture',
-            'description': 'Clean architecture, design patterns, and best practices',
-            'keywords': ['architecture', 'design', 'clean', 'patterns'],
+        "architecture": {
+            "name": "Software Architecture",
+            "description": "Clean architecture, design patterns, and best practices",
+            "keywords": ["architecture", "design", "clean", "patterns"],
         },
-        'web-development': {
-            'name': 'Web Development',
-            'description': 'Frontend, backend, Node.js, and API development',
-            'keywords': ['node', 'web', 'api', 'frontend'],
+        "web-development": {
+            "name": "Web Development",
+            "description": "Frontend, backend, Node.js, and API development",
+            "keywords": ["node", "web", "api", "frontend"],
         },
     }
 
@@ -662,7 +654,7 @@ def create_server() -> FastMCP:
         Returns overview of curated reading lists for different learning paths.
         Use collection://{name} to get books in a specific collection.
         """
-        result = "📚 Reading Collections\n" + "="*60 + "\n\n"
+        result = "📚 Reading Collections\n" + "=" * 60 + "\n\n"
         result += "Curated reading lists organized by topic and learning path.\n"
         result += "Access a collection with: collection://{collection-name}\n\n"
 
@@ -718,12 +710,12 @@ def create_server() -> FastMCP:
             # Filter books matching collection keywords
             matching_books = []
             for book in books:
-                title_lower = book['title'].lower()
-                if any(kw in title_lower for kw in collection['keywords']):
+                title_lower = book["title"].lower()
+                if any(kw in title_lower for kw in collection["keywords"]):
                     matching_books.append(book)
 
             # Build output
-            result = f"📚 {collection['name']}\n" + "="*60 + "\n\n"
+            result = f"📚 {collection['name']}\n" + "=" * 60 + "\n\n"
             result += f"{collection['description']}\n\n"
 
             if not matching_books:
@@ -731,24 +723,24 @@ def create_server() -> FastMCP:
                 result += "Try adding books with relevant topics to your library.\n"
                 return result
 
-            result += f"📖 {len(matching_books)} Books in Collection\n" + "-"*60 + "\n"
+            result += f"📖 {len(matching_books)} Books in Collection\n" + "-" * 60 + "\n"
 
             total_words = 0
             total_chapters = 0
 
             for i, book in enumerate(matching_books, 1):
-                total_words += book['word_count'] or 0
-                total_chapters += book['chapter_count']
+                total_words += book["word_count"] or 0
+                total_chapters += book["chapter_count"]
 
                 result += f"\n{i}. {book['title']}\n"
-                if book['author']:
+                if book["author"]:
                     result += f"   Author: {book['author']}\n"
                 result += f"   Chapters: {book['chapter_count']}, Words: {book['word_count']:,}\n"
 
                 # Semantic search readiness
-                if book['embedded_chapters'] == book['chapter_count']:
+                if book["embedded_chapters"] == book["chapter_count"]:
                     result += "   Semantic Search: ✅ Ready\n"
-                elif book['embedded_chapters'] > 0:
+                elif book["embedded_chapters"] > 0:
                     result += f"   Semantic Search: ⚠️ Partial ({book['embedded_chapters']}/{book['chapter_count']})\n"
                 else:
                     result += "   Semantic Search: ❌ Not indexed\n"
@@ -756,7 +748,7 @@ def create_server() -> FastMCP:
                 result += f"   ID: {book['id']}\n"
 
             # Collection summary
-            result += "\n📊 Collection Summary\n" + "-"*60 + "\n"
+            result += "\n📊 Collection Summary\n" + "-" * 60 + "\n"
             result += f"Total Books: {len(matching_books)}\n"
             result += f"Total Chapters: {total_chapters}\n"
             result += f"Total Words: {total_words:,}\n"
@@ -796,7 +788,7 @@ def create_server() -> FastMCP:
 
         # Get library stats for context
         books = execute_query("SELECT title, author FROM books ORDER BY title")
-        book_list = "\n".join([f"- {b['title']}" + (f" by {b['author']}" if b['author'] else "") for b in books])
+        book_list = "\n".join([f"- {b['title']}" + (f" by {b['author']}" if b["author"] else "") for b in books])
 
         if depth == "deep-dive":
             return f"""# Deep-Dive Research: {topic}
@@ -894,20 +886,20 @@ Create a concise summary (3-5 paragraphs) covering:
                 "tone": "simple, avoiding jargon, using analogies",
                 "focus": "fundamental understanding and practical getting-started steps",
                 "depth": "surface-level with clear examples",
-                "prerequisites": "Assume no prior knowledge of this topic"
+                "prerequisites": "Assume no prior knowledge of this topic",
             },
             "intermediate": {
                 "tone": "technical but accessible, explaining trade-offs",
                 "focus": "practical application, common patterns, and best practices",
                 "depth": "moderate with code examples and architectural considerations",
-                "prerequisites": "Assume familiarity with basic programming concepts"
+                "prerequisites": "Assume familiarity with basic programming concepts",
             },
             "advanced": {
                 "tone": "deeply technical, discussing edge cases and optimizations",
                 "focus": "advanced patterns, performance implications, and expert techniques",
                 "depth": "comprehensive with advanced examples and internal workings",
-                "prerequisites": "Assume strong foundation and production experience"
-            }
+                "prerequisites": "Assume strong foundation and production experience",
+            },
         }
 
         ctx = level_context.get(expertise_level, level_context["intermediate"])
@@ -916,15 +908,15 @@ Create a concise summary (3-5 paragraphs) covering:
 
 ## Target Audience
 Level: {expertise_level.upper()}
-{ctx['prerequisites']}
+{ctx["prerequisites"]}
 
 ## Your Task
 Explain "{concept}" using your technical book library as the authoritative source.
 
 ## Explanation Guidelines
-- **Tone**: {ctx['tone']}
-- **Focus**: {ctx['focus']}
-- **Depth**: {ctx['depth']}
+- **Tone**: {ctx["tone"]}
+- **Focus**: {ctx["focus"]}
+- **Depth**: {ctx["depth"]}
 
 ## Workflow
 
@@ -968,9 +960,7 @@ Create an explanation that:
 
     @mcp.prompt()
     def create_reading_plan(
-        goal: str,
-        time_available: str = "flexible",
-        current_knowledge: str = "some programming experience"
+        goal: str, time_available: str = "flexible", current_knowledge: str = "some programming experience"
     ) -> str:
         """Create a personalized reading plan from your book library
 
@@ -1003,10 +993,9 @@ Create an explanation that:
             ORDER BY b.title
         """)
 
-        book_summary = "\n".join([
-            f"- {b['title']} ({b['chapters']} chapters, ~{b['word_count']//250} min read)"
-            for b in books
-        ])
+        book_summary = "\n".join(
+            [f"- {b['title']} ({b['chapters']} chapters, ~{b['word_count'] // 250} min read)" for b in books]
+        )
 
         return f"""# Create Reading Plan
 
@@ -1018,7 +1007,7 @@ Create an explanation that:
 - **Time Available**: {time_available}
 
 ## Your Library
-{stats['book_count']} books, {stats['chapter_count']} chapters, {stats['total_words']:,} total words
+{stats["book_count"]} books, {stats["chapter_count"]} chapters, {stats["total_words"]:,} total words
 
 ### Available Books:
 {book_summary}
@@ -1095,7 +1084,7 @@ How to know you've achieved "{goal}":
 
         if book_ids:
             id_list = [bid.strip() for bid in book_ids.split(",")]
-            filtered = [b for b in books if b['id'] in id_list]
+            filtered = [b for b in books if b["id"] in id_list]
             book_context = "\n".join([f"- {b['title']} by {b['author']}" for b in filtered])
             search_scope = f"Focus on these {len(filtered)} books:\n{book_context}"
         else:
@@ -1183,6 +1172,7 @@ Based on this analysis:
     logger.info(f"Server '{Config.SERVER_NAME}' v{Config.SERVER_VERSION} ready")
     return mcp
 
+
 def main():
     """Main entry point"""
     try:
@@ -1191,6 +1181,7 @@ def main():
     except Exception as e:
         logger.critical(f"Server failed to start: {e}")
         raise
+
 
 if __name__ == "__main__":
     main()

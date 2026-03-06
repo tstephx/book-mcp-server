@@ -75,9 +75,7 @@ class LLMFallbackAdapter:
 
         return False
 
-    def improve_detection(
-        self, request: LLMFallbackRequest
-    ) -> Optional[LLMFallbackResponse]:
+    def improve_detection(self, request: LLMFallbackRequest) -> Optional[LLMFallbackResponse]:
         """
         Attempt to improve chapter detection using LLM analysis.
 
@@ -106,14 +104,14 @@ class LLMFallbackAdapter:
     def _build_prompt(self, request: LLMFallbackRequest) -> str:
         """Build the prompt for LLM analysis."""
         chapters_summary = "\n".join(
-            f"  {i+1}. {ch.get('title', 'Untitled')} ({ch.get('word_count', 0)} words)"
+            f"  {i + 1}. {ch.get('title', 'Untitled')} ({ch.get('word_count', 0)} words)"
             for i, ch in enumerate(request.detected_chapters[:20])
         )
 
         return f"""Analyze this book's chapter structure and suggest improvements.
 
-Book: {request.book_metadata.get('title', 'Unknown')}
-Author: {request.book_metadata.get('author', 'Unknown')}
+Book: {request.book_metadata.get("title", "Unknown")}
+Author: {request.book_metadata.get("author", "Unknown")}
 Detection method: {request.detection_method}
 Current confidence: {request.detection_confidence:.1%}
 
@@ -122,7 +120,7 @@ Current chapters detected:
 
 Text sample (first {len(request.text_sample)} chars):
 ---
-{request.text_sample[:self.max_text_sample]}
+{request.text_sample[: self.max_text_sample]}
 ---
 
 Based on this information:
@@ -143,9 +141,7 @@ Respond in this JSON format:
     ]
 }}"""
 
-    def _parse_response(
-        self, response, request: LLMFallbackRequest
-    ) -> Optional[LLMFallbackResponse]:
+    def _parse_response(self, response, request: LLMFallbackRequest) -> Optional[LLMFallbackResponse]:
         """Parse LLM response into LLMFallbackResponse."""
         import json
 
@@ -161,6 +157,7 @@ Respond in this JSON format:
 
             # Strip single-line comments (// ...) which OpenAI models sometimes include
             import re
+
             json_str = re.sub(r"//[^\n]*", "", content[start:end])
             data = json.loads(json_str)
 

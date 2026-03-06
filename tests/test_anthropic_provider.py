@@ -28,14 +28,16 @@ def test_anthropic_provider_parses_valid_response():
 
     mock_response = Mock()
     mock_response.content = [Mock()]
-    mock_response.content[0].text = json.dumps({
-        "book_type": "narrative_nonfiction",
-        "confidence": 0.88,
-        "suggested_tags": ["biography", "technology"],
-        "reasoning": "Narrative structure following a person's life"
-    })
+    mock_response.content[0].text = json.dumps(
+        {
+            "book_type": "narrative_nonfiction",
+            "confidence": 0.88,
+            "suggested_tags": ["biography", "technology"],
+            "reasoning": "Narrative structure following a person's life",
+        }
+    )
 
-    with patch.object(provider, '_client') as mock_client:
+    with patch.object(provider, "_client") as mock_client:
         mock_client.messages.create.return_value = mock_response
         result = provider.classify("sample text")
 
@@ -52,7 +54,7 @@ def test_anthropic_provider_handles_malformed_json():
     mock_response.content = [Mock()]
     mock_response.content[0].text = "Not valid JSON at all"
 
-    with patch.object(provider, '_client') as mock_client:
+    with patch.object(provider, "_client") as mock_client:
         mock_client.messages.create.return_value = mock_response
 
         with pytest.raises(ValueError, match="Failed to parse"):

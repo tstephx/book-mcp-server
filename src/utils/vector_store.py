@@ -10,6 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     """Calculate cosine similarity between two vectors
 
@@ -36,6 +37,7 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
 
     return float(dot_product / (norm1 * norm2))
 
+
 def batch_cosine_similarity(query_vec: np.ndarray, vectors: np.ndarray) -> np.ndarray:
     """Calculate cosine similarity between query and multiple vectors efficiently
 
@@ -56,9 +58,7 @@ def batch_cosine_similarity(query_vec: np.ndarray, vectors: np.ndarray) -> np.nd
         raise ValueError(f"Vectors must be 2D matrix, got shape {vectors.shape}")
 
     if query_vec.shape[0] != vectors.shape[1]:
-        raise ValueError(
-            f"Dimension mismatch: query {query_vec.shape[0]} vs vectors {vectors.shape[1]}"
-        )
+        raise ValueError(f"Dimension mismatch: query {query_vec.shape[0]} vs vectors {vectors.shape[1]}")
 
     # Normalize query vector
     query_norm = query_vec / np.linalg.norm(query_vec)
@@ -74,11 +74,9 @@ def batch_cosine_similarity(query_vec: np.ndarray, vectors: np.ndarray) -> np.nd
 
     return similarities
 
+
 def find_top_k(
-    query_vec: np.ndarray,
-    vectors: np.ndarray,
-    k: int = 10,
-    min_similarity: float = 0.0
+    query_vec: np.ndarray, vectors: np.ndarray, k: int = 10, min_similarity: float = 0.0
 ) -> List[Tuple[int, float]]:
     """Find top K most similar vectors
 
@@ -115,9 +113,6 @@ def find_top_k(
     # Get top k
     top_k_indices = np.argsort(filtered_similarities)[::-1][:k]
 
-    results = [
-        (int(filtered_indices[i]), float(filtered_similarities[i]))
-        for i in top_k_indices
-    ]
+    results = [(int(filtered_indices[i]), float(filtered_similarities[i])) for i in top_k_indices]
 
     return results

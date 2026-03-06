@@ -61,7 +61,7 @@ def test_full_pipeline_mocked(config, sample_book):
         book_type=BookType.TECHNICAL_TUTORIAL,
         confidence=0.9,
         suggested_tags=["python", "programming"],
-        reasoning="Contains code examples"
+        reasoning="Contains code examples",
     )
 
     mock_processing_result = {
@@ -84,12 +84,16 @@ def test_full_pipeline_mocked(config, sample_book):
     mock_adapter_instance.generate_embeddings.return_value = mock_embed_result
 
     from agentic_pipeline.validation import ValidationResult
+
     mock_validation = ValidationResult(passed=True, reasons=[], warnings=[], metrics={"chapter_count": 10})
 
-    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
-        with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
+    with patch.object(orchestrator.classifier, "classify", return_value=mock_profile):
+        with patch.object(orchestrator, "_run_processing", return_value=mock_processing_result):
             with patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", mock_adapter_cls):
-                with patch("agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate", return_value=mock_validation):
+                with patch(
+                    "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                    return_value=mock_validation,
+                ):
                     result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "complete"
@@ -112,10 +116,7 @@ def test_low_confidence_needs_approval(config, sample_book):
 
     # Low confidence profile
     mock_profile = BookProfile(
-        book_type=BookType.UNKNOWN,
-        confidence=0.5,
-        suggested_tags=[],
-        reasoning="Unclear structure"
+        book_type=BookType.UNKNOWN, confidence=0.5, suggested_tags=[], reasoning="Unclear structure"
     )
 
     mock_processing_result = {
@@ -131,11 +132,15 @@ def test_low_confidence_needs_approval(config, sample_book):
     }
 
     from agentic_pipeline.validation import ValidationResult
+
     mock_validation = ValidationResult(passed=True, reasons=[], warnings=[], metrics={"chapter_count": 3})
 
-    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
-        with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
-            with patch("agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate", return_value=mock_validation):
+    with patch.object(orchestrator.classifier, "classify", return_value=mock_profile):
+        with patch.object(orchestrator, "_run_processing", return_value=mock_processing_result):
+            with patch(
+                "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                return_value=mock_validation,
+            ):
                 result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "pending_approval"
@@ -151,10 +156,7 @@ def test_validation_failure_rejects_book(config, sample_book):
     orchestrator = Orchestrator(config)
 
     mock_profile = BookProfile(
-        book_type=BookType.TECHNICAL_TUTORIAL,
-        confidence=0.9,
-        suggested_tags=["python"],
-        reasoning="Test book"
+        book_type=BookType.TECHNICAL_TUTORIAL, confidence=0.9, suggested_tags=["python"], reasoning="Test book"
     )
 
     mock_processing_result = {
@@ -170,6 +172,7 @@ def test_validation_failure_rejects_book(config, sample_book):
     }
 
     from agentic_pipeline.validation import ValidationResult
+
     mock_validation = ValidationResult(
         passed=False,
         reasons=["Too few chapters: 1 (minimum 7 required)", "Total word count too low: 500 (minimum 5,000 required)"],
@@ -178,9 +181,12 @@ def test_validation_failure_rejects_book(config, sample_book):
     )
 
     # Validation always fails (return_value), so both initial and retry fail -> rejected
-    with patch.object(orchestrator.classifier, 'classify', return_value=mock_profile):
-        with patch.object(orchestrator, '_run_processing', return_value=mock_processing_result):
-            with patch("agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate", return_value=mock_validation):
+    with patch.object(orchestrator.classifier, "classify", return_value=mock_profile):
+        with patch.object(orchestrator, "_run_processing", return_value=mock_processing_result):
+            with patch(
+                "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                return_value=mock_validation,
+            ):
                 result = orchestrator.process_one(sample_book)
 
     assert result["state"] == "rejected"

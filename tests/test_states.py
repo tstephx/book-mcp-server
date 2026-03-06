@@ -7,10 +7,21 @@ def test_pipeline_state_enum_has_required_states():
     from agentic_pipeline.pipeline.states import PipelineState
 
     required = [
-        "DETECTED", "HASHING", "DUPLICATE", "CLASSIFYING",
-        "SELECTING_STRATEGY", "PROCESSING", "VALIDATING",
-        "PENDING_APPROVAL", "NEEDS_RETRY", "APPROVED",
-        "EMBEDDING", "COMPLETE", "REJECTED", "ARCHIVED", "FAILED"
+        "DETECTED",
+        "HASHING",
+        "DUPLICATE",
+        "CLASSIFYING",
+        "SELECTING_STRATEGY",
+        "PROCESSING",
+        "VALIDATING",
+        "PENDING_APPROVAL",
+        "NEEDS_RETRY",
+        "APPROVED",
+        "EMBEDDING",
+        "COMPLETE",
+        "REJECTED",
+        "ARCHIVED",
+        "FAILED",
     ]
 
     for state in required:
@@ -48,21 +59,25 @@ def test_is_terminal_state():
 
 def test_pipeline_state_has_failed():
     from agentic_pipeline.pipeline.states import PipelineState
+
     assert hasattr(PipelineState, "FAILED")
     assert PipelineState.FAILED.value == "failed"
 
 
 def test_failed_is_terminal():
     from agentic_pipeline.pipeline.states import PipelineState, is_terminal_state
+
     assert is_terminal_state(PipelineState.FAILED)
 
 
 def test_needs_retry_can_transition_to_failed():
     from agentic_pipeline.pipeline.states import PipelineState, can_transition
+
     assert can_transition(PipelineState.NEEDS_RETRY, PipelineState.FAILED)
 
 
 def test_failed_has_no_outgoing_transitions():
     from agentic_pipeline.pipeline.states import PipelineState, can_transition
+
     for state in PipelineState:
         assert not can_transition(PipelineState.FAILED, state)

@@ -16,8 +16,7 @@ def get_db_path() -> Path:
 
     if not DEFAULT_DB_PATH.exists():
         warnings.warn(
-            f"Default DB path not found: {DEFAULT_DB_PATH}. "
-            f"Set AGENTIC_PIPELINE_DB environment variable.",
+            f"Default DB path not found: {DEFAULT_DB_PATH}. Set AGENTIC_PIPELINE_DB environment variable.",
             stacklevel=2,
         )
     return DEFAULT_DB_PATH

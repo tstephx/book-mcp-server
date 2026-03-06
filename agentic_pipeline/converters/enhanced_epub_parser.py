@@ -79,16 +79,16 @@ class EnhancedEPUBParser:
 
     # Skip patterns for front/back matter
     SKIP_PATTERNS = re.compile(
-        r'^(cover|cover page|title|title page|copyright|contents|toc|'
-        r'table of contents|dedication|acknowledgments?|preface|foreword|'
-        r'introduction|about the authors?|about this book|index|glossary|'
-        r'bibliography|appendix|colophon|front matter|back matter|'
-        r'half title|full title|also by|praise for|endorsements|notes|'
-        r'references|who this book is for|what this book covers|'
-        r'how to read this book|conventions used|get in touch|code in action|'
-        r'to get the most out of this book|download|errata|piracy|'
-        r'other books you may enjoy|share your thoughts)$',
-        re.IGNORECASE
+        r"^(cover|cover page|title|title page|copyright|contents|toc|"
+        r"table of contents|dedication|acknowledgments?|preface|foreword|"
+        r"introduction|about the authors?|about this book|index|glossary|"
+        r"bibliography|appendix|colophon|front matter|back matter|"
+        r"half title|full title|also by|praise for|endorsements|notes|"
+        r"references|who this book is for|what this book covers|"
+        r"how to read this book|conventions used|get in touch|code in action|"
+        r"to get the most out of this book|download|errata|piracy|"
+        r"other books you may enjoy|share your thoughts)$",
+        re.IGNORECASE,
     )
 
     def __init__(self, file_path: str | Path):
@@ -106,7 +106,7 @@ class EnhancedEPUBParser:
         self._epub = epub.read_epub(str(self.file_path))
 
         # Also open as ZIP for low-level access (spine order, raw content)
-        self._zip = zipfile.ZipFile(self.file_path, 'r')
+        self._zip = zipfile.ZipFile(self.file_path, "r")
 
         try:
             # Parse container.xml to find OPF
@@ -125,14 +125,14 @@ class EnhancedEPUBParser:
             split_points = self._generate_split_points(spine)
 
             # Extract metadata
-            title = self._get_metadata('title') or "(Title Missing)"
+            title = self._get_metadata("title") or "(Title Missing)"
             authors = self._get_authors()
 
             # Build flat TOC titles list (for compatibility with existing code)
             toc_titles = [sp.title for sp in split_points if not self._should_skip(sp.title)]
 
             # Combine full text
-            full_text = '\n\n'.join(item.text for item in spine if item.text)
+            full_text = "\n\n".join(item.text for item in spine if item.text)
 
             return EPUBStructure(
                 title=title,
@@ -144,7 +144,7 @@ class EnhancedEPUBParser:
                 has_ncx=self._has_ncx(),
                 has_nav=self._has_nav(),
                 spine_count=len(spine),
-                anchor_count=sum(1 for sp in split_points if sp.is_anchor_split)
+                anchor_count=sum(1 for sp in split_points if sp.is_anchor_split),
             )
         finally:
             if self._zip:
@@ -153,28 +153,28 @@ class EnhancedEPUBParser:
     def _parse_container(self) -> None:
         """Parse META-INF/container.xml to find OPF location."""
         try:
-            container_xml = self._zip.read("META-INF/container.xml").decode('utf-8')
+            container_xml = self._zip.read("META-INF/container.xml").decode("utf-8")
             dom = parseString(container_xml)
             rootfile = dom.getElementsByTagName("rootfile")[0]
             self._opf_path = rootfile.getAttribute("full-path")
             # Get directory part for resolving relative paths
-            if '/' in self._opf_path:
-                self._opf_dir = self._opf_path.rsplit('/', 1)[0] + '/'
+            if "/" in self._opf_path:
+                self._opf_dir = self._opf_path.rsplit("/", 1)[0] + "/"
             else:
                 self._opf_dir = ""
         except Exception:
             # Fallback: look for .opf file
             for name in self._zip.namelist():
-                if name.endswith('.opf'):
+                if name.endswith(".opf"):
                     self._opf_path = name
-                    if '/' in name:
-                        self._opf_dir = name.rsplit('/', 1)[0] + '/'
+                    if "/" in name:
+                        self._opf_dir = name.rsplit("/", 1)[0] + "/"
                     break
 
     def _parse_manifest(self) -> None:
         """Parse manifest from OPF to map IDs to hrefs."""
         try:
-            opf_content = self._zip.read(self._opf_path).decode('utf-8')
+            opf_content = self._zip.read(self._opf_path).decode("utf-8")
             dom = parseString(opf_content)
 
             for item in dom.getElementsByTagName("item"):
@@ -203,27 +203,27 @@ class EnhancedEPUBParser:
     def _find_ncx_path(self) -> Optional[str]:
         """Find NCX file path from manifest."""
         for item_id, (href, media_type) in self._manifest.items():
-            if media_type == "application/x-dtbncx+xml" or href.endswith('.ncx'):
+            if media_type == "application/x-dtbncx+xml" or href.endswith(".ncx"):
                 return href
         return None
 
     def _find_nav_path(self) -> Optional[str]:
         """Find NAV file path from manifest."""
         for item_id, (href, media_type) in self._manifest.items():
-            if 'nav' in item_id.lower() and media_type == "application/xhtml+xml":
+            if "nav" in item_id.lower() and media_type == "application/xhtml+xml":
                 return href
         return None
 
     def _parse_ncx(self, ncx_path: str) -> None:
         """Parse NCX file for TOC with anchors."""
         try:
-            ncx_content = self._zip.read(ncx_path).decode('utf-8')
+            ncx_content = self._zip.read(ncx_path).decode("utf-8")
             dom = parseString(ncx_content)
 
             # Get NCX directory for resolving relative paths
             ncx_dir = ""
-            if '/' in ncx_path:
-                ncx_dir = ncx_path.rsplit('/', 1)[0] + '/'
+            if "/" in ncx_path:
+                ncx_dir = ncx_path.rsplit("/", 1)[0] + "/"
 
             def parse_navpoints(navpoints, depth=0):
                 for navpoint in navpoints:
@@ -245,13 +245,13 @@ class EnhancedEPUBParser:
                         src = unquote(src)
 
                         # Resolve relative to NCX location
-                        if not src.startswith('/'):
+                        if not src.startswith("/"):
                             src = ncx_dir + src
                         src = self._normalize_path(src)
 
                         # Split href and anchor
-                        if '#' in src:
-                            href, anchor = src.split('#', 1)
+                        if "#" in src:
+                            href, anchor = src.split("#", 1)
                         else:
                             href, anchor = src, None
 
@@ -261,8 +261,9 @@ class EnhancedEPUBParser:
                         self._toc_map[href].append((title, anchor, depth))
 
                     # Recurse into nested navPoints
-                    child_navpoints = [n for n in navpoint.childNodes
-                                       if n.nodeType == n.ELEMENT_NODE and n.tagName == "navPoint"]
+                    child_navpoints = [
+                        n for n in navpoint.childNodes if n.nodeType == n.ELEMENT_NODE and n.tagName == "navPoint"
+                    ]
                     if child_navpoints:
                         parse_navpoints(child_navpoints, depth + 1)
 
@@ -276,36 +277,36 @@ class EnhancedEPUBParser:
     def _parse_nav(self, nav_path: str) -> None:
         """Parse EPUB 3 NAV file for TOC with anchors."""
         try:
-            nav_content = self._zip.read(nav_path).decode('utf-8')
-            soup = BeautifulSoup(nav_content, 'html.parser')
+            nav_content = self._zip.read(nav_path).decode("utf-8")
+            soup = BeautifulSoup(nav_content, "html.parser")
 
             # Get NAV directory for resolving relative paths
             nav_dir = ""
-            if '/' in nav_path:
-                nav_dir = nav_path.rsplit('/', 1)[0] + '/'
+            if "/" in nav_path:
+                nav_dir = nav_path.rsplit("/", 1)[0] + "/"
 
             # Find the toc nav element
-            toc_nav = soup.find('nav', {'epub:type': 'toc'}) or soup.find('nav', id='toc')
+            toc_nav = soup.find("nav", {"epub:type": "toc"}) or soup.find("nav", id="toc")
             if not toc_nav:
                 return
 
             def parse_list(ol, depth=0):
                 if not ol:
                     return
-                for li in ol.find_all('li', recursive=False):
-                    a = li.find('a')
-                    if a and a.get('href'):
+                for li in ol.find_all("li", recursive=False):
+                    a = li.find("a")
+                    if a and a.get("href"):
                         title = a.get_text(strip=True)
-                        href = unquote(a['href'])
+                        href = unquote(a["href"])
 
                         # Resolve relative path
-                        if not href.startswith('/') and not href.startswith('#'):
+                        if not href.startswith("/") and not href.startswith("#"):
                             href = nav_dir + href
                         href = self._normalize_path(href)
 
                         # Split href and anchor
-                        if '#' in href:
-                            file_href, anchor = href.split('#', 1)
+                        if "#" in href:
+                            file_href, anchor = href.split("#", 1)
                         else:
                             file_href, anchor = href, None
 
@@ -314,11 +315,11 @@ class EnhancedEPUBParser:
                         self._toc_map[file_href].append((title, anchor, depth))
 
                     # Recurse into nested lists
-                    nested_ol = li.find('ol')
+                    nested_ol = li.find("ol")
                     if nested_ol:
                         parse_list(nested_ol, depth + 1)
 
-            parse_list(toc_nav.find('ol'))
+            parse_list(toc_nav.find("ol"))
 
         except Exception:
             pass
@@ -328,7 +329,7 @@ class EnhancedEPUBParser:
         spine = []
 
         try:
-            opf_content = self._zip.read(self._opf_path).decode('utf-8')
+            opf_content = self._zip.read(self._opf_path).decode("utf-8")
             dom = parseString(opf_content)
 
             for itemref in dom.getElementsByTagName("itemref"):
@@ -344,20 +345,14 @@ class EnhancedEPUBParser:
 
                 # Read content
                 try:
-                    content = self._zip.read(href).decode('utf-8')
-                    soup = BeautifulSoup(content, 'html.parser')
-                    text = soup.get_text(separator='\n', strip=True)
+                    content = self._zip.read(href).decode("utf-8")
+                    soup = BeautifulSoup(content, "html.parser")
+                    text = soup.get_text(separator="\n", strip=True)
                 except Exception:
                     content = ""
                     text = ""
 
-                spine.append(SpineItem(
-                    idref=idref,
-                    href=href,
-                    media_type=media_type,
-                    content=content,
-                    text=text
-                ))
+                spine.append(SpineItem(idref=idref, href=href, media_type=media_type, content=content, text=text))
         except Exception:
             pass
 
@@ -383,32 +378,34 @@ class EnhancedEPUBParser:
                     if not self._should_skip(title):
                         preview = item.text[:500] if item.text else ""
                         word_count = len(item.text.split()) if item.text else 0
-                        split_points.append(SplitPoint(
-                            href=href,
-                            anchor=None,
-                            title=title,
-                            spine_index=spine_idx,
-                            content_preview=preview,
-                            word_count=word_count,
-                            depth=depth
-                        ))
+                        split_points.append(
+                            SplitPoint(
+                                href=href,
+                                anchor=None,
+                                title=title,
+                                spine_index=spine_idx,
+                                content_preview=preview,
+                                word_count=word_count,
+                                depth=depth,
+                            )
+                        )
 
                 # Add anchor-level entries
                 for title, anchor, depth in anchor_level:
                     if not self._should_skip(title):
                         # Extract content from anchor point
-                        preview, word_count = self._extract_anchor_content(
-                            item.content, anchor
+                        preview, word_count = self._extract_anchor_content(item.content, anchor)
+                        split_points.append(
+                            SplitPoint(
+                                href=href,
+                                anchor=anchor,
+                                title=title,
+                                spine_index=spine_idx,
+                                content_preview=preview,
+                                word_count=word_count,
+                                depth=depth,
+                            )
                         )
-                        split_points.append(SplitPoint(
-                            href=href,
-                            anchor=anchor,
-                            title=title,
-                            spine_index=spine_idx,
-                            content_preview=preview,
-                            word_count=word_count,
-                            depth=depth
-                        ))
             else:
                 # No TOC entry - create split point from spine item anyway
                 # This ensures we don't miss content not in TOC
@@ -419,41 +416,43 @@ class EnhancedEPUBParser:
                 title = self._extract_title_from_content(item.content) or f"Section {spine_idx + 1}"
 
                 if not self._should_skip(title) and word_count > 100:  # Skip empty/tiny sections
-                    split_points.append(SplitPoint(
-                        href=href,
-                        anchor=None,
-                        title=title,
-                        spine_index=spine_idx,
-                        content_preview=preview,
-                        word_count=word_count,
-                        depth=0
-                    ))
+                    split_points.append(
+                        SplitPoint(
+                            href=href,
+                            anchor=None,
+                            title=title,
+                            spine_index=spine_idx,
+                            content_preview=preview,
+                            word_count=word_count,
+                            depth=0,
+                        )
+                    )
 
         return split_points
 
     def _extract_anchor_content(self, html: str, anchor: str) -> tuple[str, int]:
         """Extract text content starting from an anchor point."""
         try:
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
 
             # Find element with matching ID
             element = soup.find(id=anchor)
             if not element:
                 # Try finding by name attribute
-                element = soup.find(attrs={'name': anchor})
+                element = soup.find(attrs={"name": anchor})
 
             if element:
                 # Get text from this element and its siblings until next anchor
                 text_parts = []
                 for sibling in element.find_all_next():
                     # Stop if we hit another anchor point
-                    if sibling.get('id') or sibling.get('name'):
+                    if sibling.get("id") or sibling.get("name"):
                         break
                     text = sibling.get_text(strip=True)
                     if text:
                         text_parts.append(text)
 
-                full_text = ' '.join(text_parts)
+                full_text = " ".join(text_parts)
                 return full_text[:500], len(full_text.split())
         except Exception:
             pass
@@ -463,10 +462,10 @@ class EnhancedEPUBParser:
     def _extract_title_from_content(self, html: str) -> Optional[str]:
         """Try to extract a title from HTML content."""
         try:
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
 
             # Try common title elements in order
-            for tag in ['h1', 'h2', 'title']:
+            for tag in ["h1", "h2", "title"]:
                 element = soup.find(tag)
                 if element:
                     title = element.get_text(strip=True)
@@ -479,20 +478,20 @@ class EnhancedEPUBParser:
 
     def _resolve_path(self, href: str) -> str:
         """Resolve a relative path against the OPF directory."""
-        if href.startswith('/'):
+        if href.startswith("/"):
             return href[1:]  # Remove leading slash
         return self._opf_dir + href
 
     def _normalize_path(self, path: str) -> str:
         """Normalize path (resolve .. and .)"""
         parts = []
-        for part in path.split('/'):
-            if part == '..':
+        for part in path.split("/"):
+            if part == "..":
                 if parts:
                     parts.pop()
-            elif part and part != '.':
+            elif part and part != ".":
                 parts.append(part)
-        return '/'.join(parts)
+        return "/".join(parts)
 
     def _should_skip(self, title: str) -> bool:
         """Check if title should be skipped (front/back matter)."""
@@ -501,7 +500,7 @@ class EnhancedEPUBParser:
     def _get_metadata(self, key: str) -> Optional[str]:
         """Get metadata value from EPUB."""
         try:
-            values = self._epub.get_metadata('DC', key)
+            values = self._epub.get_metadata("DC", key)
             if values:
                 return values[0][0]
         except Exception:
@@ -512,7 +511,7 @@ class EnhancedEPUBParser:
         """Get list of authors from EPUB."""
         authors = []
         try:
-            creators = self._epub.get_metadata('DC', 'creator')
+            creators = self._epub.get_metadata("DC", "creator")
             for creator in creators:
                 if creator[0]:
                     authors.append(creator[0])

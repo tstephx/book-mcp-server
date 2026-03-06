@@ -35,17 +35,14 @@ def test_classify_command_with_mock_provider(temp_db):
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
 
     mock_profile = BookProfile(
-        book_type=BookType.TECHNICAL_TUTORIAL,
-        confidence=0.9,
-        suggested_tags=["python"],
-        reasoning="Test"
+        book_type=BookType.TECHNICAL_TUTORIAL, confidence=0.9, suggested_tags=["python"], reasoning="Test"
     )
 
     mock_agent = Mock()
     mock_agent.classify.return_value = mock_profile
 
-    with patch('agentic_pipeline.agents.providers.openai_provider.OpenAI'):
-        with patch('agentic_pipeline.agents.classifier.ClassifierAgent', return_value=mock_agent):
+    with patch("agentic_pipeline.agents.providers.openai_provider.OpenAI"):
+        with patch("agentic_pipeline.agents.classifier.ClassifierAgent", return_value=mock_agent):
             runner = CliRunner()
             result = runner.invoke(main, ["classify", "--text", "Sample book content"])
 

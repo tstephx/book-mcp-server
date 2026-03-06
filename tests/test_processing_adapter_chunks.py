@@ -90,15 +90,12 @@ def _create_test_db(tmp_path: Path) -> Path:
     return db_path
 
 
-def _insert_book_and_chapter(db_path: Path, book_id: str, chapter_id: str,
-                              file_path: str):
+def _insert_book_and_chapter(db_path: Path, book_id: str, chapter_id: str, file_path: str):
     """Insert a book and chapter into the test DB."""
     conn = sqlite3.connect(db_path)
-    conn.execute("INSERT INTO books (id, title, author) VALUES (?, ?, ?)",
-                 (book_id, "Test Book", "Author"))
+    conn.execute("INSERT INTO books (id, title, author) VALUES (?, ?, ?)", (book_id, "Test Book", "Author"))
     conn.execute(
-        "INSERT INTO chapters (id, book_id, title, chapter_number, file_path) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO chapters (id, book_id, title, chapter_number, file_path) VALUES (?, ?, ?, ?, ?)",
         (chapter_id, book_id, "Chapter 1", 1, file_path),
     )
     conn.commit()
@@ -170,8 +167,7 @@ class TestGenerateEmbeddings:
         # Pre-insert a chunk so chapter is already processed
         conn = sqlite3.connect(db_path)
         conn.execute(
-            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count) VALUES (?, ?, ?, ?, ?, ?)",
             ("c1:0", "c1", "b1", 0, "existing chunk", 20),
         )
         conn.commit()

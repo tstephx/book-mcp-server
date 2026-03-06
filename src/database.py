@@ -12,9 +12,12 @@ from .config import Config
 
 logger = logging.getLogger(__name__)
 
+
 class DatabaseError(Exception):
     """Custom exception for database errors"""
+
     pass
+
 
 @contextmanager
 def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
@@ -43,6 +46,7 @@ def get_db_connection() -> Generator[sqlite3.Connection, None, None]:
         if conn:
             conn.close()
 
+
 def execute_query(query: str, params: tuple = ()) -> list[sqlite3.Row]:
     """
     Execute a SELECT query and return results
@@ -64,6 +68,7 @@ def execute_query(query: str, params: tuple = ()) -> list[sqlite3.Row]:
             return cursor.fetchall()
     except sqlite3.Error as e:
         raise DatabaseError(f"Query execution failed: {str(e)}")
+
 
 def execute_single(query: str, params: tuple = ()) -> sqlite3.Row | None:
     """
@@ -87,6 +92,7 @@ def execute_single(query: str, params: tuple = ()) -> sqlite3.Row | None:
     except sqlite3.Error as e:
         raise DatabaseError(f"Query execution failed: {str(e)}")
 
+
 def check_database_health() -> dict:
     """
     Check database health and return stats
@@ -100,27 +106,19 @@ def check_database_health() -> dict:
 
             # Count books
             cursor.execute("SELECT COUNT(*) as count FROM books")
-            book_count = cursor.fetchone()['count']
+            book_count = cursor.fetchone()["count"]
 
             # Count chapters
             cursor.execute("SELECT COUNT(*) as count FROM chapters")
-            chapter_count = cursor.fetchone()['count']
+            chapter_count = cursor.fetchone()["count"]
 
             # Total word count
             cursor.execute("SELECT SUM(word_count) as total FROM books")
-            total_words = cursor.fetchone()['total'] or 0
+            total_words = cursor.fetchone()["total"] or 0
 
-            return {
-                "status": "healthy",
-                "books": book_count,
-                "chapters": chapter_count,
-                "total_words": total_words
-            }
+            return {"status": "healthy", "books": book_count, "chapters": chapter_count, "total_words": total_words}
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "error": str(e)}
 
 
 def _add_column_if_missing(cursor, table: str, column: str, col_type: str) -> bool:
@@ -151,9 +149,7 @@ def ensure_library_schema() -> None:
         created = []
 
         # --- FTS5 virtual table (empty — rebuild_fts_index() populates it) ---
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'")
         if not cursor.fetchone():
             cursor.execute("""
                 CREATE VIRTUAL TABLE chapters_fts USING fts5(
@@ -176,9 +172,7 @@ def ensure_library_schema() -> None:
                 FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
             )
         """)
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_summaries_type ON chapter_summaries(summary_type)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_summaries_type ON chapter_summaries(summary_type)")
 
         # Embedding columns on chapter_summaries
         if _add_column_if_missing(cursor, "chapter_summaries", "embedding", "BLOB"):
@@ -231,12 +225,8 @@ def ensure_library_schema() -> None:
                 FOREIGN KEY (chapter_id) REFERENCES chapters(id)
             )
         """)
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_chunks_chapter ON chunks(chapter_id)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_chunks_book ON chunks(book_id)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_chapter ON chunks(chapter_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_chunks_book ON chunks(book_id)")
 
         # --- Tracking columns on chapters (owned by book-ingestion, but we add columns) ---
         if _add_column_if_missing(cursor, "chapters", "content_hash", "TEXT"):

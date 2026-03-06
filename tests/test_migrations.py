@@ -24,15 +24,11 @@ def test_run_migrations_creates_pipeline_tables(temp_db):
     cursor = conn.cursor()
 
     # Check processing_pipelines table exists
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='processing_pipelines'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='processing_pipelines'")
     assert cursor.fetchone() is not None
 
     # Check pipeline_state_history table exists
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='pipeline_state_history'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pipeline_state_history'")
     assert cursor.fetchone() is not None
 
     conn.close()
@@ -47,9 +43,7 @@ def test_run_migrations_creates_autonomy_tables(temp_db):
     cursor = conn.cursor()
 
     # Check autonomy_config table exists
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='autonomy_config'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='autonomy_config'")
     assert cursor.fetchone() is not None
 
     # Check it has default row

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BatchResult:
     """Result of a batch operation"""
+
     total: int
     processed: int
     results: list = field(default_factory=list)
@@ -27,20 +28,17 @@ class BatchResult:
 
     def to_dict(self) -> dict:
         return {
-            'total': self.total,
-            'processed': self.processed,
-            'success_count': len(self.results),
-            'error_count': len(self.errors),
-            'results': self.results,
-            'errors': self.errors if self.errors else None
+            "total": self.total,
+            "processed": self.processed,
+            "success_count": len(self.results),
+            "error_count": len(self.errors),
+            "results": self.results,
+            "errors": self.errors if self.errors else None,
         }
 
 
 def batch_semantic_search(
-    query: str,
-    book_ids: Optional[List[str]] = None,
-    max_per_book: int = 5,
-    min_similarity: float = 0.3
+    query: str, book_ids: Optional[List[str]] = None, max_per_book: int = 5, min_similarity: float = 0.3
 ) -> dict:
     """Search across multiple books with per-book result limits using chunk-level search
 
@@ -59,21 +57,13 @@ def batch_semantic_search(
 
     # Get list of books to search
     if book_ids:
-        placeholders = ','.join('?' * len(book_ids))
-        books = execute_query(
-            f"SELECT id, title FROM books WHERE id IN ({placeholders})",
-            tuple(book_ids)
-        )
+        placeholders = ",".join("?" * len(book_ids))
+        books = execute_query(f"SELECT id, title FROM books WHERE id IN ({placeholders})", tuple(book_ids))
     else:
         books = execute_query("SELECT id, title FROM books ORDER BY title")
 
     if not books:
-        return {
-            "query": query,
-            "books_searched": 0,
-            "total_results": 0,
-            "results_by_book": []
-        }
+        return {"query": query, "books_searched": 0, "total_results": 0, "results_by_book": []}
 
     embeddings_matrix, chunk_metadata = load_chunk_embeddings()
     if embeddings_matrix is None:
@@ -82,7 +72,7 @@ def batch_semantic_search(
             "error": "No embeddings found",
             "books_searched": 0,
             "total_results": 0,
-            "results_by_book": []
+            "results_by_book": [],
         }
 
     results_by_book = []
@@ -95,10 +85,7 @@ def batch_semantic_search(
         for book in books:
             try:
                 # Filter to this book's chunks
-                book_indices = [
-                    i for i, m in enumerate(chunk_metadata)
-                    if m['book_id'] == book['id']
-                ]
+                book_indices = [i for i, m in enumerate(chunk_metadata) if m["book_id"] == book["id"]]
 
                 if not book_indices:
                     continue
@@ -108,47 +95,48 @@ def batch_semantic_search(
 
                 # Find top chunk results for this book
                 top_results = find_top_k(
-                    query_embedding,
-                    book_embeddings,
-                    k=max_per_book * 3,
-                    min_similarity=min_similarity
+                    query_embedding, book_embeddings, k=max_per_book * 3, min_similarity=min_similarity
                 )
 
                 chunk_results = []
                 for idx, similarity in top_results:
                     meta = book_chunk_meta[idx]
-                    chunk_results.append({**meta, 'similarity': similarity})
+                    chunk_results.append({**meta, "similarity": similarity})
 
                 # Aggregate to chapter level
                 chapter_results = best_chunk_per_chapter(chunk_results)[:max_per_book]
 
                 book_results = []
                 for r in chapter_results:
-                    book_results.append({
-                        'chapter_number': r['chapter_number'],
-                        'chapter_title': r['chapter_title'],
-                        'similarity': round(r['similarity'], 3),
-                        'excerpt': r.get('excerpt', '')[:300]
-                    })
+                    book_results.append(
+                        {
+                            "chapter_number": r["chapter_number"],
+                            "chapter_title": r["chapter_title"],
+                            "similarity": round(r["similarity"], 3),
+                            "excerpt": r.get("excerpt", "")[:300],
+                        }
+                    )
 
                 if book_results:
-                    results_by_book.append({
-                        'book_id': book['id'],
-                        'book_title': book['title'],
-                        'result_count': len(book_results),
-                        'chapters': book_results
-                    })
+                    results_by_book.append(
+                        {
+                            "book_id": book["id"],
+                            "book_title": book["title"],
+                            "result_count": len(book_results),
+                            "chapters": book_results,
+                        }
+                    )
                     total_results += len(book_results)
 
             except Exception as e:
                 logger.warning(f"Error searching book {book['id']}: {e}")
-                errors.append({'book_id': book['id'], 'error': str(e)})
+                errors.append({"book_id": book["id"], "error": str(e)})
 
     result = {
         "query": query,
         "books_searched": len(books),
         "total_results": total_results,
-        "results_by_book": results_by_book
+        "results_by_book": results_by_book,
     }
 
     if errors:
@@ -160,9 +148,7 @@ def batch_semantic_search(
 
 
 def batch_export_chapters(
-    book_ids: Optional[List[str]] = None,
-    format: str = "markdown",
-    include_content: bool = False
+    book_ids: Optional[List[str]] = None, format: str = "markdown", include_content: bool = False
 ) -> Iterator[str]:
     """Stream export of chapter metadata
 
@@ -180,7 +166,7 @@ def batch_export_chapters(
 
     # Build query
     if book_ids:
-        placeholders = ','.join('?' * len(book_ids))
+        placeholders = ",".join("?" * len(book_ids))
         query = f"""
             SELECT c.id, c.book_id, c.chapter_number, c.title, c.file_path, c.word_count,
                    b.title as book_title, b.author
@@ -212,10 +198,10 @@ def batch_export_chapters(
         for row in cursor:
             if format == "markdown":
                 # Add book header when book changes
-                if row['book_title'] != current_book:
-                    current_book = row['book_title']
+                if row["book_title"] != current_book:
+                    current_book = row["book_title"]
                     yield f"\n## {current_book}\n"
-                    if row['author']:
+                    if row["author"]:
                         yield f"*by {row['author']}*\n\n"
                     else:
                         yield "\n"
@@ -225,7 +211,7 @@ def batch_export_chapters(
 
                 if include_content:
                     try:
-                        content = read_chapter_content(row['file_path'])
+                        content = read_chapter_content(row["file_path"])
                         yield f"\n{content}\n\n---\n"
                     except Exception as e:
                         yield f"- *Content unavailable: {e}*\n"
@@ -234,20 +220,20 @@ def batch_export_chapters(
 
             else:  # json
                 data = {
-                    'chapter_id': row['id'],
-                    'book_id': row['book_id'],
-                    'book_title': row['book_title'],
-                    'author': row['author'],
-                    'chapter_number': row['chapter_number'],
-                    'chapter_title': row['title'],
-                    'word_count': row['word_count']
+                    "chapter_id": row["id"],
+                    "book_id": row["book_id"],
+                    "book_title": row["book_title"],
+                    "author": row["author"],
+                    "chapter_number": row["chapter_number"],
+                    "chapter_title": row["title"],
+                    "word_count": row["word_count"],
                 }
 
                 if include_content:
                     try:
-                        data['content'] = read_chapter_content(row['file_path'])
+                        data["content"] = read_chapter_content(row["file_path"])
                     except Exception as e:
-                        data['content_error'] = str(e)
+                        data["content_error"] = str(e)
 
                 yield json.dumps(data) + "\n"
 
@@ -270,13 +256,13 @@ def get_library_statistics() -> dict:
 
     if rows:
         row = rows[0]
-        stats['books'] = row['book_count']
-        stats['chapters'] = row['chapter_count']
-        stats['total_words'] = row['total_words']
-        stats['embedded_chapters'] = row['embedded_chapters']
-        stats['embedding_coverage'] = round(
-            row['embedded_chapters'] / row['chapter_count'] * 100, 1
-        ) if row['chapter_count'] > 0 else 0
+        stats["books"] = row["book_count"]
+        stats["chapters"] = row["chapter_count"]
+        stats["total_words"] = row["total_words"]
+        stats["embedded_chapters"] = row["embedded_chapters"]
+        stats["embedding_coverage"] = (
+            round(row["embedded_chapters"] / row["chapter_count"] * 100, 1) if row["chapter_count"] > 0 else 0
+        )
 
     # Per-book stats
     books = execute_query("""
@@ -289,13 +275,13 @@ def get_library_statistics() -> dict:
         ORDER BY b.word_count DESC
     """)
 
-    stats['books_detail'] = [
+    stats["books_detail"] = [
         {
-            'id': b['id'],
-            'title': b['title'],
-            'word_count': b['word_count'],
-            'chapters': b['chapters'],
-            'embedded': b['embedded']
+            "id": b["id"],
+            "title": b["title"],
+            "word_count": b["word_count"],
+            "chapters": b["chapters"],
+            "embedded": b["embedded"],
         }
         for b in books
     ]
@@ -303,15 +289,15 @@ def get_library_statistics() -> dict:
     # FTS status
     try:
         fts_rows = execute_query("SELECT COUNT(*) as count FROM chapters_fts")
-        stats['fts_indexed'] = fts_rows[0]['count'] if fts_rows else 0
+        stats["fts_indexed"] = fts_rows[0]["count"] if fts_rows else 0
     except Exception:
-        stats['fts_indexed'] = 0
+        stats["fts_indexed"] = 0
 
     # Summaries status
     try:
         sum_rows = execute_query("SELECT COUNT(*) as count FROM chapter_summaries")
-        stats['summaries_generated'] = sum_rows[0]['count'] if sum_rows else 0
+        stats["summaries_generated"] = sum_rows[0]["count"] if sum_rows else 0
     except Exception:
-        stats['summaries_generated'] = 0
+        stats["summaries_generated"] = 0
 
     return stats

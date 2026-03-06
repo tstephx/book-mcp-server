@@ -23,11 +23,9 @@ class MockProvider:
 
     def __init__(self, response=None, should_fail=False):
         from agentic_pipeline.agents.classifier_types import BookProfile, BookType
+
         self.response = response or BookProfile(
-            book_type=BookType.TECHNICAL_TUTORIAL,
-            confidence=0.9,
-            suggested_tags=["test"],
-            reasoning="Test response"
+            book_type=BookType.TECHNICAL_TUTORIAL, confidence=0.9, suggested_tags=["test"], reasoning="Test response"
         )
         self.should_fail = should_fail
         self.call_count = 0
@@ -52,12 +50,10 @@ def test_classifier_returns_cached_result(db_path):
     # Setup: create pipeline with existing profile
     repo = PipelineRepository(db_path)
     pid = repo.create("/book.epub", "hash123")
-    repo.update_book_profile(pid, {
-        "book_type": "textbook",
-        "confidence": 0.85,
-        "suggested_tags": ["economics"],
-        "reasoning": "Cached result"
-    })
+    repo.update_book_profile(
+        pid,
+        {"book_type": "textbook", "confidence": 0.85, "suggested_tags": ["economics"], "reasoning": "Cached result"},
+    )
 
     mock_provider = MockProvider()
     agent = ClassifierAgent(db_path, primary=mock_provider)
@@ -88,12 +84,11 @@ def test_classifier_falls_back_on_primary_failure(db_path):
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
 
     primary = MockProvider(should_fail=True)
-    fallback = MockProvider(response=BookProfile(
-        book_type=BookType.PERIODICAL,
-        confidence=0.8,
-        suggested_tags=["news"],
-        reasoning="Fallback response"
-    ))
+    fallback = MockProvider(
+        response=BookProfile(
+            book_type=BookType.PERIODICAL, confidence=0.8, suggested_tags=["news"], reasoning="Fallback response"
+        )
+    )
 
     agent = ClassifierAgent(db_path, primary=primary, fallback=fallback)
 

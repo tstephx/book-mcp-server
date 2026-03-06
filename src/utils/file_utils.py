@@ -34,7 +34,7 @@ def resolve_chapter_path(file_path: str | Path) -> Path:
 
     # Strip 'data/books/' prefix if present and resolve relative to BOOKS_DIR
     try:
-        relative_path = path.relative_to('data/books')
+        relative_path = path.relative_to("data/books")
         return Config.BOOKS_DIR / relative_path
     except ValueError:
         # Path doesn't start with 'data/books/', try as-is from BOOKS_DIR
@@ -77,12 +77,12 @@ def read_chapter_content(file_path: str | Path) -> str:
     actual_path = path
     if path.is_file():
         logger.debug(f"Reading single-file chapter: {path}")
-        content = path.read_text(encoding='utf-8')
+        content = path.read_text(encoding="utf-8")
     elif path.is_dir():
         content = _read_split_chapter(path)
         actual_path = path
-    elif path.suffix == '.md':
-        dir_path = path.with_suffix('')
+    elif path.suffix == ".md":
+        dir_path = path.with_suffix("")
         if dir_path.is_dir():
             content = _read_split_chapter(dir_path)
             actual_path = dir_path
@@ -116,17 +116,11 @@ def _read_split_chapter(dir_path: Path) -> str:
         Concatenated content from all parts
     """
     # Find all numbered .md files (exclude _index.md)
-    parts = sorted([
-        p for p in dir_path.glob('[0-9]*.md')
-        if not p.name.startswith('_')
-    ])
+    parts = sorted([p for p in dir_path.glob("[0-9]*.md") if not p.name.startswith("_")])
 
     if not parts:
         # Fallback: try any .md files except _index.md
-        parts = sorted([
-            p for p in dir_path.glob('*.md')
-            if not p.name.startswith('_')
-        ])
+        parts = sorted([p for p in dir_path.glob("*.md") if not p.name.startswith("_")])
 
     if not parts:
         raise FileNotFoundError(f"No chapter parts found in: {dir_path}")
@@ -136,11 +130,11 @@ def _read_split_chapter(dir_path: Path) -> str:
     content_parts = []
     for part in parts:
         try:
-            content_parts.append(part.read_text(encoding='utf-8'))
+            content_parts.append(part.read_text(encoding="utf-8"))
         except Exception as e:
             logger.warning(f"Could not read chapter part {part}: {e}")
 
-    return '\n\n'.join(content_parts)
+    return "\n\n".join(content_parts)
 
 
 def get_chapter_excerpt(file_path: str | Path, max_chars: int = 300) -> str:

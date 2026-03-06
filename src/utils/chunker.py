@@ -35,7 +35,7 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
         List of sentence-split chunks, each under max_tokens
     """
     # Split on sentence boundaries
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = re.split(r"(?<=[.!?])\s+", text)
 
     chunks = []
     current = []
@@ -47,7 +47,7 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
         # If single sentence exceeds limit, hard truncate
         if sentence_tokens > max_tokens:
             if current:
-                chunks.append(' '.join(current))
+                chunks.append(" ".join(current))
                 current = []
                 current_tokens = 0
 
@@ -58,7 +58,7 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
             continue
 
         if current_tokens + sentence_tokens > max_tokens and current:
-            chunks.append(' '.join(current))
+            chunks.append(" ".join(current))
             current = [sentence]
             current_tokens = sentence_tokens
         else:
@@ -66,7 +66,7 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
             current_tokens += sentence_tokens
 
     if current:
-        chunks.append(' '.join(current))
+        chunks.append(" ".join(current))
 
     return chunks
 
@@ -104,16 +104,11 @@ def chunk_chapter(
                     "chunk_index": i,
                     "content": chunk,
                     "word_count": len(chunk.split()),
-                    "token_count": _count_tokens(chunk)
+                    "token_count": _count_tokens(chunk),
                 }
                 for i, chunk in enumerate(sub_chunks)
             ]
-        return [{
-            "chunk_index": 0,
-            "content": text,
-            "word_count": total_words,
-            "token_count": token_count
-        }]
+        return [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
 
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
@@ -125,16 +120,11 @@ def chunk_chapter(
                     "chunk_index": i,
                     "content": chunk,
                     "word_count": len(chunk.split()),
-                    "token_count": _count_tokens(chunk)
+                    "token_count": _count_tokens(chunk),
                 }
                 for i, chunk in enumerate(sub_chunks)
             ]
-        return [{
-            "chunk_index": 0,
-            "content": text,
-            "word_count": total_words,
-            "token_count": token_count
-        }]
+        return [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
 
     chunks = []
     current_paragraphs: list[str] = []
@@ -172,12 +162,14 @@ def chunk_chapter(
             # Split oversized chunk at sentence boundaries
             sub_chunks = _split_at_sentences(chunk["content"], max_tokens)
             for i, sub_content in enumerate(sub_chunks):
-                final_chunks.append({
-                    "chunk_index": len(final_chunks),
-                    "content": sub_content,
-                    "word_count": len(sub_content.split()),
-                    "token_count": _count_tokens(sub_content)
-                })
+                final_chunks.append(
+                    {
+                        "chunk_index": len(final_chunks),
+                        "content": sub_content,
+                        "word_count": len(sub_content.split()),
+                        "token_count": _count_tokens(sub_content),
+                    }
+                )
         else:
             # Re-index to maintain sequential indices
             chunk["chunk_index"] = len(final_chunks)

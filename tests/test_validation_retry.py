@@ -214,9 +214,7 @@ def test_retry_processing_error_rejects_directly(config, sample_book):
     )
 
     # First call succeeds, second call (retry) raises ProcessingError
-    mock_run_processing = MagicMock(
-        side_effect=[mock_processing_result, ProcessingError("Splitter crashed")]
-    )
+    mock_run_processing = MagicMock(side_effect=[mock_processing_result, ProcessingError("Splitter crashed")])
 
     with patch.object(orchestrator.classifier, "classify", return_value=mock_profile):
         with patch.object(orchestrator, "_run_processing", mock_run_processing):

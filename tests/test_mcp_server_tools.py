@@ -25,6 +25,7 @@ def db_path():
 # C4: set_autonomy_mode — invalid mode must return error, not raise
 # ---------------------------------------------------------------------------
 
+
 def test_set_autonomy_mode_invalid_returns_error_not_exception(db_path):
     """set_autonomy_mode('invalid') must return {"error": ...} not raise ValueError."""
     from agentic_pipeline.mcp_server import set_autonomy_mode
@@ -50,6 +51,7 @@ def test_set_autonomy_mode_valid_returns_success(db_path):
 # ---------------------------------------------------------------------------
 # C1: process_book — path validation
 # ---------------------------------------------------------------------------
+
 
 def test_process_book_rejects_disallowed_extension():
     """process_book must reject files that are not .epub or .pdf."""
@@ -84,6 +86,7 @@ def test_process_book_rejects_empty_path():
 # W8: missing tool registrations — functions must exist in mcp_server module
 # ---------------------------------------------------------------------------
 
+
 def test_backfill_library_is_importable():
     """backfill_library must be importable from mcp_server (not missing)."""
     from agentic_pipeline.mcp_server import backfill_library  # noqa: F401
@@ -113,6 +116,7 @@ def test_backfill_validate_reingest_registered_in_wrapper():
 # W2: type annotations — Optional parameters must be Optional
 # ---------------------------------------------------------------------------
 
+
 def test_batch_approve_accepts_none_confidence():
     """batch_approve_tool must accept None for min_confidence (Optional[float])."""
     from agentic_pipeline.mcp_server import batch_approve_tool
@@ -134,19 +138,20 @@ def test_batch_approve_accepts_none_book_type():
     annotation = param.annotation
     # Must be Optional[str] (i.e., Union[str, None] or str | None), not bare str
     import typing
+
     args = getattr(annotation, "__args__", None)
-    assert args is not None and type(None) in args, (
-        f"book_type annotation {annotation} is not Optional[str]"
-    )
+    assert args is not None and type(None) in args, f"book_type annotation {annotation} is not Optional[str]"
 
 
 # ---------------------------------------------------------------------------
 # C3: reingest_book_tool must use a public Orchestrator method, not _process_book
 # ---------------------------------------------------------------------------
 
+
 def test_orchestrator_exposes_reprocess_existing_as_public_method():
     """Orchestrator must have a public reprocess_existing() method."""
     from agentic_pipeline.orchestrator import Orchestrator
+
     assert hasattr(Orchestrator, "reprocess_existing"), (
         "Orchestrator has no public reprocess_existing() method. "
         "reingest_book_tool must not call _process_book directly."

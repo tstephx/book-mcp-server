@@ -13,6 +13,7 @@ from ..utils.logging import logger
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
+
 def register_search_tools(mcp: "FastMCP") -> None:
     """
     Register all search-related tools
@@ -40,37 +41,43 @@ def register_search_tools(mcp: "FastMCP") -> None:
             search_pattern = f"%{query}%"
 
             # Search in book titles and authors
-            books = execute_query("""
+            books = execute_query(
+                """
                 SELECT id, title, author
                 FROM books
                 WHERE title LIKE ? OR author LIKE ?
                 ORDER BY title
                 LIMIT ?
-            """, (search_pattern, search_pattern, limit))
+            """,
+                (search_pattern, search_pattern, limit),
+            )
 
             # Search in chapter titles
-            chapters = execute_query("""
+            chapters = execute_query(
+                """
                 SELECT c.book_id, b.title as book_title, c.chapter_number, c.title as chapter_title
                 FROM chapters c
                 JOIN books b ON c.book_id = b.id
                 WHERE c.title LIKE ?
                 ORDER BY b.title, c.chapter_number
                 LIMIT ?
-            """, (search_pattern, limit))
+            """,
+                (search_pattern, limit),
+            )
 
             # Build result
-            result = f"🔍 Search Results for '{query}'\n" + "="*50 + "\n\n"
+            result = f"🔍 Search Results for '{query}'\n" + "=" * 50 + "\n\n"
 
             if books:
-                result += "📚 Matching Books:\n" + "-"*50 + "\n"
+                result += "📚 Matching Books:\n" + "-" * 50 + "\n"
                 for book in books:
                     result += f"• {book['title']}"
-                    if book['author']:
+                    if book["author"]:
                         result += f" by {book['author']}"
                     result += f"\n  ID: {book['id']}\n"
 
             if chapters:
-                result += "\n📄 Matching Chapters:\n" + "-"*50 + "\n"
+                result += "\n📄 Matching Chapters:\n" + "-" * 50 + "\n"
                 for chapter in chapters:
                     result += f"• {chapter['book_title']}\n"
                     result += f"  Chapter {chapter['chapter_number']}: {chapter['chapter_title']}\n"

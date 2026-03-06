@@ -52,12 +52,15 @@ class BatchFilter:
 
             where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT * FROM processing_pipelines
                 {where}
                 ORDER BY priority ASC, created_at ASC
                 LIMIT ?
-            """, params + [self.max_count * 2])  # Fetch extra for post-filtering
+            """,
+                params + [self.max_count * 2],
+            )  # Fetch extra for post-filtering
 
             rows = cursor.fetchall()
 

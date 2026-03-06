@@ -63,12 +63,15 @@ def test_config_watch_dir_not_set_in_env(monkeypatch):
 
 def test_default_chapter_tokens_exists():
     from src.config import Config
-    assert hasattr(Config, 'DEFAULT_CHAPTER_TOKENS')
+
+    assert hasattr(Config, "DEFAULT_CHAPTER_TOKENS")
     assert Config.DEFAULT_CHAPTER_TOKENS == 8000
+
 
 def test_default_chapter_tokens_env_override(monkeypatch):
     import importlib
     import src.config as config_module
+
     monkeypatch.setenv("DEFAULT_CHAPTER_TOKENS", "4000")
     importlib.reload(config_module)
     assert config_module.Config.DEFAULT_CHAPTER_TOKENS == 4000

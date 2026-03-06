@@ -9,6 +9,7 @@ from typing import Optional
 
 from ..config import Config
 
+
 def setup_logging(name: Optional[str] = None) -> logging.Logger:
     """
     Setup logging for the server
@@ -38,15 +39,13 @@ def setup_logging(name: Optional[str] = None) -> logging.Logger:
     handler.setLevel(level)
 
     # Create formatter
-    formatter = logging.Formatter(
-        fmt='[%(asctime)s] %(levelname)s [%(name)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
+    formatter = logging.Formatter(fmt="[%(asctime)s] %(levelname)s [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     handler.setFormatter(formatter)
 
     logger.addHandler(handler)
 
     return logger
+
 
 # Default logger for the module
 logger = setup_logging("book-mcp-server")

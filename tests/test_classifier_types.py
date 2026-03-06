@@ -8,8 +8,13 @@ def test_book_type_enum_has_required_types():
     from agentic_pipeline.agents.classifier_types import BookType
 
     required = [
-        "TECHNICAL_TUTORIAL", "TECHNICAL_REFERENCE", "TEXTBOOK",
-        "NARRATIVE_NONFICTION", "PERIODICAL", "RESEARCH_COLLECTION", "UNKNOWN"
+        "TECHNICAL_TUTORIAL",
+        "TECHNICAL_REFERENCE",
+        "TEXTBOOK",
+        "NARRATIVE_NONFICTION",
+        "PERIODICAL",
+        "RESEARCH_COLLECTION",
+        "UNKNOWN",
     ]
 
     for book_type in required:
@@ -23,7 +28,7 @@ def test_book_profile_creation():
         book_type=BookType.TECHNICAL_TUTORIAL,
         confidence=0.85,
         suggested_tags=["python", "web"],
-        reasoning="Contains code examples"
+        reasoning="Contains code examples",
     )
 
     assert profile.book_type == BookType.TECHNICAL_TUTORIAL
@@ -36,10 +41,7 @@ def test_book_profile_to_dict():
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
 
     profile = BookProfile(
-        book_type=BookType.TEXTBOOK,
-        confidence=0.72,
-        suggested_tags=["economics"],
-        reasoning="Academic structure"
+        book_type=BookType.TEXTBOOK, confidence=0.72, suggested_tags=["economics"], reasoning="Academic structure"
     )
 
     d = profile.to_dict()
@@ -57,7 +59,7 @@ def test_book_profile_from_dict():
         "book_type": "periodical",
         "confidence": 0.90,
         "suggested_tags": ["news", "politics"],
-        "reasoning": "Article format with bylines"
+        "reasoning": "Article format with bylines",
     }
 
     profile = BookProfile.from_dict(d)

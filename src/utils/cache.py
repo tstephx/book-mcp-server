@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CachedChapter:
     """Cached chapter content with metadata for validation"""
+
     content: str
     mtime: float
     expires_at: float
@@ -29,6 +30,7 @@ class CachedChapter:
 @dataclass
 class CachedEmbeddings:
     """Cached embeddings matrix with metadata"""
+
     matrix: np.ndarray
     metadata: list[dict]
     loaded_at: float
@@ -97,13 +99,8 @@ class LibraryCache:
             return
 
         with self._lock:
-            self._embeddings = CachedEmbeddings(
-                matrix=matrix,
-                metadata=metadata,
-                loaded_at=time()
-            )
-            logger.info(f"Cached embeddings matrix: {matrix.shape[0]} chapters, "
-                       f"{matrix.nbytes / 1024 / 1024:.1f} MB")
+            self._embeddings = CachedEmbeddings(matrix=matrix, metadata=metadata, loaded_at=time())
+            logger.info(f"Cached embeddings matrix: {matrix.shape[0]} chapters, {matrix.nbytes / 1024 / 1024:.1f} MB")
 
     def invalidate_embeddings(self) -> None:
         """Invalidate embeddings cache (call when books are added/removed)"""
@@ -136,13 +133,8 @@ class LibraryCache:
             return
 
         with self._lock:
-            self._chunk_embeddings = CachedEmbeddings(
-                matrix=matrix,
-                metadata=metadata,
-                loaded_at=time()
-            )
-            logger.info(f"Cached chunk embeddings: {matrix.shape[0]} chunks, "
-                       f"{matrix.nbytes / 1024 / 1024:.1f} MB")
+            self._chunk_embeddings = CachedEmbeddings(matrix=matrix, metadata=metadata, loaded_at=time())
+            logger.info(f"Cached chunk embeddings: {matrix.shape[0]} chunks, {matrix.nbytes / 1024 / 1024:.1f} MB")
 
     def invalidate_chunk_embeddings(self) -> None:
         """Invalidate chunk embeddings cache"""
@@ -184,13 +176,8 @@ class LibraryCache:
             return
 
         with self._lock:
-            self._summary_embeddings = CachedEmbeddings(
-                matrix=matrix,
-                metadata=metadata,
-                loaded_at=time()
-            )
-            logger.info(f"Cached summary embeddings: {matrix.shape[0]} summaries, "
-                       f"{matrix.nbytes / 1024 / 1024:.1f} MB")
+            self._summary_embeddings = CachedEmbeddings(matrix=matrix, metadata=metadata, loaded_at=time())
+            logger.info(f"Cached summary embeddings: {matrix.shape[0]} summaries, {matrix.nbytes / 1024 / 1024:.1f} MB")
 
     def invalidate_summary_embeddings(self) -> None:
         """Invalidate summary embeddings cache"""
@@ -239,8 +226,8 @@ class LibraryCache:
             try:
                 path = Path(file_path)
                 # Handle split chapters (directory)
-                if path.suffix == '.md' and not path.exists():
-                    dir_path = path.with_suffix('')
+                if path.suffix == ".md" and not path.exists():
+                    dir_path = path.with_suffix("")
                     if dir_path.is_dir():
                         # Check mtime of directory (changes when files added/modified)
                         current_mtime = dir_path.stat().st_mtime
@@ -287,7 +274,7 @@ class LibraryCache:
                 content=content,
                 mtime=mtime,
                 expires_at=time() + self.chapter_ttl,
-                size_bytes=len(content.encode('utf-8'))
+                size_bytes=len(content.encode("utf-8")),
             )
             logger.debug(f"Cached chapter: {key} ({len(content)} chars)")
 
@@ -318,15 +305,9 @@ class LibraryCache:
         """
         with self._lock:
             chapter_memory = sum(c.size_bytes for c in self._chapters.values())
-            embeddings_memory = (
-                self._embeddings.matrix.nbytes if self._embeddings else 0
-            )
-            chunk_embeddings_memory = (
-                self._chunk_embeddings.matrix.nbytes if self._chunk_embeddings else 0
-            )
-            summary_embeddings_memory = (
-                self._summary_embeddings.matrix.nbytes if self._summary_embeddings else 0
-            )
+            embeddings_memory = self._embeddings.matrix.nbytes if self._embeddings else 0
+            chunk_embeddings_memory = self._chunk_embeddings.matrix.nbytes if self._chunk_embeddings else 0
+            summary_embeddings_memory = self._summary_embeddings.matrix.nbytes if self._summary_embeddings else 0
 
             total_requests = self._hits + self._misses
             hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0
@@ -336,13 +317,9 @@ class LibraryCache:
                 "enabled": self.enabled,
                 "chapters_cached": len(self._chapters),
                 "embeddings_loaded": self._embeddings is not None,
-                "embeddings_chapters": (
-                    self._embeddings.matrix.shape[0] if self._embeddings else 0
-                ),
+                "embeddings_chapters": (self._embeddings.matrix.shape[0] if self._embeddings else 0),
                 "chunk_embeddings_loaded": self._chunk_embeddings is not None,
-                "chunk_embeddings_count": (
-                    self._chunk_embeddings.matrix.shape[0] if self._chunk_embeddings else 0
-                ),
+                "chunk_embeddings_count": (self._chunk_embeddings.matrix.shape[0] if self._chunk_embeddings else 0),
                 "summary_embeddings_loaded": self._summary_embeddings is not None,
                 "summary_embeddings_count": (
                     self._summary_embeddings.matrix.shape[0] if self._summary_embeddings else 0
@@ -354,7 +331,7 @@ class LibraryCache:
                 "hits": self._hits,
                 "misses": self._misses,
                 "hit_rate_percent": round(hit_rate, 1),
-                "chapter_ttl_seconds": self.chapter_ttl
+                "chapter_ttl_seconds": self.chapter_ttl,
             }
 
     def clear_all(self) -> None:
@@ -381,10 +358,8 @@ def get_cache() -> LibraryCache:
     global _cache
     if _cache is None:
         from ..config import Config
-        _cache = LibraryCache(
-            enabled=Config.ENABLE_CACHING,
-            chapter_ttl=getattr(Config, 'CACHE_CHAPTER_TTL', 3600)
-        )
+
+        _cache = LibraryCache(enabled=Config.ENABLE_CACHING, chapter_ttl=getattr(Config, "CACHE_CHAPTER_TTL", 3600))
     return _cache
 
 

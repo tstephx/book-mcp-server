@@ -48,7 +48,7 @@ def _find_chapter_path(book_id: str, chapter_number: int, recorded_path: str) ->
 
     # Otherwise return the first .md file
     for match in potential_matches:
-        if match.suffix == '.md':
+        if match.suffix == ".md":
             return match, False
 
     return potential_matches[0], potential_matches[0].is_dir()
@@ -56,13 +56,12 @@ def _find_chapter_path(book_id: str, chapter_number: int, recorded_path: str) ->
 
 def _read_file_content(file_path: Path, check_size: bool = True) -> str:
     """Read file content with optional size checking."""
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     if check_size and len(content) > Config.MAX_CHAPTER_SIZE:
         raise ValueError(
-            f"Content is too large ({len(content)} bytes). "
-            f"Maximum allowed: {Config.MAX_CHAPTER_SIZE} bytes"
+            f"Content is too large ({len(content)} bytes). Maximum allowed: {Config.MAX_CHAPTER_SIZE} bytes"
         )
 
     return content
@@ -92,19 +91,14 @@ def _truncate_to_tokens(content: str, max_tokens: int) -> Tuple[str, bool, int]:
     truncated = content[:max_chars]
 
     # Try to break at paragraph
-    last_para = truncated.rfind('\n\n')
+    last_para = truncated.rfind("\n\n")
     if last_para > max_chars * 0.7:  # Only if we keep at least 70%
         truncated = truncated[:last_para]
     else:
         # Try to break at sentence
-        last_sentence = max(
-            truncated.rfind('. '),
-            truncated.rfind('.\n'),
-            truncated.rfind('? '),
-            truncated.rfind('! ')
-        )
+        last_sentence = max(truncated.rfind(". "), truncated.rfind(".\n"), truncated.rfind("? "), truncated.rfind("! "))
         if last_sentence > max_chars * 0.8:  # Only if we keep at least 80%
-            truncated = truncated[:last_sentence + 1]
+            truncated = truncated[: last_sentence + 1]
 
     return truncated, True, total_tokens
 
@@ -122,12 +116,12 @@ def _extract_frontmatter(content: str) -> Tuple[str, str]:
     Returns:
         Tuple of (frontmatter, remaining_content)
     """
-    if content.startswith('---'):
-        end_match = re.search(r'\n---\n', content[3:])
+    if content.startswith("---"):
+        end_match = re.search(r"\n---\n", content[3:])
         if end_match:
             frontmatter_end = end_match.end() + 3
             return content[:frontmatter_end], content[frontmatter_end:]
-    return '', content
+    return "", content
 
 
 def _split_by_headers(content: str) -> list[dict]:
@@ -144,7 +138,7 @@ def _split_by_headers(content: str) -> list[dict]:
     frontmatter, body = _extract_frontmatter(content)
 
     # Find ## or ### headers (h2 or h3)
-    header_pattern = re.compile(r'^(#{2,3}) (.+)$', re.MULTILINE)
+    header_pattern = re.compile(r"^(#{2,3}) (.+)$", re.MULTILINE)
     matches = list(header_pattern.finditer(body))
 
     if not matches:
@@ -154,13 +148,15 @@ def _split_by_headers(content: str) -> list[dict]:
 
     # Content before first header (intro)
     if matches[0].start() > 0:
-        intro_content = body[:matches[0].start()].strip()
+        intro_content = body[: matches[0].start()].strip()
         if intro_content and _estimate_tokens(intro_content) > 100:
-            sections.append({
-                'title': 'Introduction',
-                'content': frontmatter + intro_content if frontmatter else intro_content,
-                'tokens': _estimate_tokens(intro_content)
-            })
+            sections.append(
+                {
+                    "title": "Introduction",
+                    "content": frontmatter + intro_content if frontmatter else intro_content,
+                    "tokens": _estimate_tokens(intro_content),
+                }
+            )
 
     # Each header section
     for i, match in enumerate(matches):
@@ -169,11 +165,7 @@ def _split_by_headers(content: str) -> list[dict]:
         end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
         section_content = body[start:end].strip()
 
-        sections.append({
-            'title': title,
-            'content': section_content,
-            'tokens': _estimate_tokens(section_content)
-        })
+        sections.append({"title": title, "content": section_content, "tokens": _estimate_tokens(section_content)})
 
     return sections
 
@@ -189,7 +181,7 @@ def _split_by_paragraphs(content: str, target_tokens: int = CHUNK_TARGET_TOKENS)
     frontmatter, body = _extract_frontmatter(content)
 
     # Split into paragraphs
-    paragraphs = re.split(r'\n\n+', body)
+    paragraphs = re.split(r"\n\n+", body)
 
     sections = []
     current_chunk = []
@@ -205,16 +197,12 @@ def _split_by_paragraphs(content: str, target_tokens: int = CHUNK_TARGET_TOKENS)
 
         # If adding this paragraph exceeds target, save current chunk
         if current_tokens > 0 and current_tokens + para_tokens > target_tokens:
-            chunk_content = '\n\n'.join(current_chunk)
+            chunk_content = "\n\n".join(current_chunk)
             # Add frontmatter to first chunk only
             if chunk_num == 1 and frontmatter:
                 chunk_content = frontmatter + chunk_content
 
-            sections.append({
-                'title': f'Part {chunk_num}',
-                'content': chunk_content,
-                'tokens': current_tokens
-            })
+            sections.append({"title": f"Part {chunk_num}", "content": chunk_content, "tokens": current_tokens})
             current_chunk = [para]
             current_tokens = para_tokens
             chunk_num += 1
@@ -224,14 +212,10 @@ def _split_by_paragraphs(content: str, target_tokens: int = CHUNK_TARGET_TOKENS)
 
     # Don't forget the last chunk
     if current_chunk:
-        chunk_content = '\n\n'.join(current_chunk)
+        chunk_content = "\n\n".join(current_chunk)
         if chunk_num == 1 and frontmatter:
             chunk_content = frontmatter + chunk_content
-        sections.append({
-            'title': f'Part {chunk_num}',
-            'content': chunk_content,
-            'tokens': current_tokens
-        })
+        sections.append({"title": f"Part {chunk_num}", "content": chunk_content, "tokens": current_tokens})
 
     return sections
 
@@ -256,7 +240,7 @@ def _auto_split_chapter(content: str) -> list[dict]:
     # - No single section should be > 40% of total content
     # - Average section size should be reasonable
     if len(sections) >= 3:
-        max_section_tokens = max(s['tokens'] for s in sections)
+        max_section_tokens = max(s["tokens"] for s in sections)
         if max_section_tokens < total_tokens * 0.4:
             logger.info(f"Auto-split chapter into {len(sections)} header-based sections")
             return sections
@@ -269,7 +253,7 @@ def _auto_split_chapter(content: str) -> list[dict]:
 
 def _format_section_index(chapter_title: str, sections: list[dict], book_id: str, chapter_number: int) -> str:
     """Format a section index for display."""
-    total_tokens = sum(s['tokens'] for s in sections)
+    total_tokens = sum(s["tokens"] for s in sections)
 
     lines = [
         f"# {chapter_title}",
@@ -280,7 +264,7 @@ def _format_section_index(chapter_title: str, sections: list[dict], book_id: str
         f"Use `get_section('{book_id}', {chapter_number}, section_number)` to read each section.",
         "",
         "## Sections",
-        ""
+        "",
     ]
 
     for i, section in enumerate(sections, 1):
@@ -322,24 +306,24 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
             # Apply server-side default if caller did not specify
             if max_tokens is None:
-
                 max_tokens = Config.DEFAULT_CHAPTER_TOKENS
 
             # Get chapter info from database
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT title, file_path, word_count
                 FROM chapters
                 WHERE book_id = ? AND chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return f"Chapter {chapter_number} not found for book ID: {book_id}"
 
             # Find the chapter path
             try:
-                chapter_path, is_folder = _find_chapter_path(
-                    book_id, chapter_number, chapter['file_path']
-                )
+                chapter_path, is_folder = _find_chapter_path(book_id, chapter_number, chapter["file_path"])
             except FileNotFoundError as e:
                 return f"Error: {str(e)}"
 
@@ -376,7 +360,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                     "Use `get_section(book_id, chapter_number, section_number)` to read each section.",
                     "",
                     "## Sections",
-                    ""
+                    "",
                 ]
 
                 for i, section in enumerate(sections, 1):
@@ -406,9 +390,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                     _auto_split_cache[(book_id, chapter_number)] = sections
 
                     # Return section index
-                    return _format_section_index(
-                        chapter['title'], sections, book_id, chapter_number
-                    )
+                    return _format_section_index(chapter["title"], sections, book_id, chapter_number)
 
                 # Small chapter - apply token truncation if requested
                 if max_tokens is not None:
@@ -422,8 +404,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                         )
                         content += truncation_note
                         logger.info(
-                            f"Truncated chapter {chapter_number} from {book_id}: "
-                            f"{total_tokens} -> {max_tokens} tokens"
+                            f"Truncated chapter {chapter_number} from {book_id}: {total_tokens} -> {max_tokens} tokens"
                         )
 
                 logger.info(f"Retrieved chapter {chapter_number} from {book_id}")
@@ -470,26 +451,26 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
             # Apply server-side default if caller did not specify
             if max_tokens is None:
-
                 max_tokens = Config.DEFAULT_CHAPTER_TOKENS
             if section_number < 1:
                 return "Error: section_number must be >= 1"
 
             # Get chapter info from database
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT title, file_path, word_count
                 FROM chapters
                 WHERE book_id = ? AND chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return f"Chapter {chapter_number} not found for book ID: {book_id}"
 
             # Find the chapter path
             try:
-                chapter_path, is_folder = _find_chapter_path(
-                    book_id, chapter_number, chapter['file_path']
-                )
+                chapter_path, is_folder = _find_chapter_path(book_id, chapter_number, chapter["file_path"])
             except FileNotFoundError as e:
                 return f"Error: {str(e)}"
 
@@ -498,11 +479,13 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             if not is_folder and cache_key in _auto_split_cache:
                 sections = _auto_split_cache[cache_key]
                 if section_number > len(sections):
-                    return (f"Section {section_number} not found. "
-                           f"Chapter {chapter_number} has {len(sections)} auto-split sections.")
+                    return (
+                        f"Section {section_number} not found. "
+                        f"Chapter {chapter_number} has {len(sections)} auto-split sections."
+                    )
 
                 section = sections[section_number - 1]
-                content = section['content']
+                content = section["content"]
 
                 # Apply token truncation if requested
                 if max_tokens is not None:
@@ -529,38 +512,38 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                         _auto_split_cache[cache_key] = sections
 
                         if section_number > len(sections):
-                            return (f"Section {section_number} not found. "
-                                   f"Chapter {chapter_number} has {len(sections)} auto-split sections.")
+                            return (
+                                f"Section {section_number} not found. "
+                                f"Chapter {chapter_number} has {len(sections)} auto-split sections."
+                            )
 
                         section = sections[section_number - 1]
-                        section_content = section['content']
+                        section_content = section["content"]
 
                         if max_tokens is not None:
                             section_content, was_truncated, _ = _truncate_to_tokens(section_content, max_tokens)
                             if was_truncated:
-                                section_content += (
-                                    f"\n\n---\n"
-                                    f"⚠️ **Content truncated** to ~{max_tokens:,} tokens."
-                                )
+                                section_content += f"\n\n---\n⚠️ **Content truncated** to ~{max_tokens:,} tokens."
 
                         return section_content
                     else:
-                        return (f"Chapter {chapter_number} is not split into sections "
-                               f"(only {total_tokens} tokens). Use get_chapter() to read it directly.")
+                        return (
+                            f"Chapter {chapter_number} is not split into sections "
+                            f"(only {total_tokens} tokens). Use get_chapter() to read it directly."
+                        )
                 except Exception as e:
                     logger.error(f"Error auto-splitting chapter: {e}")
-                    return (f"Chapter {chapter_number} is not split into sections. "
-                           f"Use get_chapter() to read it directly.")
+                    return (
+                        f"Chapter {chapter_number} is not split into sections. Use get_chapter() to read it directly."
+                    )
 
             # Find the section file
-            section_files = sorted([
-                f for f in chapter_path.glob("*.md")
-                if f.name != "_index.md"
-            ])
+            section_files = sorted([f for f in chapter_path.glob("*.md") if f.name != "_index.md"])
 
             if section_number > len(section_files):
-                return (f"Section {section_number} not found. "
-                       f"Chapter {chapter_number} has {len(section_files)} sections.")
+                return (
+                    f"Section {section_number} not found. Chapter {chapter_number} has {len(section_files)} sections."
+                )
 
             section_file = section_files[section_number - 1]
 
@@ -618,20 +601,21 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             chapter_number = validate_chapter_number(chapter_number)
 
             # Get chapter info from database
-            chapter = execute_single("""
+            chapter = execute_single(
+                """
                 SELECT title, file_path, word_count
                 FROM chapters
                 WHERE book_id = ? AND chapter_number = ?
-            """, (book_id, chapter_number))
+            """,
+                (book_id, chapter_number),
+            )
 
             if not chapter:
                 return f"Chapter {chapter_number} not found for book ID: {book_id}"
 
             # Find the chapter path
             try:
-                chapter_path, is_folder = _find_chapter_path(
-                    book_id, chapter_number, chapter['file_path']
-                )
+                chapter_path, is_folder = _find_chapter_path(book_id, chapter_number, chapter["file_path"])
             except FileNotFoundError as e:
                 return f"Error: {str(e)}"
 
@@ -639,13 +623,13 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
             cache_key = (book_id, chapter_number)
             if not is_folder and cache_key in _auto_split_cache:
                 sections = _auto_split_cache[cache_key]
-                total_tokens = sum(s['tokens'] for s in sections)
+                total_tokens = sum(s["tokens"] for s in sections)
 
                 lines = [
                     f"# {chapter['title']}",
                     "",
                     f"**{len(sections)} auto-split sections** | ~{total_tokens:,} total tokens",
-                    ""
+                    "",
                 ]
 
                 for i, section in enumerate(sections, 1):
@@ -667,7 +651,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
                             f"# {chapter['title']}",
                             "",
                             f"**{len(sections)} auto-split sections** | ~{total_tokens:,} total tokens",
-                            ""
+                            "",
                         ]
 
                         for i, section in enumerate(sections, 1):
@@ -675,33 +659,28 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
                         return "\n".join(lines)
                     else:
-                        return (f"Chapter {chapter_number} is not split into sections "
-                               f"(only {total_tokens} tokens). Use get_chapter() to read it directly.")
+                        return (
+                            f"Chapter {chapter_number} is not split into sections "
+                            f"(only {total_tokens} tokens). Use get_chapter() to read it directly."
+                        )
                 except Exception as e:
                     logger.error(f"Error checking chapter for auto-split: {e}")
-                    return (f"Chapter {chapter_number} is not split into sections. "
-                           f"Use get_chapter() to read it directly.")
+                    return (
+                        f"Chapter {chapter_number} is not split into sections. Use get_chapter() to read it directly."
+                    )
 
             # List section files
-            section_files = sorted([
-                f for f in chapter_path.glob("*.md")
-                if f.name != "_index.md"
-            ])
+            section_files = sorted([f for f in chapter_path.glob("*.md") if f.name != "_index.md"])
 
-            lines = [
-                f"# {chapter['title']}",
-                "",
-                f"**{len(section_files)} sections**",
-                ""
-            ]
+            lines = [f"# {chapter['title']}", "", f"**{len(section_files)} sections**", ""]
 
             for i, section in enumerate(section_files, 1):
                 # Try to get token count from file
                 try:
-                    content = section.read_text(encoding='utf-8')
+                    content = section.read_text(encoding="utf-8")
                     # Look for token count in frontmatter
-                    if content.startswith('---'):
-                        token_match = re.search(r'tokens:\s*(\d+)', content[:500])
+                    if content.startswith("---"):
+                        token_match = re.search(r"tokens:\s*(\d+)", content[:500])
                         tokens = int(token_match.group(1)) if token_match else "?"
                     else:
                         tokens = len(content) // 4  # Estimate
@@ -710,7 +689,7 @@ def register_chapter_tools(mcp: "FastMCP") -> None:
 
                 # Extract title from filename
                 title = section.stem
-                if re.match(r'^\d{2}-', title):
+                if re.match(r"^\d{2}-", title):
                     title = title[3:]
                 title = title.replace("-", " ").title()
 

@@ -33,16 +33,18 @@ class ApprovalQueue:
 
             total_confidence += confidence
 
-            books.append({
-                "id": p["id"],
-                "source_path": p["source_path"],
-                "content_hash": p["content_hash"],
-                "book_type": profile.get("book_type", "unknown"),
-                "confidence": confidence,
-                "suggested_tags": profile.get("suggested_tags", []),
-                "created_at": p["created_at"],
-                "priority": p["priority"],
-            })
+            books.append(
+                {
+                    "id": p["id"],
+                    "source_path": p["source_path"],
+                    "content_hash": p["content_hash"],
+                    "book_type": profile.get("book_type", "unknown"),
+                    "confidence": confidence,
+                    "suggested_tags": profile.get("suggested_tags", []),
+                    "created_at": p["created_at"],
+                    "priority": p["priority"],
+                }
+            )
 
         avg_confidence = total_confidence / len(pipelines) if pipelines else 0
 

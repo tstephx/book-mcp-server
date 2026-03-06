@@ -12,6 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 @contextmanager
 def embedding_model_context() -> Generator:
     """Manage embedding model lifecycle.
@@ -39,6 +40,7 @@ def embedding_model_context() -> Generator:
         raise
     finally:
         logger.debug("Embedding model context closed")
+
 
 @contextmanager
 def database_transaction() -> Generator:
@@ -81,9 +83,9 @@ def database_transaction() -> Generator:
             logger.error(f"Transaction rolled back: {e}")
             raise
 
+
 @contextmanager
-def batch_processing_context(batch_size: int = 32,
-                             description: str = "Processing") -> Generator:
+def batch_processing_context(batch_size: int = 32, description: str = "Processing") -> Generator:
     """Manage batch processing operations
 
     Provides progress tracking and proper cleanup for batch operations.
@@ -105,11 +107,7 @@ def batch_processing_context(batch_size: int = 32,
     import time
 
     start_time = time.time()
-    context = {
-        'batch_size': batch_size,
-        'processed': 0,
-        'start_time': start_time
-    }
+    context = {"batch_size": batch_size, "processed": 0, "start_time": start_time}
 
     logger.info(f"Starting {description} (batch_size={batch_size})")
 
@@ -117,16 +115,12 @@ def batch_processing_context(batch_size: int = 32,
         yield context
     finally:
         elapsed = time.time() - start_time
-        rate = context['processed'] / elapsed if elapsed > 0 else 0
-        logger.info(
-            f"{description} complete: {context['processed']} items "
-            f"in {elapsed:.1f}s ({rate:.1f} items/s)"
-        )
+        rate = context["processed"] / elapsed if elapsed > 0 else 0
+        logger.info(f"{description} complete: {context['processed']} items in {elapsed:.1f}s ({rate:.1f} items/s)")
+
 
 @contextmanager
-def error_context(operation: str,
-                  default_value: Optional[any] = None,
-                  raise_error: bool = True) -> Generator:
+def error_context(operation: str, default_value: Optional[any] = None, raise_error: bool = True) -> Generator:
     """Wrap operations with consistent error handling
 
     Provides consistent error logging and optional graceful degradation.
@@ -156,4 +150,4 @@ def error_context(operation: str,
             raise
         else:
             logger.warning(f"Returning default value for {operation}")
-            context['result'] = default_value
+            context["result"] = default_value

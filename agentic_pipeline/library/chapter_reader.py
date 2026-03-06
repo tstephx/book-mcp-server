@@ -34,15 +34,9 @@ def read_chapter_content(file_path: str, books_dir: Path) -> str:
     # Handle split chapters (directory with numbered .md parts)
     dir_path = path if path.is_dir() else path.with_suffix("")
     if dir_path.is_dir():
-        parts = sorted(
-            p for p in dir_path.glob("[0-9]*.md")
-            if not p.name.startswith("_")
-        )
+        parts = sorted(p for p in dir_path.glob("[0-9]*.md") if not p.name.startswith("_"))
         if not parts:
-            parts = sorted(
-                p for p in dir_path.glob("*.md")
-                if not p.name.startswith("_")
-            )
+            parts = sorted(p for p in dir_path.glob("*.md") if not p.name.startswith("_"))
         if parts:
             return "\n\n".join(p.read_text(encoding="utf-8") for p in parts)
 

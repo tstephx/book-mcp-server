@@ -20,9 +20,7 @@ class TestSchemaMigrationsTable:
             run_migrations(Path(f.name))
             conn = _open(f.name)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
             assert cursor.fetchone() is not None, "schema_migrations table not created"
             conn.close()
 
@@ -48,9 +46,7 @@ class TestSchemaMigrationsTable:
 
             conn = _open(f.name)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) as cnt FROM schema_migrations WHERE name = 'add_processing_result_column'"
-            )
+            cursor.execute("SELECT COUNT(*) as cnt FROM schema_migrations WHERE name = 'add_processing_result_column'")
             count = cursor.fetchone()["cnt"]
             conn.close()
 

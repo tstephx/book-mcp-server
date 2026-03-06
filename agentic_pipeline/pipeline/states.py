@@ -33,7 +33,12 @@ TRANSITIONS = {
     PipelineState.PROCESSING: {PipelineState.VALIDATING, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.VALIDATING: {PipelineState.PENDING_APPROVAL, PipelineState.NEEDS_RETRY, PipelineState.REJECTED},
     PipelineState.PENDING_APPROVAL: {PipelineState.APPROVED, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
-    PipelineState.NEEDS_RETRY: {PipelineState.HASHING, PipelineState.PROCESSING, PipelineState.REJECTED, PipelineState.FAILED},
+    PipelineState.NEEDS_RETRY: {
+        PipelineState.HASHING,
+        PipelineState.PROCESSING,
+        PipelineState.REJECTED,
+        PipelineState.FAILED,
+    },
     PipelineState.APPROVED: {PipelineState.EMBEDDING, PipelineState.NEEDS_RETRY},
     PipelineState.EMBEDDING: {PipelineState.COMPLETE, PipelineState.REJECTED, PipelineState.NEEDS_RETRY},
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books

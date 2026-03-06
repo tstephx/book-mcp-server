@@ -71,19 +71,21 @@ def load_chunk_embeddings(
     for row in rows:
         embedding = np.load(io.BytesIO(row["embedding"]))
         embeddings.append(embedding)
-        metadata.append({
-            "chunk_id": row["chunk_id"],
-            "chapter_id": row["chapter_id"],
-            "book_id": row["book_id"],
-            "book_title": row["book_title"],
-            "author": row["author"],
-            "chapter_title": row["chapter_title"],
-            "chapter_number": row["chapter_number"],
-            "chunk_index": row["chunk_index"],
-            "content": row["content"],
-            "file_path": row["file_path"],
-            "word_count": row["word_count"],
-        })
+        metadata.append(
+            {
+                "chunk_id": row["chunk_id"],
+                "chapter_id": row["chapter_id"],
+                "book_id": row["book_id"],
+                "book_title": row["book_title"],
+                "author": row["author"],
+                "chapter_title": row["chapter_title"],
+                "chapter_number": row["chapter_number"],
+                "chunk_index": row["chunk_index"],
+                "content": row["content"],
+                "file_path": row["file_path"],
+                "word_count": row["word_count"],
+            }
+        )
 
     matrix = np.vstack(embeddings)
 

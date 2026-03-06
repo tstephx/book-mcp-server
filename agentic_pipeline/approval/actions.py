@@ -62,7 +62,7 @@ def _record_audit(
                 json.dumps(adjustments) if adjustments else None,
                 confidence,
                 AutonomyConfig(db_path).get_mode(),
-            )
+            ),
         )
         conn.commit()
 
@@ -129,11 +129,7 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
     if processing_result and isinstance(processing_result, str):
         processing_result = json.loads(processing_result)
 
-    book_id = (
-        processing_result.get("book_id", pipeline_id)
-        if processing_result
-        else pipeline_id
-    )
+    book_id = processing_result.get("book_id", pipeline_id) if processing_result else pipeline_id
 
     # Transition to EMBEDDING
     repo.update_state(pipeline_id, PipelineState.EMBEDDING)
@@ -146,9 +142,7 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
         result = adapter.generate_embeddings(book_id=book_id)
 
         if not result.success:
-            logger.warning(
-                "Embedding failed for %s: %s", pipeline_id, result.error
-            )
+            logger.warning("Embedding failed for %s: %s", pipeline_id, result.error)
             repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
             return {
                 "state": PipelineState.NEEDS_RETRY.value,

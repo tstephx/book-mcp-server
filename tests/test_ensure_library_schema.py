@@ -109,9 +109,7 @@ def full_db(empty_db):
 
 
 def _table_exists(cursor, name):
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,))
     return cursor.fetchone() is not None
 
 
@@ -127,6 +125,7 @@ class TestEnsureLibrarySchemaFreshDB:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -138,6 +137,7 @@ class TestEnsureLibrarySchemaFreshDB:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -151,6 +151,7 @@ class TestEnsureLibrarySchemaFreshDB:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -162,6 +163,7 @@ class TestEnsureLibrarySchemaFreshDB:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -173,6 +175,7 @@ class TestEnsureLibrarySchemaFreshDB:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -190,6 +193,7 @@ class TestEnsureLibrarySchemaIdempotent:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = full_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
             # Call twice — should not raise
             ensure_library_schema()
@@ -197,21 +201,18 @@ class TestEnsureLibrarySchemaIdempotent:
     def test_preserves_existing_data(self, full_db):
         # Insert test data before running
         conn = sqlite3.connect(str(full_db))
-        conn.execute(
-            "INSERT INTO chapter_summaries (chapter_id, summary) VALUES ('ch1', 'test summary')"
-        )
+        conn.execute("INSERT INTO chapter_summaries (chapter_id, summary) VALUES ('ch1', 'test summary')")
         conn.commit()
         conn.close()
 
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = full_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(full_db))
-        row = conn.execute(
-            "SELECT summary FROM chapter_summaries WHERE chapter_id = 'ch1'"
-        ).fetchone()
+        row = conn.execute("SELECT summary FROM chapter_summaries WHERE chapter_id = 'ch1'").fetchone()
         assert row[0] == "test summary"
         conn.close()
 
@@ -238,6 +239,7 @@ class TestEnsureLibrarySchemaPartialState:
         with patch("src.database.Config") as mock_config:
             mock_config.DB_PATH = empty_db
             from src.database import ensure_library_schema
+
             ensure_library_schema()
 
         conn = sqlite3.connect(str(empty_db))
@@ -252,9 +254,11 @@ class TestServerIntegration:
 
     def test_create_server_calls_ensure_library_schema(self, empty_db):
         """create_server() should call ensure_library_schema before registering tools."""
-        with patch("src.database.Config") as mock_config, \
-             patch("src.server.Config") as mock_server_config, \
-             patch("src.server.ensure_library_schema") as mock_ensure:
+        with (
+            patch("src.database.Config") as mock_config,
+            patch("src.server.Config") as mock_server_config,
+            patch("src.server.ensure_library_schema") as mock_ensure,
+        ):
             mock_config.DB_PATH = empty_db
             mock_server_config.DB_PATH = empty_db
             mock_server_config.SERVER_NAME = "test"
@@ -263,10 +267,9 @@ class TestServerIntegration:
 
             # Mock check_database_health to return healthy
             with patch("src.server.check_database_health") as mock_health:
-                mock_health.return_value = {
-                    "status": "healthy", "books": 0, "chapters": 0, "total_words": 0
-                }
+                mock_health.return_value = {"status": "healthy", "books": 0, "chapters": 0, "total_words": 0}
                 from src.server import create_server
+
                 try:
                     create_server()
                 except Exception:

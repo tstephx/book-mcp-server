@@ -16,20 +16,25 @@ from agentic_pipeline.converters.enhanced_epub_parser import (
 
 def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
     """Create a minimal valid EPUB for testing."""
-    with zipfile.ZipFile(path, 'w') as zf:
+    with zipfile.ZipFile(path, "w") as zf:
         # mimetype (must be first, uncompressed)
-        zf.writestr('mimetype', 'application/epub+zip')
+        zf.writestr("mimetype", "application/epub+zip")
 
         # container.xml
-        zf.writestr('META-INF/container.xml', '''<?xml version="1.0"?>
+        zf.writestr(
+            "META-INF/container.xml",
+            """<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
     <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
   </rootfiles>
-</container>''')
+</container>""",
+        )
 
         # content.opf
-        zf.writestr('OEBPS/content.opf', '''<?xml version="1.0"?>
+        zf.writestr(
+            "OEBPS/content.opf",
+            """<?xml version="1.0"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Test Book</dc:title>
@@ -45,11 +50,12 @@ def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
     <itemref idref="chapter1"/>
     <itemref idref="chapter2"/>
   </spine>
-</package>''')
+</package>""",
+        )
 
         # toc.ncx with or without anchors
         if with_anchors:
-            ncx_content = '''<?xml version="1.0"?>
+            ncx_content = """<?xml version="1.0"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <navMap>
     <navPoint id="np1" playOrder="1">
@@ -69,9 +75,9 @@ def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
       <content src="chapter2.xhtml"/>
     </navPoint>
   </navMap>
-</ncx>'''
+</ncx>"""
         else:
-            ncx_content = '''<?xml version="1.0"?>
+            ncx_content = """<?xml version="1.0"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <navMap>
     <navPoint id="np1" playOrder="1">
@@ -83,12 +89,14 @@ def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
       <content src="chapter2.xhtml"/>
     </navPoint>
   </navMap>
-</ncx>'''
+</ncx>"""
 
-        zf.writestr('OEBPS/toc.ncx', ncx_content)
+        zf.writestr("OEBPS/toc.ncx", ncx_content)
 
         # chapter1.xhtml
-        zf.writestr('OEBPS/chapter1.xhtml', '''<?xml version="1.0"?>
+        zf.writestr(
+            "OEBPS/chapter1.xhtml",
+            """<?xml version="1.0"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>Chapter 1</title></head>
 <body>
@@ -99,10 +107,13 @@ def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
   <h2 id="section-1-2">Section 1.2: Setup</h2>
   <p>This section covers the setup process. Follow these steps carefully.</p>
 </body>
-</html>''')
+</html>""",
+        )
 
         # chapter2.xhtml
-        zf.writestr('OEBPS/chapter2.xhtml', '''<?xml version="1.0"?>
+        zf.writestr(
+            "OEBPS/chapter2.xhtml",
+            """<?xml version="1.0"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head><title>Chapter 2</title></head>
 <body>
@@ -110,7 +121,8 @@ def create_minimal_epub(path: Path, with_anchors: bool = False) -> None:
   <p>This chapter covers advanced topics in depth. We will discuss complex patterns.</p>
   <p>Additional content here to make the chapter longer and more substantial.</p>
 </body>
-</html>''')
+</html>""",
+        )
 
 
 @pytest.fixture
@@ -215,16 +227,21 @@ class TestEnhancedEPUBParser:
         """Test that front matter titles are skipped."""
         epub_path = tmp_path / "frontmatter.epub"
 
-        with zipfile.ZipFile(epub_path, 'w') as zf:
-            zf.writestr('mimetype', 'application/epub+zip')
-            zf.writestr('META-INF/container.xml', '''<?xml version="1.0"?>
+        with zipfile.ZipFile(epub_path, "w") as zf:
+            zf.writestr("mimetype", "application/epub+zip")
+            zf.writestr(
+                "META-INF/container.xml",
+                """<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
     <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
   </rootfiles>
-</container>''')
+</container>""",
+            )
 
-            zf.writestr('content.opf', '''<?xml version="1.0"?>
+            zf.writestr(
+                "content.opf",
+                """<?xml version="1.0"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>Test</dc:title>
@@ -238,9 +255,12 @@ class TestEnhancedEPUBParser:
     <itemref idref="cover"/>
     <itemref idref="ch1"/>
   </spine>
-</package>''')
+</package>""",
+            )
 
-            zf.writestr('toc.ncx', '''<?xml version="1.0"?>
+            zf.writestr(
+                "toc.ncx",
+                """<?xml version="1.0"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <navMap>
     <navPoint id="np1" playOrder="1">
@@ -256,10 +276,11 @@ class TestEnhancedEPUBParser:
       <content src="ch1.xhtml"/>
     </navPoint>
   </navMap>
-</ncx>''')
+</ncx>""",
+            )
 
-            zf.writestr('cover.xhtml', '<html><body>Cover page</body></html>')
-            zf.writestr('ch1.xhtml', '<html><body><h1>Chapter 1</h1><p>Content here.</p></body></html>')
+            zf.writestr("cover.xhtml", "<html><body>Cover page</body></html>")
+            zf.writestr("ch1.xhtml", "<html><body><h1>Chapter 1</h1><p>Content here.</p></body></html>")
 
         structure = parse_epub(epub_path)
 
@@ -289,40 +310,20 @@ class TestSplitPointDataclass:
 
     def test_is_anchor_split_true(self):
         """Test is_anchor_split when anchor is present."""
-        sp = SplitPoint(
-            href="chapter.xhtml",
-            anchor="section-1",
-            title="Section 1",
-            spine_index=0
-        )
+        sp = SplitPoint(href="chapter.xhtml", anchor="section-1", title="Section 1", spine_index=0)
         assert sp.is_anchor_split is True
 
     def test_is_anchor_split_false(self):
         """Test is_anchor_split when no anchor."""
-        sp = SplitPoint(
-            href="chapter.xhtml",
-            anchor=None,
-            title="Chapter 1",
-            spine_index=0
-        )
+        sp = SplitPoint(href="chapter.xhtml", anchor=None, title="Chapter 1", spine_index=0)
         assert sp.is_anchor_split is False
 
     def test_full_href_with_anchor(self):
         """Test full_href includes anchor."""
-        sp = SplitPoint(
-            href="chapter.xhtml",
-            anchor="section-1",
-            title="Section 1",
-            spine_index=0
-        )
+        sp = SplitPoint(href="chapter.xhtml", anchor="section-1", title="Section 1", spine_index=0)
         assert sp.full_href == "chapter.xhtml#section-1"
 
     def test_full_href_without_anchor(self):
         """Test full_href without anchor."""
-        sp = SplitPoint(
-            href="chapter.xhtml",
-            anchor=None,
-            title="Chapter 1",
-            spine_index=0
-        )
+        sp = SplitPoint(href="chapter.xhtml", anchor=None, title="Chapter 1", spine_index=0)
         assert sp.full_href == "chapter.xhtml"

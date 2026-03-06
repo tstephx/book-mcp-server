@@ -16,9 +16,9 @@ def test_llm_provider_defines_required_methods():
     import inspect
 
     # Check abstract methods exist
-    assert hasattr(LLMProvider, 'classify')
-    assert hasattr(LLMProvider, 'name')
+    assert hasattr(LLMProvider, "classify")
+    assert hasattr(LLMProvider, "name")
 
     # Check they are abstract
-    assert getattr(LLMProvider.classify, '__isabstractmethod__', False)
-    assert isinstance(inspect.getattr_static(LLMProvider, 'name'), property)
+    assert getattr(LLMProvider.classify, "__isabstractmethod__", False)
+    assert isinstance(inspect.getattr_static(LLMProvider, "name"), property)

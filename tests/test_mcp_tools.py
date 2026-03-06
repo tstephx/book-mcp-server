@@ -26,10 +26,7 @@ def setup_pending_books(db_path):
 
     repo = PipelineRepository(db_path)
     pid = repo.create("/test/book.epub", "testhash")
-    repo.update_book_profile(pid, {
-        "book_type": "technical_tutorial",
-        "confidence": 0.92
-    })
+    repo.update_book_profile(pid, {"book_type": "technical_tutorial", "confidence": 0.92})
     transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
     return pid
 

@@ -38,7 +38,7 @@ def test_select_spot_check_with_candidates(db_path):
             book_type="technical_tutorial",
             confidence=0.92,
             decision="approved",
-            actor="auto:high_confidence"
+            actor="auto:high_confidence",
         )
 
     manager = SpotCheckManager(db_path, sample_rate=0.10)
@@ -52,10 +52,7 @@ def test_submit_spot_check_result(db_path):
 
     manager = SpotCheckManager(db_path)
     manager.submit_result(
-        book_id="book123",
-        classification_correct=True,
-        quality_acceptable=True,
-        reviewer="human:taylor"
+        book_id="book123", classification_correct=True, quality_acceptable=True, reviewer="human:taylor"
     )
 
     results = manager.get_results(days=1)

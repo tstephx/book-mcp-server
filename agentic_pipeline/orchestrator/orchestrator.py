@@ -72,7 +72,11 @@ class Orchestrator:
             return {"skipped": True, "reason": "Already processed", "pipeline_id": existing["id"]}
 
         if state == PipelineState.FAILED:
-            return {"skipped": True, "reason": "Permanently failed (max retries exhausted)", "pipeline_id": existing["id"]}
+            return {
+                "skipped": True,
+                "reason": "Permanently failed (max retries exhausted)",
+                "pipeline_id": existing["id"],
+            }
 
         if state not in TERMINAL_STATES:
             return {"skipped": True, "reason": "Already in progress", "pipeline_id": existing["id"]}
@@ -110,8 +114,10 @@ class Orchestrator:
                 def __init__(self):
                     super().__init__()
                     self.text = []
+
                 def handle_data(self, data):
                     self.text.append(data)
+
                 def get_text(self):
                     return " ".join(self.text)
 
@@ -151,15 +157,18 @@ class Orchestrator:
 
     def _store_processing_result(self, pipeline_id: str, result: dict) -> None:
         """Persist processing result metrics to the pipeline record."""
-        self.repo.update_processing_result(pipeline_id, {
-            "quality_score": result.get("quality_score"),
-            "detection_confidence": result.get("detection_confidence"),
-            "detection_method": result.get("detection_method"),
-            "chapter_count": result.get("chapter_count"),
-            "word_count": result.get("word_count"),
-            "warnings": result.get("warnings", []),
-            "llm_fallback_used": result.get("llm_fallback_used", False),
-        })
+        self.repo.update_processing_result(
+            pipeline_id,
+            {
+                "quality_score": result.get("quality_score"),
+                "detection_confidence": result.get("detection_confidence"),
+                "detection_method": result.get("detection_method"),
+                "chapter_count": result.get("chapter_count"),
+                "word_count": result.get("word_count"),
+                "warnings": result.get("warnings", []),
+                "llm_fallback_used": result.get("llm_fallback_used", False),
+            },
+        )
 
     def _run_processing(self, book_path: str, book_id: Optional[str] = None, force_fallback: bool = False) -> dict:
         """Run book-ingestion processing via direct library call.
@@ -212,9 +221,9 @@ class Orchestrator:
         """Delete existing book/chapter data before retry processing."""
         try:
             with get_pipeline_db(self.config.db_path) as conn:
-                ch_ids = [r[0] for r in conn.execute(
-                    "SELECT id FROM chapters WHERE book_id = ?", (book_id,)
-                ).fetchall()]
+                ch_ids = [
+                    r[0] for r in conn.execute("SELECT id FROM chapters WHERE book_id = ?", (book_id,)).fetchall()
+                ]
                 if ch_ids:
                     placeholders = ",".join("?" * len(ch_ids))
                     for table in ("chapters_fts", "chapter_summaries", "chunks"):
@@ -289,11 +298,7 @@ class Orchestrator:
         except Exception as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
             self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
-            return {
-                "pipeline_id": pipeline_id,
-                "state": PipelineState.NEEDS_RETRY.value,
-                "error": str(e)
-            }
+            return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
     def reprocess_existing(self, pipeline_id: str, book_path: str, content_hash: str) -> dict:
         """Drive an already-created pipeline record through the full processing states.
@@ -303,6 +308,7 @@ class Orchestrator:
         this method skips hashing, idempotency checks, and record creation.
         """
         import time
+
         start_time = time.time()
         self.logger.processing_started(pipeline_id, book_path)
         try:
@@ -353,9 +359,7 @@ class Orchestrator:
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
         validator = ExtractionValidator()
-        validation = validator.validate(
-            book_id=pipeline_id, db_path=str(self.config.db_path)
-        )
+        validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
 
         if not validation.passed:
             # Check if we can retry with force_fallback
@@ -396,9 +400,7 @@ class Orchestrator:
 
                 # Re-validate
                 self._transition(pipeline_id, PipelineState.VALIDATING)
-                validation = validator.validate(
-                    book_id=pipeline_id, db_path=str(self.config.db_path)
-                )
+                validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
 
             if not validation.passed:
                 reason = "; ".join(validation.reasons)
@@ -440,7 +442,7 @@ class Orchestrator:
                 "state": PipelineState.PENDING_APPROVAL.value,
                 "book_type": profile.get("book_type"),
                 "confidence": confidence,
-                "needs_review": True
+                "needs_review": True,
             }
 
         # EMBEDDING → COMPLETE (delegate to shared helper)
@@ -455,13 +457,16 @@ class Orchestrator:
         if sys.platform != "darwin":
             return
         try:
-            safe_name = book_name.replace('\\', '').replace('"', "'").replace("'", "\u2019")
-            subprocess.Popen([
-                "osascript", "-e",
-                f'display notification "\\"{safe_name}\\" needs approval (confidence: {confidence:.0%})" '
-                f'with title "Agentic Pipeline" subtitle "Book Pending Approval" '
-                f'sound name "Purr"',
-            ])
+            safe_name = book_name.replace("\\", "").replace('"', "'").replace("'", "\u2019")
+            subprocess.Popen(
+                [
+                    "osascript",
+                    "-e",
+                    f'display notification "\\"{safe_name}\\" needs approval (confidence: {confidence:.0%})" '
+                    f'with title "Agentic Pipeline" subtitle "Book Pending Approval" '
+                    f'sound name "Purr"',
+                ]
+            )
         except Exception as e:
             logger.debug("Notification failed (non-critical): %s", e)
 
@@ -505,9 +510,7 @@ class Orchestrator:
         self.logger.retry_scheduled(book["id"], new_count)
 
         try:
-            return self._process_book(
-                book["id"], book["source_path"], book["content_hash"]
-            )
+            return self._process_book(book["id"], book["source_path"], book["content_hash"])
         except Exception as e:
             self.logger.error(book["id"], type(e).__name__, str(e))
             return {

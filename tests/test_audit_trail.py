@@ -21,13 +21,7 @@ def test_log_approval(db_path):
     from agentic_pipeline.audit import AuditTrail
 
     trail = AuditTrail(db_path)
-    trail.log(
-        book_id="book123",
-        pipeline_id="pipe456",
-        action="APPROVED",
-        actor="human:taylor",
-        confidence=0.95
-    )
+    trail.log(book_id="book123", pipeline_id="pipe456", action="APPROVED", actor="human:taylor", confidence=0.95)
 
     entries = trail.query(book_id="book123")
     assert len(entries) == 1
@@ -39,12 +33,7 @@ def test_log_rejection_with_reason(db_path):
     from agentic_pipeline.audit import AuditTrail
 
     trail = AuditTrail(db_path)
-    trail.log(
-        book_id="book123",
-        action="REJECTED",
-        actor="human:taylor",
-        reason="Not a technical book"
-    )
+    trail.log(book_id="book123", action="REJECTED", actor="human:taylor", reason="Not a technical book")
 
     entries = trail.query(book_id="book123")
     assert entries[0]["reason"] == "Not a technical book"
@@ -93,7 +82,7 @@ def test_log_batch_operation_with_filter(db_path):
         book_id="batch",
         action="BATCH_APPROVED",
         actor="batch:filter_abc",
-        filter_used={"min_confidence": 0.9, "book_type": "technical_tutorial"}
+        filter_used={"min_confidence": 0.9, "book_type": "technical_tutorial"},
     )
 
     entries = trail.query(action="BATCH_APPROVED")

@@ -28,30 +28,47 @@ DEPTH_CONFIGS = {
         "source_limit": 3,
         "min_similarity": 0.35,
         "output_sections": ["summary", "business_impact", "vocabulary"],
-        "detail_level": "minimal"
+        "detail_level": "minimal",
     },
     "working": {
         "description": "10-minute read. Enough to discuss intelligently with engineers.",
         "source_limit": 5,
         "min_similarity": 0.30,
-        "output_sections": ["summary", "what_it_is", "business_impact", "vocabulary",
-                          "decisions", "prerequisites", "related"],
-        "detail_level": "moderate"
+        "output_sections": [
+            "summary",
+            "what_it_is",
+            "business_impact",
+            "vocabulary",
+            "decisions",
+            "prerequisites",
+            "related",
+        ],
+        "detail_level": "moderate",
     },
     "practitioner": {
         "description": "30-minute read. Enough to evaluate decisions or do basic work.",
         "source_limit": 8,
         "min_similarity": 0.25,
-        "output_sections": ["summary", "what_it_is", "how_it_works", "business_impact",
-                          "vocabulary", "decisions", "tradeoffs", "examples",
-                          "prerequisites", "related", "deep_reading"],
-        "detail_level": "comprehensive"
-    }
+        "output_sections": [
+            "summary",
+            "what_it_is",
+            "how_it_works",
+            "business_impact",
+            "vocabulary",
+            "decisions",
+            "tradeoffs",
+            "examples",
+            "prerequisites",
+            "related",
+            "deep_reading",
+        ],
+        "detail_level": "comprehensive",
+    },
 }
 
 OUTPUT_FORMATS = {
     "markdown": "Structured markdown document for saving/reference",
-    "conversational": "Natural explanation for dialogue"
+    "conversational": "Natural explanation for dialogue",
 }
 
 
@@ -63,45 +80,44 @@ CONCEPT_ANALOGIES = {
     # Version Control / Git
     "git": {
         "analogy": "Git is like having a corporate document management system with unlimited 'undo' and parallel workstreams. Imagine if every change to a proposal created a timestamped backup, and multiple teams could work on different versions simultaneously without overwriting each other.",
-        "pm_context": "Think of branches like parallel project workstreams - you can run experiments without affecting the main deliverable."
+        "pm_context": "Think of branches like parallel project workstreams - you can run experiments without affecting the main deliverable.",
     },
     "branch": {
         "analogy": "A branch is like creating a sandbox copy of a project for experimentation. It's as if you could duplicate your entire project plan, try risky changes, and only merge back the ideas that work.",
-        "pm_context": "Like spinning up a pilot program that doesn't affect production operations until proven successful."
+        "pm_context": "Like spinning up a pilot program that doesn't affect production operations until proven successful.",
     },
     "merge": {
         "analogy": "Merging is like reconciling two versions of a project plan after different teams worked on them independently. The system helps identify conflicts where both teams changed the same thing.",
-        "pm_context": "Similar to consolidating feedback from multiple stakeholders into one final document."
+        "pm_context": "Similar to consolidating feedback from multiple stakeholders into one final document.",
     },
     "commit": {
         "analogy": "A commit is like signing off on a milestone checkpoint. It creates a permanent record of the project state at that moment, with notes about what changed and why.",
-        "pm_context": "Think of it as documenting a decision - you're creating an audit trail with rationale."
+        "pm_context": "Think of it as documenting a decision - you're creating an audit trail with rationale.",
     },
     "pull request": {
         "analogy": "A pull request is like a formal change proposal with built-in review workflow. You're saying 'I'd like to incorporate these changes - please review before approving.'",
-        "pm_context": "It's your approval gate - like a stage-gate review before changes go live."
+        "pm_context": "It's your approval gate - like a stage-gate review before changes go live.",
     },
-
     # Containers / Docker
     "docker": {
         "analogy": "Docker is like shipping containers for software. Just as standardized containers revolutionized global shipping (any cargo, any ship, any port), Docker standardizes how software runs (any app, any server, any cloud).",
-        "pm_context": "Eliminates 'it works on my machine' problems. Your team ships predictable, consistent deliverables."
+        "pm_context": "Eliminates 'it works on my machine' problems. Your team ships predictable, consistent deliverables.",
     },
     "container": {
         "analogy": "A container is like a pre-configured, self-sufficient office in a box. It includes everything needed to do the work - the desk, computer, software, even the specific versions of tools - isolated from other 'offices.'",
-        "pm_context": "Reduces deployment risk and environment dependencies. Easier to scale teams and projects."
+        "pm_context": "Reduces deployment risk and environment dependencies. Easier to scale teams and projects.",
     },
-
     # Architecture
     "api": {
         "analogy": "An API is like a standardized interface in an organization. Just as your company has defined processes for how departments request resources from each other, an API defines how software systems make requests.",
-        "pm_context": "APIs create contracts between teams. When defined well, teams can work independently."
+        "pm_context": "APIs create contracts between teams. When defined well, teams can work independently.",
     },
     "microservices": {
         "analogy": "Microservices is like organizing a company into specialized, autonomous teams rather than one monolithic department. Each team owns their deliverable end-to-end.",
-        "pm_context": "Enables parallel workstreams and independent releases. Tradeoff: more coordination overhead."
+        "pm_context": "Enables parallel workstreams and independent releases. Tradeoff: more coordination overhead.",
     },
 }
+
 
 def get_analogy(concept: str) -> dict:
     """Get business/organizational analogy for a concept"""
@@ -123,15 +139,12 @@ def get_analogy(concept: str) -> dict:
 # MAIN TOOL REGISTRATION
 # =============================================================================
 
+
 def register_learning_tools(mcp):
     """Register learning/teaching tools with MCP server"""
 
     @mcp.tool()
-    def teach_concept(
-        concept: str,
-        depth: str = "working",
-        output_format: str = "markdown"
-    ) -> dict:
+    def teach_concept(concept: str, depth: str = "working", output_format: str = "markdown") -> dict:
         """Teach a technical concept with business/organizational analogies
 
         Designed for a Program Manager with MBA background who needs to learn
@@ -169,14 +182,14 @@ def register_learning_tools(mcp):
             if depth not in DEPTH_CONFIGS:
                 return {
                     "error": f"Invalid depth '{depth}'. Use: executive, working, or practitioner",
-                    "valid_depths": list(DEPTH_CONFIGS.keys())
+                    "valid_depths": list(DEPTH_CONFIGS.keys()),
                 }
 
             # Validate output format
             if output_format not in OUTPUT_FORMATS:
                 return {
                     "error": f"Invalid output_format '{output_format}'. Use: markdown or conversational",
-                    "valid_formats": list(OUTPUT_FORMATS.keys())
+                    "valid_formats": list(OUTPUT_FORMATS.keys()),
                 }
 
             config = DEPTH_CONFIGS[depth]
@@ -187,9 +200,7 @@ def register_learning_tools(mcp):
 
             # Search library for relevant content
             sources = _find_relevant_sources(
-                concept,
-                limit=config["source_limit"],
-                min_similarity=config["min_similarity"]
+                concept, limit=config["source_limit"], min_similarity=config["min_similarity"]
             )
 
             if not sources:
@@ -197,7 +208,7 @@ def register_learning_tools(mcp):
                     "concept": concept,
                     "depth": depth,
                     "message": f"No content found about '{concept}' in your library.",
-                    "suggestion": "Try a more specific term or check your library contents with list_books()"
+                    "suggestion": "Try a more specific term or check your library contents with list_books()",
                 }
 
             # Build teaching content
@@ -221,12 +232,14 @@ def register_learning_tools(mcp):
                         "book": s["book_title"],
                         "chapter": s["chapter_title"],
                         "chapter_number": s["chapter_number"],
-                        "relevance": f"{s['similarity']:.0%}"
+                        "relevance": f"{s['similarity']:.0%}",
                     }
                     for s in sources
                 ],
                 "related_concepts": related,
-                "next_steps": f"To go deeper, try: teach_concept('{concept}', depth='practitioner')" if depth != "practitioner" else None
+                "next_steps": f"To go deeper, try: teach_concept('{concept}', depth='practitioner')"
+                if depth != "practitioner"
+                else None,
             }
 
         except Exception as e:
@@ -237,6 +250,7 @@ def register_learning_tools(mcp):
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0.30) -> list:
     """Find relevant sources from the library using chunk-level semantic search"""
@@ -249,19 +263,18 @@ def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0
             query_embedding = generator.generate(query)
 
             # Search at chunk level (fetch extra to ensure enough chapters after aggregation)
-            top_results = find_top_k(
-                query_embedding, embeddings_matrix,
-                k=limit * 3, min_similarity=min_similarity
-            )
+            top_results = find_top_k(query_embedding, embeddings_matrix, k=limit * 3, min_similarity=min_similarity)
 
             chunk_results = []
             for idx, similarity in top_results:
                 meta = chunk_metadata[idx]
-                chunk_results.append({
-                    **meta,
-                    'id': meta['chapter_id'],
-                    'similarity': similarity,
-                })
+                chunk_results.append(
+                    {
+                        **meta,
+                        "id": meta["chapter_id"],
+                        "similarity": similarity,
+                    }
+                )
 
             # Aggregate to chapter level (best chunk per chapter)
             sources = best_chunk_per_chapter(chunk_results)[:limit]
@@ -273,8 +286,7 @@ def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0
         return []
 
 
-def _build_markdown_content(concept: str, depth: str, config: dict,
-                            analogy_data: dict, sources: list) -> str:
+def _build_markdown_content(concept: str, depth: str, config: dict, analogy_data: dict, sources: list) -> str:
     """Build structured markdown teaching content"""
     lines = []
 
@@ -341,14 +353,15 @@ def _build_markdown_content(concept: str, depth: str, config: dict,
         lines.append("*Deeper reading from your library:*")
         lines.append("")
         for s in sources[:5]:
-            lines.append(f"- **{s['book_title']}** — Chapter {s['chapter_number']}: {s['chapter_title']} ({s['similarity']:.0%} relevant)")
+            lines.append(
+                f"- **{s['book_title']}** — Chapter {s['chapter_number']}: {s['chapter_title']} ({s['similarity']:.0%} relevant)"
+            )
         lines.append("")
 
     return "\n".join(lines)
 
 
-def _build_conversational_content(concept: str, depth: str, config: dict,
-                                   analogy_data: dict, sources: list) -> str:
+def _build_conversational_content(concept: str, depth: str, config: dict, analogy_data: dict, sources: list) -> str:
     """Build natural conversational teaching content"""
     parts = []
 
@@ -397,7 +410,9 @@ def _build_conversational_content(concept: str, depth: str, config: dict,
     # Close with sources
     parts.append("")
     if sources:
-        parts.append(f"This is based on what I found in your library, primarily from '{sources[0]['book_title']}' if you want to dig deeper.")
+        parts.append(
+            f"This is based on what I found in your library, primarily from '{sources[0]['book_title']}' if you want to dig deeper."
+        )
 
     return "\n".join(parts)
 
@@ -408,10 +423,10 @@ def _generate_quick_summary(concept: str, sources: list) -> str:
         return f"{concept} is a technical concept used in software development."
 
     # Use the most relevant excerpt as the basis
-    best_excerpt = sources[0].get('excerpt', '')
+    best_excerpt = sources[0].get("excerpt", "")
     if best_excerpt:
         # Return a cleaned version of the first paragraph
-        paragraphs = best_excerpt.split('\n\n')
+        paragraphs = best_excerpt.split("\n\n")
         return paragraphs[0][:500] if paragraphs else best_excerpt[:500]
 
     return f"Based on your library, {concept} appears in discussions about {sources[0]['book_title']}."
@@ -422,7 +437,7 @@ def _synthesize_definition(concept: str, sources: list) -> str:
     if not sources:
         return ""
 
-    excerpts = [s.get('excerpt', '')[:400] for s in sources[:3] if s.get('excerpt')]
+    excerpts = [s.get("excerpt", "")[:400] for s in sources[:3] if s.get("excerpt")]
     if excerpts:
         return "\n\n".join(excerpts)
     return ""
@@ -432,9 +447,24 @@ def _generate_business_impact(concept: str, sources: list) -> str:
     """Generate business impact statement from source excerpts."""
     # Try to extract impact-related content from sources
     impact_keywords = [
-        "benefit", "advantage", "improve", "reduce", "enable", "save",
-        "cost", "risk", "scale", "performance", "reliable", "maintain",
-        "team", "deploy", "product", "customer", "business", "efficien",
+        "benefit",
+        "advantage",
+        "improve",
+        "reduce",
+        "enable",
+        "save",
+        "cost",
+        "risk",
+        "scale",
+        "performance",
+        "reliable",
+        "maintain",
+        "team",
+        "deploy",
+        "product",
+        "customer",
+        "business",
+        "efficien",
     ]
 
     impact_sentences = []
@@ -472,9 +502,7 @@ def _extract_vocabulary(concept: str, sources: list) -> dict:
             continue
 
         # Match markdown bold definitions: **term** — definition or **term**: definition
-        for match in re.finditer(
-            r"\*\*([^*]{2,40})\*\*\s*[:\u2014\u2013\-]\s*(.{10,120})", excerpt
-        ):
+        for match in re.finditer(r"\*\*([^*]{2,40})\*\*\s*[:\u2014\u2013\-]\s*(.{10,120})", excerpt):
             term = match.group(1).strip()
             defn = match.group(2).strip().rstrip(".")
             if term.lower() != concept.lower():
@@ -501,9 +529,20 @@ def _extract_vocabulary(concept: str, sources: list) -> dict:
 def _generate_decisions(concept: str, sources: list) -> str:
     """Generate common decisions from source excerpts."""
     decision_keywords = [
-        "choose", "decision", "option", "consider", "whether",
-        "trade-off", "tradeoff", "versus", " vs ", "alternative",
-        "should", "recommend", "approach", "strategy",
+        "choose",
+        "decision",
+        "option",
+        "consider",
+        "whether",
+        "trade-off",
+        "tradeoff",
+        "versus",
+        " vs ",
+        "alternative",
+        "should",
+        "recommend",
+        "approach",
+        "strategy",
     ]
 
     decision_sentences = []
@@ -530,9 +569,21 @@ def _generate_decisions(concept: str, sources: list) -> str:
 def _generate_tradeoffs(concept: str, sources: list) -> str:
     """Generate tradeoff analysis from source excerpts."""
     tradeoff_keywords = [
-        "tradeoff", "trade-off", "downside", "drawback", "however",
-        "but", "although", "cost", "complex", "overhead", "risk",
-        "limitation", "caveat", "challenge", "disadvantage",
+        "tradeoff",
+        "trade-off",
+        "downside",
+        "drawback",
+        "however",
+        "but",
+        "although",
+        "cost",
+        "complex",
+        "overhead",
+        "risk",
+        "limitation",
+        "caveat",
+        "challenge",
+        "disadvantage",
     ]
 
     tradeoff_sentences = []
@@ -586,11 +637,11 @@ def _extract_related_concepts(concept: str, sources: list) -> list:
 def _split_sentences(text: str) -> list[str]:
     """Split text into sentences, handling common abbreviations."""
     import re
+
     # Split on period followed by space and uppercase, or newlines
-    parts = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    parts = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text)
     # Also split on double newlines
     result = []
     for part in parts:
         result.extend(part.split("\n\n"))
     return [s.strip() for s in result if s.strip()]
-

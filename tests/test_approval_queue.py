@@ -27,11 +27,9 @@ def test_get_pending_returns_formatted_queue(db_path):
     # Setup: create a pending pipeline
     repo = PipelineRepository(db_path)
     pid = repo.create("/path/to/book.epub", "hash123")
-    repo.update_book_profile(pid, {
-        "book_type": "technical_tutorial",
-        "confidence": 0.92,
-        "suggested_tags": ["ai", "python"]
-    })
+    repo.update_book_profile(
+        pid, {"book_type": "technical_tutorial", "confidence": 0.92, "suggested_tags": ["ai", "python"]}
+    )
     transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
 
     # Test

@@ -51,9 +51,8 @@ def _insert_library_book(db_path, book_id, title, source_file, chapters=3):
     )
     for i in range(chapters):
         conn.execute(
-            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), book_id, f"Chapter {i+1}", f"ch{i}.md", 3000, b"fake-emb"),
+            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), book_id, f"Chapter {i + 1}", f"ch{i}.md", 3000, b"fake-emb"),
         )
     conn.commit()
     conn.close()

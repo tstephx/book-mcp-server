@@ -108,8 +108,7 @@ class BackfillManager:
                 (book_id, pipeline_id, action, actor, reason)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (book_id, book_id, "backfill", "backfill:automated",
-                 "Legacy book registered in pipeline"),
+                (book_id, book_id, "backfill", "backfill:automated", "Legacy book registered in pipeline"),
             )
             conn.commit()
 

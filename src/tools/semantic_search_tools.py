@@ -58,9 +58,7 @@ def register_semantic_search_tools(mcp):
         """
         try:
             try:
-                validated = SemanticSearchInput(
-                    query=query, limit=limit, min_similarity=min_similarity
-                )
+                validated = SemanticSearchInput(query=query, limit=limit, min_similarity=min_similarity)
             except Exception as e:
                 return {"error": f"Invalid input: {e}", "results": []}
 
@@ -88,16 +86,18 @@ def register_semantic_search_tools(mcp):
             candidates = []
             for idx, similarity in top_results:
                 meta = chunk_metadata[idx]
-                candidates.append({
-                    "chapter_id": meta["chapter_id"],
-                    "chunk_id": meta["chunk_id"],
-                    "book_id": meta["book_id"],
-                    "book_title": meta["book_title"],
-                    "chapter_title": meta["chapter_title"],
-                    "chapter_number": meta["chapter_number"],
-                    "similarity": round(similarity, 3),
-                    "chunk_content": meta["content"],
-                })
+                candidates.append(
+                    {
+                        "chapter_id": meta["chapter_id"],
+                        "chunk_id": meta["chunk_id"],
+                        "book_id": meta["book_id"],
+                        "book_title": meta["book_title"],
+                        "chapter_title": meta["chapter_title"],
+                        "chapter_number": meta["chapter_number"],
+                        "similarity": round(similarity, 3),
+                        "chunk_content": meta["content"],
+                    }
+                )
 
             # Rerank
             if rerank and candidates:
@@ -113,14 +113,16 @@ def register_semantic_search_tools(mcp):
             # Format output
             results = []
             for r in candidates:
-                results.append({
-                    "book_title": r["book_title"],
-                    "chapter_title": r["chapter_title"],
-                    "chapter_number": r["chapter_number"],
-                    "similarity": r.get("similarity", 0),
-                    "rerank_score": r.get("rerank_score"),
-                    "excerpt": _truncate(r["chunk_content"], 500),
-                })
+                results.append(
+                    {
+                        "book_title": r["book_title"],
+                        "chapter_title": r["chapter_title"],
+                        "chapter_number": r["chapter_number"],
+                        "similarity": r.get("similarity", 0),
+                        "rerank_score": r.get("rerank_score"),
+                        "excerpt": _truncate(r["chunk_content"], 500),
+                    }
+                )
 
             return {
                 "query": validated.query,

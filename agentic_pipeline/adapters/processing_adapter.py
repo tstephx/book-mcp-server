@@ -84,9 +84,7 @@ class ProcessingAdapter:
         # Create LLM fallback if enabled
         llm_fallback = None
         if enable_llm_fallback:
-            llm_fallback = LLMFallbackAdapter(
-                confidence_threshold=llm_fallback_threshold
-            )
+            llm_fallback = LLMFallbackAdapter(confidence_threshold=llm_fallback_threshold)
 
         # Create the book ingestion app
         self._app = BookIngestionApp.create(
@@ -159,9 +157,7 @@ class ProcessingAdapter:
                 needs_review=pipeline_result.needs_review,
                 warnings=pipeline_result.warnings,
                 chapter_count=len(pipeline_result.chapters),
-                word_count=sum(
-                    ch.get("word_count", 0) for ch in pipeline_result.chapters
-                ),
+                word_count=sum(ch.get("word_count", 0) for ch in pipeline_result.chapters),
                 llm_fallback_used=result.llm_fallback_used,
             )
 
@@ -243,27 +239,25 @@ class ProcessingAdapter:
 
                 for ch in chapters:
                     try:
-                        content = read_chapter_content(
-                            ch["file_path"], books_dir
-                        )
+                        content = read_chapter_content(ch["file_path"], books_dir)
                         if not content.strip():
                             continue
 
                         chunks = chunk_chapter(content)
                         for chunk in chunks:
                             chunk_id = f"{ch['id']}:{chunk['chunk_index']}"
-                            content_hash = hashlib.sha256(
-                                chunk["content"].encode()
-                            ).hexdigest()
-                            all_chunk_rows.append((
-                                chunk_id,
-                                ch["id"],
-                                ch["book_id"],
-                                chunk["chunk_index"],
-                                chunk["content"],
-                                chunk["word_count"],
-                                content_hash,
-                            ))
+                            content_hash = hashlib.sha256(chunk["content"].encode()).hexdigest()
+                            all_chunk_rows.append(
+                                (
+                                    chunk_id,
+                                    ch["id"],
+                                    ch["book_id"],
+                                    chunk["chunk_index"],
+                                    chunk["content"],
+                                    chunk["word_count"],
+                                    content_hash,
+                                )
+                            )
 
                         chapters_processed += 1
 
@@ -271,9 +265,7 @@ class ProcessingAdapter:
                         logger.warning(f"Cannot chunk chapter {ch['id']}: {e}")
 
                 if not all_chunk_rows:
-                    return EmbeddingResult(
-                        success=True, chapters_processed=chapters_processed
-                    )
+                    return EmbeddingResult(success=True, chapters_processed=chapters_processed)
 
                 # Insert chunk rows
                 cursor.executemany(
@@ -308,9 +300,7 @@ class ProcessingAdapter:
 
                     conn.commit()
 
-                logger.info(
-                    f"Embedded {chunks_embedded} chunks from {chapters_processed} chapters"
-                )
+                logger.info(f"Embedded {chunks_embedded} chunks from {chapters_processed} chapters")
                 return EmbeddingResult(
                     success=True,
                     chapters_processed=chapters_processed,
@@ -353,7 +343,5 @@ class ProcessingAdapter:
             "status": book.get("processing_status"),
             "chapter_count": len(chapters),
             "word_count": book.get("word_count", 0),
-            "has_embeddings": any(
-                ch.get("has_embedding", False) for ch in chapters
-            ),
+            "has_embeddings": any(ch.get("has_embedding", False) for ch in chapters),
         }

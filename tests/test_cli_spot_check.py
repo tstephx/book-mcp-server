@@ -53,6 +53,7 @@ def _patch_title(title="Test Book"):
 def _patch_submit(submitted):
     def _record(**kwargs):
         submitted.append(kwargs)
+
     return patch(
         "agentic_pipeline.autonomy.spot_check.SpotCheckManager.submit_result",
         side_effect=_record,
@@ -88,10 +89,7 @@ def test_spot_check_list_no_candidates(runner, db_path):
 def test_spot_check_list_shows_full_unsampled_count(runner, db_path):
     """--list uses the full unsampled list, not the 10% sample."""
     # 10 books in the full list — if sampling were applied, fewer would show
-    all_books = [
-        dict(MOCK_BOOK, book_id=f"abc12345-0000-0000-0000-00000000000{i}")
-        for i in range(10)
-    ]
+    all_books = [dict(MOCK_BOOK, book_id=f"abc12345-0000-0000-0000-00000000000{i}") for i in range(10)]
     with _patch_db(db_path), _patch_all_unreviewed(all_books), _patch_title("Test Book"):
         result = runner.invoke(main, ["spot-check", "--list"])
 

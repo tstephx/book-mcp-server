@@ -32,10 +32,13 @@ def test_full_batch_approve_flow(db_path):
     for i in range(5):
         pid = repo.create(f"/book{i}.epub", f"hash{i}")
         transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
-        repo.update_book_profile(pid, {
-            "book_type": "technical_tutorial",
-            "confidence": 0.85 + (i * 0.03)  # 0.85, 0.88, 0.91, 0.94, 0.97
-        })
+        repo.update_book_profile(
+            pid,
+            {
+                "book_type": "technical_tutorial",
+                "confidence": 0.85 + (i * 0.03),  # 0.85, 0.88, 0.91, 0.94, 0.97
+            },
+        )
 
     # Batch approve high confidence
     ops = BatchOperations(db_path)
@@ -106,5 +109,5 @@ def test_priority_queue_ordering(db_path):
 
     # Should be ordered by priority
     assert queue[0]["id"] == id_high  # priority 1
-    assert queue[1]["id"] == id_med   # priority 5
-    assert queue[2]["id"] == id_low   # priority 10
+    assert queue[1]["id"] == id_med  # priority 5
+    assert queue[2]["id"] == id_low  # priority 10

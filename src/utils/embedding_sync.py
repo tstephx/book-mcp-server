@@ -48,7 +48,7 @@ def get_file_mtime(file_path: str | Path) -> float:
 
         if path.is_dir():
             # For split chapters, use latest mtime of parts
-            mtimes = [p.stat().st_mtime for p in path.glob('*.md')]
+            mtimes = [p.stat().st_mtime for p in path.glob("*.md")]
             return max(mtimes) if mtimes else 0
         elif path.is_file():
             return path.stat().st_mtime
@@ -87,11 +87,11 @@ def find_chapters_needing_update(force: bool = False) -> list[dict]:
             rows = cursor.fetchall()
             return [
                 {
-                    'id': row['id'],
-                    'file_path': row['file_path'],
-                    'title': row['title'],
-                    'chapter_number': row['chapter_number'],
-                    'reason': 'forced'
+                    "id": row["id"],
+                    "file_path": row["file_path"],
+                    "title": row["title"],
+                    "chapter_number": row["chapter_number"],
+                    "reason": "forced",
                 }
                 for row in rows
             ]
@@ -109,31 +109,35 @@ def find_chapters_needing_update(force: bool = False) -> list[dict]:
     mtime_updates = []  # Chapters where only mtime needs updating
 
     for row in rows:
-        chapter_id = row['id']
-        file_path = row['file_path']
-        stored_hash = row['content_hash']
-        stored_mtime = row['file_mtime']
+        chapter_id = row["id"]
+        file_path = row["file_path"]
+        stored_hash = row["content_hash"]
+        stored_mtime = row["file_mtime"]
 
         # Case 1: No embedding
-        if row['embedding'] is None:
-            chapters_needing_update.append({
-                'id': chapter_id,
-                'file_path': file_path,
-                'title': row['title'],
-                'chapter_number': row['chapter_number'],
-                'reason': 'new'
-            })
+        if row["embedding"] is None:
+            chapters_needing_update.append(
+                {
+                    "id": chapter_id,
+                    "file_path": file_path,
+                    "title": row["title"],
+                    "chapter_number": row["chapter_number"],
+                    "reason": "new",
+                }
+            )
             continue
 
         # Case 2: No tracking data
         if stored_hash is None or stored_mtime is None:
-            chapters_needing_update.append({
-                'id': chapter_id,
-                'file_path': file_path,
-                'title': row['title'],
-                'chapter_number': row['chapter_number'],
-                'reason': 'no_tracking'
-            })
+            chapters_needing_update.append(
+                {
+                    "id": chapter_id,
+                    "file_path": file_path,
+                    "title": row["title"],
+                    "chapter_number": row["chapter_number"],
+                    "reason": "no_tracking",
+                }
+            )
             continue
 
         # Case 3: Check if file changed
@@ -147,35 +151,36 @@ def find_chapters_needing_update(force: bool = False) -> list[dict]:
 
                 if current_hash != stored_hash:
                     # Content actually changed
-                    chapters_needing_update.append({
-                        'id': chapter_id,
-                        'file_path': file_path,
-                        'title': row['title'],
-                        'chapter_number': row['chapter_number'],
-                        'reason': 'modified'
-                    })
+                    chapters_needing_update.append(
+                        {
+                            "id": chapter_id,
+                            "file_path": file_path,
+                            "title": row["title"],
+                            "chapter_number": row["chapter_number"],
+                            "reason": "modified",
+                        }
+                    )
                 else:
                     # File touched but content unchanged, just update mtime
                     mtime_updates.append((current_mtime, chapter_id))
             except Exception as e:
                 logger.warning(f"Error checking chapter {chapter_id}: {e}")
                 # If we can't read it, mark for update to surface the error
-                chapters_needing_update.append({
-                    'id': chapter_id,
-                    'file_path': file_path,
-                    'title': row['title'],
-                    'chapter_number': row['chapter_number'],
-                    'reason': 'error'
-                })
+                chapters_needing_update.append(
+                    {
+                        "id": chapter_id,
+                        "file_path": file_path,
+                        "title": row["title"],
+                        "chapter_number": row["chapter_number"],
+                        "reason": "error",
+                    }
+                )
 
     # Update mtimes for unchanged content
     if mtime_updates:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.executemany(
-                "UPDATE chapters SET file_mtime = ? WHERE id = ?",
-                mtime_updates
-            )
+            cursor.executemany("UPDATE chapters SET file_mtime = ? WHERE id = ?", mtime_updates)
             conn.commit()
         logger.debug(f"Updated mtime for {len(mtime_updates)} unchanged chapters")
 
@@ -183,9 +188,7 @@ def find_chapters_needing_update(force: bool = False) -> list[dict]:
 
 
 def update_embeddings_incremental(
-    batch_size: int = 50,
-    force: bool = False,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    batch_size: int = 50, force: bool = False, progress_callback: Optional[Callable[[int, int], None]] = None
 ) -> dict:
     """Incrementally update embeddings for changed chapters
 
@@ -204,11 +207,11 @@ def update_embeddings_incremental(
 
     if not chapters_to_update:
         return {
-            'status': 'no_updates_needed',
-            'updated': 0,
-            'skipped': 0,
-            'errors': 0,
-            'duration_seconds': round(time.time() - start_time, 2)
+            "status": "no_updates_needed",
+            "updated": 0,
+            "skipped": 0,
+            "errors": 0,
+            "duration_seconds": round(time.time() - start_time, 2),
         }
 
     logger.info(f"Found {len(chapters_to_update)} chapters needing embedding update")
@@ -224,7 +227,7 @@ def update_embeddings_incremental(
 
     # Process in batches
     for i in range(0, len(chapters_to_update), batch_size):
-        batch = chapters_to_update[i:i + batch_size]
+        batch = chapters_to_update[i : i + batch_size]
 
         # Read content for batch
         batch_contents = []
@@ -232,7 +235,7 @@ def update_embeddings_incremental(
 
         for chapter in batch:
             try:
-                content = read_chapter_content(chapter['file_path'])
+                content = read_chapter_content(chapter["file_path"])
                 batch_contents.append(content)
                 batch_valid.append(chapter)
             except Exception as e:
@@ -263,10 +266,11 @@ def update_embeddings_incremental(
 
                     # Compute tracking data
                     content_hash = compute_content_hash(content)
-                    file_mtime = get_file_mtime(chapter['file_path'])
+                    file_mtime = get_file_mtime(chapter["file_path"])
 
                     # Update database
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE chapters
                         SET embedding = ?,
                             embedding_model = ?,
@@ -274,14 +278,9 @@ def update_embeddings_incremental(
                             file_mtime = ?,
                             embedding_updated_at = ?
                         WHERE id = ?
-                    """, (
-                        embedding_bytes,
-                        'text-embedding-3-large',
-                        content_hash,
-                        file_mtime,
-                        now,
-                        chapter['id']
-                    ))
+                    """,
+                        (embedding_bytes, "text-embedding-3-large", content_hash, file_mtime, now, chapter["id"]),
+                    )
 
                     updated += 1
 
@@ -308,16 +307,16 @@ def update_embeddings_incremental(
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM chapters")
-        total_chapters = cursor.fetchone()['count']
+        total_chapters = cursor.fetchone()["count"]
 
     skipped = total_chapters - updated - errors
 
     result = {
-        'status': 'updated',
-        'updated': updated,
-        'skipped': skipped,
-        'errors': errors,
-        'duration_seconds': duration
+        "status": "updated",
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+        "duration_seconds": duration,
     }
 
     logger.info(f"Embedding sync complete: {result}")

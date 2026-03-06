@@ -98,6 +98,7 @@ def test_create_backfill_uses_book_id_as_pipeline_id(db_path):
 def _insert_library_book(db_path, book_id, title, source_file, chapters=3):
     """Insert a fake library book with chapters."""
     import uuid
+
     conn = sqlite3.connect(db_path)
     conn.execute(
         "INSERT INTO books (id, title, author, source_file, word_count) VALUES (?, ?, ?, ?, ?)",
@@ -105,9 +106,8 @@ def _insert_library_book(db_path, book_id, title, source_file, chapters=3):
     )
     for i in range(chapters):
         conn.execute(
-            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), book_id, f"Chapter {i+1}", f"ch{i}.md", 3000, b"fake-emb"),
+            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), book_id, f"Chapter {i + 1}", f"ch{i}.md", 3000, b"fake-emb"),
         )
     conn.commit()
     conn.close()
@@ -290,9 +290,8 @@ def test_validator_finds_missing_embeddings(db_path):
     for i in range(3):
         emb = b"fake" if i == 0 else None
         conn.execute(
-            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), "book-partial", f"Ch {i+1}", f"ch{i}.md", 3000, emb),
+            "INSERT INTO chapters (id, book_id, title, file_path, word_count, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(uuid.uuid4()), "book-partial", f"Ch {i + 1}", f"ch{i}.md", 3000, emb),
         )
     conn.commit()
     conn.close()

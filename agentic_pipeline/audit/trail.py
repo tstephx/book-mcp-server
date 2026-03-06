@@ -31,25 +31,28 @@ class AuditTrail:
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO approval_audit
                 (book_id, pipeline_id, action, actor, reason, before_state, after_state,
                  adjustments, filter_used, confidence_at_decision, autonomy_mode, session_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                book_id,
-                pipeline_id,
-                action,
-                actor,
-                reason,
-                json.dumps(before_state) if before_state else None,
-                json.dumps(after_state) if after_state else None,
-                json.dumps(adjustments) if adjustments else None,
-                json.dumps(filter_used) if filter_used else None,
-                confidence,
-                autonomy_mode,
-                session_id,
-            ))
+            """,
+                (
+                    book_id,
+                    pipeline_id,
+                    action,
+                    actor,
+                    reason,
+                    json.dumps(before_state) if before_state else None,
+                    json.dumps(after_state) if after_state else None,
+                    json.dumps(adjustments) if adjustments else None,
+                    json.dumps(filter_used) if filter_used else None,
+                    confidence,
+                    autonomy_mode,
+                    session_id,
+                ),
+            )
 
             entry_id = cursor.lastrowid
             conn.commit()
@@ -88,12 +91,15 @@ class AuditTrail:
 
             where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT * FROM approval_audit
                 {where}
                 ORDER BY performed_at DESC
                 LIMIT ?
-            """, params + [limit])
+            """,
+                params + [limit],
+            )
 
             rows = cursor.fetchall()
 

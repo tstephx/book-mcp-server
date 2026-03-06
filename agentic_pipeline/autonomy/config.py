@@ -33,7 +33,7 @@ class AutonomyConfig:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE autonomy_config SET current_mode = ?, updated_at = ? WHERE id = 1",
-                (mode, datetime.now(timezone.utc).isoformat())
+                (mode, datetime.now(timezone.utc).isoformat()),
             )
             conn.commit()
 
@@ -42,26 +42,32 @@ class AutonomyConfig:
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             now = datetime.now(timezone.utc).isoformat()
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE autonomy_config SET
                     escape_hatch_active = TRUE,
                     escape_hatch_activated_at = ?,
                     escape_hatch_reason = ?,
                     updated_at = ?
                 WHERE id = 1
-            """, (now, reason, now))
+            """,
+                (now, reason, now),
+            )
             conn.commit()
 
     def deactivate_escape_hatch(self) -> None:
         """Deactivate escape hatch."""
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE autonomy_config SET
                     escape_hatch_active = FALSE,
                     updated_at = ?
                 WHERE id = 1
-            """, (datetime.now(timezone.utc).isoformat(),))
+            """,
+                (datetime.now(timezone.utc).isoformat(),),
+            )
             conn.commit()
 
     def is_escape_hatch_active(self) -> bool:
@@ -78,7 +84,7 @@ class AutonomyConfig:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT auto_approve_threshold, manual_override FROM autonomy_thresholds WHERE book_type = ?",
-                (book_type,)
+                (book_type,),
             )
             row = cursor.fetchone()
 

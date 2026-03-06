@@ -62,16 +62,20 @@ def chunk_all_books(db_path: str, dry_run: bool = False) -> dict:
                 if not dry_run:
                     for chunk in chunks:
                         chunk_id = f"{ch['id']}:{chunk['chunk_index']}"
-                        content_hash = hashlib.sha256(
-                            chunk["content"].encode()
-                        ).hexdigest()
+                        content_hash = hashlib.sha256(chunk["content"].encode()).hexdigest()
                         cursor.execute(
                             """INSERT OR REPLACE INTO chunks
                             (id, chapter_id, book_id, chunk_index, content, word_count, content_hash)
                             VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                            (chunk_id, ch["id"], ch["book_id"],
-                             chunk["chunk_index"], chunk["content"],
-                             chunk["word_count"], content_hash),
+                            (
+                                chunk_id,
+                                ch["id"],
+                                ch["book_id"],
+                                chunk["chunk_index"],
+                                chunk["content"],
+                                chunk["word_count"],
+                                content_hash,
+                            ),
                         )
                         total_chunks += 1
                 else:
@@ -90,8 +94,7 @@ def chunk_all_books(db_path: str, dry_run: bool = False) -> dict:
         }
 
 
-def embed_all_chunks(db_path: str, dry_run: bool = False,
-                     batch_size: int = 30) -> dict:
+def embed_all_chunks(db_path: str, dry_run: bool = False, batch_size: int = 30) -> dict:
     """Embed all chunks that don't yet have embeddings.
 
     Args:
@@ -124,14 +127,12 @@ def embed_all_chunks(db_path: str, dry_run: bool = False,
         generator = OpenAIEmbeddingGenerator()
 
         # Fetch chunks without embeddings
-        cursor.execute(
-            "SELECT id, content FROM chunks WHERE embedding IS NULL"
-        )
+        cursor.execute("SELECT id, content FROM chunks WHERE embedding IS NULL")
         rows = cursor.fetchall()
 
         chunks_embedded = 0
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             texts = [r["content"] for r in batch]
             ids = [r["id"] for r in batch]
 

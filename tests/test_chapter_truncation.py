@@ -1,4 +1,5 @@
 """Tests that get_chapter and get_section apply a default token cap."""
+
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 import sys
@@ -18,6 +19,7 @@ def _register_tools(mcp):
     mcp.tool.return_value = tool_decorator
 
     from src.tools.chapter_tools import register_chapter_tools
+
     register_chapter_tools(mcp)
     return captured
 
@@ -32,11 +34,12 @@ def test_get_section_truncates_by_default(tmp_path):
     mcp = MagicMock()
     captured = _register_tools(mcp)
 
-    with patch("src.tools.chapter_tools.execute_single") as mock_db, \
-         patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
-         patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
-
+    with (
+        patch("src.tools.chapter_tools.execute_single") as mock_db,
+        patch("src.tools.chapter_tools._find_chapter_path") as mock_path,
+        patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"),
+        patch("src.tools.chapter_tools.validate_chapter_number", return_value=1),
+    ):
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
         mock_path.return_value = (chapter_dir, True)  # is_folder=True
 
@@ -57,11 +60,12 @@ def test_get_section_explicit_max_tokens_overrides_default(tmp_path):
     mcp = MagicMock()
     captured = _register_tools(mcp)
 
-    with patch("src.tools.chapter_tools.execute_single") as mock_db, \
-         patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
-         patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
-
+    with (
+        patch("src.tools.chapter_tools.execute_single") as mock_db,
+        patch("src.tools.chapter_tools._find_chapter_path") as mock_path,
+        patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"),
+        patch("src.tools.chapter_tools.validate_chapter_number", return_value=1),
+    ):
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
         mock_path.return_value = (chapter_dir, True)
 
@@ -79,11 +83,12 @@ def test_get_chapter_truncates_by_default(tmp_path):
     mcp = MagicMock()
     captured = _register_tools(mcp)
 
-    with patch("src.tools.chapter_tools.execute_single") as mock_db, \
-         patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
-         patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
-
+    with (
+        patch("src.tools.chapter_tools.execute_single") as mock_db,
+        patch("src.tools.chapter_tools._find_chapter_path") as mock_path,
+        patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"),
+        patch("src.tools.chapter_tools.validate_chapter_number", return_value=1),
+    ):
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
         mock_path.return_value = (chapter_dir, True)
 
@@ -104,11 +109,12 @@ def test_get_chapter_explicit_max_tokens_overrides_default(tmp_path):
     mcp = MagicMock()
     captured = _register_tools(mcp)
 
-    with patch("src.tools.chapter_tools.execute_single") as mock_db, \
-         patch("src.tools.chapter_tools._find_chapter_path") as mock_path, \
-         patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"), \
-         patch("src.tools.chapter_tools.validate_chapter_number", return_value=1):
-
+    with (
+        patch("src.tools.chapter_tools.execute_single") as mock_db,
+        patch("src.tools.chapter_tools._find_chapter_path") as mock_path,
+        patch("src.tools.chapter_tools.resolve_book_id", return_value="bookid123"),
+        patch("src.tools.chapter_tools.validate_chapter_number", return_value=1),
+    ):
         mock_db.return_value = {"title": "Ch1", "file_path": str(chapter_dir / "ch01.md"), "word_count": 10000}
         mock_path.return_value = (chapter_dir, True)
 

@@ -30,7 +30,7 @@ def split_paragraphs(content: str, min_length: int = 50) -> list[str]:
         List of paragraph strings, filtered and merged as needed
     """
     # Split on double newlines or markdown headers
-    raw_paragraphs = re.split(r'\n\n+|(?=^#{1,6}\s)', content, flags=re.MULTILINE)
+    raw_paragraphs = re.split(r"\n\n+|(?=^#{1,6}\s)", content, flags=re.MULTILINE)
 
     paragraphs = []
     current = ""
@@ -41,7 +41,7 @@ def split_paragraphs(content: str, min_length: int = 50) -> list[str]:
             continue
 
         # Skip pure header lines (they'll be merged with next paragraph)
-        if re.match(r'^#{1,6}\s+\S', para) and '\n' not in para:
+        if re.match(r"^#{1,6}\s+\S", para) and "\n" not in para:
             current = para + "\n"
             continue
 
@@ -66,10 +66,7 @@ def split_paragraphs(content: str, min_length: int = 50) -> list[str]:
 
 
 def extract_relevant_excerpt(
-    query_embedding: np.ndarray,
-    content: str,
-    generator: "OpenAIEmbeddingGenerator",
-    max_chars: int = 500
+    query_embedding: np.ndarray, content: str, generator: "OpenAIEmbeddingGenerator", max_chars: int = 500
 ) -> str:
     """Extract the most query-relevant paragraph from content
 
@@ -133,9 +130,6 @@ def extract_relevant_excerpt(
     else:
         excerpt = best_paragraph
 
-    logger.debug(
-        f"Selected paragraph {best_idx + 1}/{len(paragraphs)} "
-        f"(similarity: {best_similarity:.3f})"
-    )
+    logger.debug(f"Selected paragraph {best_idx + 1}/{len(paragraphs)} (similarity: {best_similarity:.3f})")
 
     return excerpt

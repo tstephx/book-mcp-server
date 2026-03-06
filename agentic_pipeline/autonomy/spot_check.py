@@ -20,7 +20,8 @@ class SpotCheckManager:
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT f.book_id, f.original_book_type, f.original_confidence, f.created_at
                 FROM autonomy_feedback f
                 LEFT JOIN spot_checks s ON f.book_id = s.book_id
@@ -29,7 +30,9 @@ class SpotCheckManager:
                 AND f.created_at > ?
                 AND s.id IS NULL
                 ORDER BY f.created_at DESC
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def select_for_review(self, days: int = 7) -> list[dict]:
@@ -40,7 +43,8 @@ class SpotCheckManager:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
             # Get auto-approved books not yet spot-checked
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT f.book_id, f.original_book_type, f.original_confidence, f.created_at
                 FROM autonomy_feedback f
                 LEFT JOIN spot_checks s ON f.book_id = s.book_id
@@ -48,7 +52,9 @@ class SpotCheckManager:
                 AND f.human_decision = 'approved'
                 AND f.created_at > ?
                 AND s.id IS NULL
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
 
             candidates = [dict(row) for row in cursor.fetchall()]
 
@@ -75,31 +81,37 @@ class SpotCheckManager:
             cursor = conn.cursor()
 
             # Get original info
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT original_book_type, original_confidence, created_at
                 FROM autonomy_feedback
                 WHERE book_id = ?
                 ORDER BY created_at DESC
                 LIMIT 1
-            """, (book_id,))
+            """,
+                (book_id,),
+            )
             original = cursor.fetchone()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO spot_checks
                 (book_id, pipeline_id, original_classification, original_confidence,
                  auto_approved_at, classification_correct, quality_acceptable, reviewer, notes)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                book_id,
-                pipeline_id,
-                original["original_book_type"] if original else None,
-                original["original_confidence"] if original else None,
-                original["created_at"] if original else None,
-                classification_correct,
-                quality_acceptable,
-                reviewer,
-                notes,
-            ))
+            """,
+                (
+                    book_id,
+                    pipeline_id,
+                    original["original_book_type"] if original else None,
+                    original["original_confidence"] if original else None,
+                    original["created_at"] if original else None,
+                    classification_correct,
+                    quality_acceptable,
+                    reviewer,
+                    notes,
+                ),
+            )
 
             conn.commit()
 
@@ -110,11 +122,14 @@ class SpotCheckManager:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT * FROM spot_checks
                 WHERE checked_at > ?
                 ORDER BY checked_at DESC
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
 
             return [dict(row) for row in cursor.fetchall()]
 
@@ -125,13 +140,16 @@ class SpotCheckManager:
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN classification_correct = 1 THEN 1 ELSE 0 END) as correct
                 FROM spot_checks
                 WHERE checked_at > ?
-            """, (cutoff,))
+            """,
+                (cutoff,),
+            )
 
             row = cursor.fetchone()
 

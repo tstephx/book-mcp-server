@@ -20,7 +20,7 @@ class OrchestratorConfig:
 
     # Timeouts (seconds)
     processing_timeout: int = 600  # 10 minutes
-    embedding_timeout: int = 300   # 5 minutes
+    embedding_timeout: int = 300  # 5 minutes
 
     # Thresholds
     confidence_threshold: float = 0.7

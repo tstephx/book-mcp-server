@@ -19,9 +19,7 @@ def db_path():
 
 def test_full_autonomy_flow(db_path):
     """Test complete autonomy workflow."""
-    from agentic_pipeline.autonomy import (
-        AutonomyConfig, MetricsCollector, CalibrationEngine, SpotCheckManager
-    )
+    from agentic_pipeline.autonomy import AutonomyConfig, MetricsCollector, CalibrationEngine, SpotCheckManager
 
     config = AutonomyConfig(db_path)
     collector = MetricsCollector(db_path)
@@ -38,7 +36,7 @@ def test_full_autonomy_flow(db_path):
             book_type="technical_tutorial",
             confidence=0.92,
             decision="approved",
-            actor="human:taylor"
+            actor="human:taylor",
         )
 
     # Calculate calibration
@@ -79,7 +77,7 @@ def test_spot_check_integration(db_path):
             book_type="technical_tutorial",
             confidence=0.95,
             decision="approved",
-            actor="auto:high_confidence"
+            actor="auto:high_confidence",
         )
 
     # Select for review
@@ -88,10 +86,7 @@ def test_spot_check_integration(db_path):
 
     # Submit results
     spot_check.submit_result(
-        book_id="book0",
-        classification_correct=True,
-        quality_acceptable=True,
-        reviewer="human:taylor"
+        book_id="book0", classification_correct=True, quality_acceptable=True, reviewer="human:taylor"
     )
 
     # Check accuracy

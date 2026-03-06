@@ -112,37 +112,31 @@ def register_hybrid_search_tools(mcp):
             embeddings_matrix, chunk_metadata = load_chunk_embeddings()
 
             if embeddings_matrix is None:
-                return {
-                    "error": "No chunk embeddings found. Run embed-library first.",
-                    "results": []
-                }
+                return {"error": "No chunk embeddings found. Run embed-library first.", "results": []}
 
             # Run FTS search (chapter-level)
             fts_response = full_text_search(query, limit=fetch_k)
-            fts_results = fts_response.get('results', [])
+            fts_results = fts_response.get("results", [])
 
             # Run semantic search (chunk-level)
-            semantic_top = find_top_k(
-                query_embedding,
-                embeddings_matrix,
-                k=fetch_k,
-                min_similarity=min_similarity
-            )
+            semantic_top = find_top_k(query_embedding, embeddings_matrix, k=fetch_k, min_similarity=min_similarity)
 
             # Build chunk-level semantic results
             chunk_results = []
             for idx, similarity in semantic_top:
                 meta = chunk_metadata[idx]
-                chunk_results.append({
-                    'chapter_id': meta['chapter_id'],
-                    'chunk_id': meta['chunk_id'],
-                    'book_id': meta['book_id'],
-                    'book_title': meta['book_title'],
-                    'chapter_number': meta['chapter_number'],
-                    'chapter_title': meta['chapter_title'],
-                    'similarity': round(similarity, 4),
-                    'chunk_content': meta['content'],
-                })
+                chunk_results.append(
+                    {
+                        "chapter_id": meta["chapter_id"],
+                        "chunk_id": meta["chunk_id"],
+                        "book_id": meta["book_id"],
+                        "book_title": meta["book_title"],
+                        "chapter_number": meta["chapter_number"],
+                        "chapter_title": meta["chapter_title"],
+                        "similarity": round(similarity, 4),
+                        "chunk_content": meta["content"],
+                    }
+                )
 
             # Aggregate to chapter level for RRF (best chunk per chapter)
             semantic_chapter_results, content_map = _best_chunk_per_chapter(chunk_results)
@@ -168,12 +162,7 @@ def register_hybrid_search_tools(mcp):
                 if chapter_emb_list:
                     chapter_emb_matrix = np.vstack(chapter_emb_list)
                     fused = maximal_marginal_relevance(
-                        fused,
-                        chapter_emb_matrix,
-                        chapter_meta_for_mmr,
-                        query_embedding,
-                        lambda_param=0.7,
-                        top_k=limit
+                        fused, chapter_emb_matrix, chapter_meta_for_mmr, query_embedding, lambda_param=0.7, top_k=limit
                     )
                 else:
                     fused = fused[:limit]
@@ -182,9 +171,7 @@ def register_hybrid_search_tools(mcp):
 
             # Add chunk content as excerpt + rerank
             for r in fused:
-                r["chunk_content"] = content_map.get(
-                    r["chapter_id"], ""
-                )
+                r["chunk_content"] = content_map.get(r["chapter_id"], "")
 
             if rerank and fused:
                 fused = rerank_results(
@@ -195,26 +182,28 @@ def register_hybrid_search_tools(mcp):
                 )
 
             # Count overlap
-            fts_ids = {r['chapter_id'] for r in fts_results}
-            sem_ids = {r['chapter_id'] for r in semantic_chapter_results}
+            fts_ids = {r["chapter_id"] for r in fts_results}
+            sem_ids = {r["chapter_id"] for r in semantic_chapter_results}
             in_both = len(fts_ids & sem_ids)
 
             # Build output
             results = []
             for r in fused:
-                results.append({
-                    'chapter_id': r['chapter_id'],
-                    'book_id': r['book_id'],
-                    'book_title': r['book_title'],
-                    'chapter_number': r['chapter_number'],
-                    'chapter_title': r['chapter_title'],
-                    'excerpt': _truncate(r.get('chunk_content', ''), 500),
-                    'rrf_score': round(r['rrf_score'], 6),
-                    'rerank_score': r.get('rerank_score'),
-                    'fts_rank': r.get('fts_rank'),
-                    'semantic_sim': r.get('semantic_sim'),
-                    'sources': r['sources'],
-                })
+                results.append(
+                    {
+                        "chapter_id": r["chapter_id"],
+                        "book_id": r["book_id"],
+                        "book_title": r["book_title"],
+                        "chapter_number": r["chapter_number"],
+                        "chapter_title": r["chapter_title"],
+                        "excerpt": _truncate(r.get("chunk_content", ""), 500),
+                        "rrf_score": round(r["rrf_score"], 6),
+                        "rerank_score": r.get("rerank_score"),
+                        "fts_rank": r.get("fts_rank"),
+                        "semantic_sim": r.get("semantic_sim"),
+                        "sources": r["sources"],
+                    }
+                )
 
             return {
                 "query": query,
@@ -225,7 +214,7 @@ def register_hybrid_search_tools(mcp):
                     "fts_candidates": len(fts_results),
                     "semantic_candidates": len(semantic_chapter_results),
                     "in_both": in_both,
-                }
+                },
             }
 
         except Exception as e:
