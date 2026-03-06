@@ -52,7 +52,7 @@ Quick reference: "which file handles X?"
 
 | File | Responsibility |
 |------|---------------|
-| `__init__.py` | `load_prompt(name) -> str` — loads prompt templates from `prompts/` directory by filename (`{name}.txt`) |
+| `__init__.py` | `load_prompt(name) -> str` — loads prompt templates from `prompts/` directory by filename (`{name}.txt`); raises `ValueError` if not found |
 | `classify.txt` | Classification prompt template used by both providers |
 
 ---

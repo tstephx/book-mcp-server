@@ -9,7 +9,7 @@ Registered tools exposed to Claude Desktop via FastMCP. Implementations in `agen
 | Tool | Signature | Description |
 |------|-----------|-------------|
 | `pending_books` | `(sort_by="priority") → dict` | Get all books awaiting review. Returns `{pending_count, books[]}` |
-| `approve` | `(pipeline_id, actor="mcp:claude") → dict` | Approve a book. Returns immediately; embedding runs in background |
+| `approve` | `(pipeline_id, actor="mcp:claude") → dict` | Approve a book. Returns immediately; embedding runs in background. Note: underlying `approve_book()` accepts `adjustments` dict but MCP wrapper does not expose it |
 | `reject` | `(pipeline_id, reason, retry=False, actor="mcp:claude") → dict` | Reject a book. `retry=True` queues for reprocessing |
 | `rollback` | `(pipeline_id, reason, actor="mcp:claude") → dict` | Remove an approved book from the library |
 
@@ -19,7 +19,7 @@ Registered tools exposed to Claude Desktop via FastMCP. Implementations in `agen
 |------|-----------|-------------|
 | `process` | `(book_path: str) → dict` | Process a book file (`.epub`/`.pdf` only). Returns `{pipeline_id, state, book_type, confidence}` |
 | `status` | `(pipeline_id: str) → dict` | Get pipeline state, book_type, confidence, approved_by |
-| `reingest` | `(book_id: str) → dict` | Reprocess existing book through full pipeline (requires original source file) |
+| `reingest` | `(book_id: str) → dict` | Reprocess existing book through full pipeline (requires original source file). Returns `{new_pipeline_id, old_pipeline_id}` |
 
 ### Health & Monitoring
 
