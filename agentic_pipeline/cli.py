@@ -1209,5 +1209,62 @@ def reprocess(flagged: bool, execute: bool, as_json: bool):
         console.print(f"\n[bold]Reprocess complete: {requeued} re-queued, {skipped} skipped.[/bold]")
 
 
+@main.command("update-title")
+@click.argument("book_id")
+@click.argument("chapter_number", type=int)
+@click.argument("new_title")
+def update_title(book_id: str, chapter_number: int, new_title: str):
+    """Update a chapter's title.
+
+    BOOK_ID is the book UUID or title slug.
+    CHAPTER_NUMBER is the chapter number to update.
+    NEW_TITLE is the new title to set.
+    """
+    from .db.config import get_db_path
+
+    import sqlite3
+
+    db_path = get_db_path()
+    conn = sqlite3.connect(str(db_path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        # Verify book exists
+        book = conn.execute(
+            "SELECT id, title FROM books WHERE id = ?", (book_id,)
+        ).fetchone()
+        if not book:
+            # Try fuzzy match
+            book = conn.execute(
+                "SELECT id, title FROM books WHERE title LIKE ?",
+                (f"%{book_id}%",),
+            ).fetchone()
+        if not book:
+            console.print(f"[red]No book found matching '{book_id}'[/red]")
+            return
+
+        # Verify chapter exists
+        chapter = conn.execute(
+            "SELECT id, title FROM chapters WHERE book_id = ? AND chapter_number = ?",
+            (book["id"], chapter_number),
+        ).fetchone()
+        if not chapter:
+            console.print(
+                f"[red]No chapter {chapter_number} found in '{book['title']}'[/red]"
+            )
+            return
+
+        old_title = chapter["title"]
+        conn.execute(
+            "UPDATE chapters SET title = ? WHERE id = ?",
+            (new_title, chapter["id"]),
+        )
+        conn.commit()
+        console.print(f"[green]Updated chapter {chapter_number}:[/green]")
+        console.print(f"  Old: {old_title}")
+        console.print(f"  New: {new_title}")
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     main()
