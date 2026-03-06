@@ -67,11 +67,11 @@ Read-only tools for Claude Desktop. Implementations in `src/tools/*.py`.
 
 | Tool | File | Description |
 |------|------|-------------|
-| `text_search` | `search_tools.py` | Keyword/FTS search across all books |
+| `text_search` | `server.py` | Keyword/FTS search across all books |
 | `search_titles` | `search_tools.py` | Search book titles by query |
 | `semantic_search` | `semantic_search_tools.py` | Vector similarity search (requires OpenAI) |
 | `hybrid_search` | `hybrid_search_tools.py` | RRF combining FTS + semantic (best quality) |
-| `search_all_books` | various | Cross-library search |
+| `search_all_books` | `server.py` | Cross-library search |
 
 ### Discovery
 
@@ -134,15 +134,18 @@ Read-only tools for Claude Desktop. Implementations in `src/tools/*.py`.
 
 | Tool | File | Description |
 |------|------|-------------|
-| `library_status` | various | Overall library health check |
+| `library_status` | `server.py` | Overall library health check |
 | `get_library_statistics` | `analytics_tools.py` | Books, chapters, word counts, coverage |
+| `get_library_stats` | `server.py` | Lightweight stats: totals, embedding coverage, per-book breakdown |
 | `find_duplicate_coverage` | `analytics_tools.py` | Topics covered by multiple books |
 | `get_author_insights` | `analytics_tools.py` | Stats for a specific author |
 | `audit_chapter_quality` | `audit_tools.py` | Chapter quality metrics |
-| `get_summary` | various | Book summary |
-| `summarize_book` | various | Generate/fetch book summary |
-| `refresh_embeddings` | various | Regenerate chapter embeddings |
-| `generate_summary_embeddings` | various | Generate summary-level embeddings |
+| `get_cache_stats` | `server.py` | Cache hit/miss rates, memory usage, cached counts |
+| `clear_cache` | `server.py` | Clear caches (`cache_type`: `chapters`/`embeddings`/`summary_embeddings`/`all`) |
+| `get_summary` | `server.py` | Book summary |
+| `summarize_book` | `server.py` | Generate/fetch book summary |
+| `refresh_embeddings` | `server.py` | Regenerate chapter embeddings |
+| `generate_summary_embeddings` | `server.py` | Generate summary-level embeddings |
 
 ---
 

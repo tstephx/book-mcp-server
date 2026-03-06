@@ -37,8 +37,23 @@ Quick reference: "which file handles X?"
 
 | File | Responsibility |
 |------|---------------|
-| `classifier.py` | `ClassifierAgent` — LLM-based book classification (book type, confidence, tags) |
+| `classifier.py` | `ClassifierAgent` — LLM-based book classification. Delegates to `LLMProvider` (OpenAI default, Anthropic alternative) |
 | `classifier_types.py` | `BookType` enum and classifier data classes |
+
+### `agents/providers/`
+
+| File | Responsibility |
+|------|---------------|
+| `base.py` | `LLMProvider` ABC — defines `classify(text, metadata) -> BookProfile` contract and `name` property |
+| `openai_provider.py` | `OpenAIProvider(LLMProvider)` — calls `gpt-4.1-mini` via OpenAI SDK; normalizes unicode before sending |
+| `anthropic_provider.py` | `AnthropicProvider(LLMProvider)` — calls `claude-haiku-4-5-20251001` via Anthropic SDK; reads `ANTHROPIC_API_KEY` from env |
+
+### `agents/prompts/`
+
+| File | Responsibility |
+|------|---------------|
+| `__init__.py` | `load_prompt(name) -> str` — loads prompt templates from `prompts/` directory by filename (`{name}.txt`) |
+| `classify.txt` | Classification prompt template used by both providers |
 
 ---
 
@@ -150,7 +165,7 @@ Quick reference: "which file handles X?"
 ```
 cli.py / mcp_server.py
     └── Orchestrator (orchestrator/)
-          ├── ClassifierAgent (agents/)
+          ├── ClassifierAgent (agents/) → LLMProvider (agents/providers/)
           ├── ProcessingAdapter (adapters/) → book-ingestion library
           ├── ExtractionValidator (validation/)
           ├── PipelineRepository (db/)

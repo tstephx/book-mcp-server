@@ -15,21 +15,24 @@ Primary pipeline state record for each book.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | TEXT PK | UUID |
-| `source_path` | TEXT | Original file path |
-| `content_hash` | TEXT | SHA256 — dedup key |
-| `state` | TEXT | `PipelineState` enum value |
+| `source_path` | TEXT NOT NULL | Original file path |
+| `content_hash` | TEXT NOT NULL UNIQUE | SHA256 — dedup key |
+| `state` | TEXT NOT NULL | `PipelineState` enum value |
 | `book_profile` | JSON | Classification result: `{book_type, confidence, suggested_tags, ...}` |
 | `strategy_config` | JSON | Processing strategy selected |
 | `validation_result` | JSON | Validation output |
 | `processing_result` | JSON | Ingestion result |
-| `approved_by` | TEXT | Actor who approved (`human:X` or `auto:X`) |
-| `approved_at` | TIMESTAMP | Approval time |
-| `rejected_by` | TEXT | Actor who rejected |
-| `rejected_at` | TIMESTAMP | Rejection time |
-| `rejection_reason` | TEXT | Human-readable rejection reason |
-| `retry_count` | INTEGER | Times retried, default 0 |
+| `retry_count` | INTEGER | Default 0 |
+| `max_retries` | INTEGER | Default 2 |
+| `error_log` | JSON | Error details accumulated across retries |
 | `created_at` | TIMESTAMP | When record created |
 | `updated_at` | TIMESTAMP | Last state change |
+| `completed_at` | TIMESTAMP | When pipeline reached terminal state |
+| `timeout_at` | TIMESTAMP | Timeout deadline for current state |
+| `last_heartbeat` | TIMESTAMP | Last worker heartbeat |
+| `priority` | INTEGER | Default 5 (lower = higher priority) |
+| `approved_by` | TEXT | Actor who approved (`human:X` or `auto:X`) |
+| `approval_confidence` | REAL | Confidence score at time of approval |
 
 ### `pipeline_state_history`
 Append-only audit trail of every state transition.
@@ -39,7 +42,7 @@ Append-only audit trail of every state transition.
 | `id` | INTEGER PK | Auto-increment |
 | `pipeline_id` | TEXT | FK → processing_pipelines.id |
 | `from_state` | TEXT | Previous state (null on initial) |
-| `to_state` | TEXT | New state |
+| `to_state` | TEXT NOT NULL | New state |
 | `duration_ms` | INTEGER | Time spent in previous state |
 | `agent_output` | JSON | LLM/processor output at this step |
 | `error_details` | JSON | Error info if transition was triggered by failure |
@@ -51,11 +54,11 @@ Named processing configurations by book type.
 | Column | Type |
 |--------|------|
 | `name` | TEXT PK |
-| `book_type` | TEXT |
-| `config` | JSON |
-| `version` | INTEGER |
+| `book_type` | TEXT NOT NULL |
+| `config` | JSON NOT NULL |
+| `version` | INTEGER (default 1) |
 | `created_at` | TIMESTAMP |
-| `is_active` | BOOLEAN |
+| `is_active` | BOOLEAN (default TRUE) |
 
 ### `pipeline_config`
 Key-value store for runtime config.
@@ -63,7 +66,7 @@ Key-value store for runtime config.
 | Column | Type |
 |--------|------|
 | `key` | TEXT PK |
-| `value` | JSON |
+| `value` | JSON NOT NULL |
 | `updated_at` | TIMESTAMP |
 
 ---
@@ -76,15 +79,19 @@ Every approve/reject/rollback action.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER PK | Auto-increment |
-| `book_id` | TEXT | Pipeline/book ID |
+| `book_id` | TEXT NOT NULL | Pipeline/book ID |
 | `pipeline_id` | TEXT | May differ if reingested |
-| `action` | TEXT | `approved`/`rejected`/`rollback` |
-| `actor` | TEXT | e.g. `human:taylor`, `auto:confident` |
+| `action` | TEXT NOT NULL | `approved`/`rejected`/`rollback` |
+| `actor` | TEXT NOT NULL | e.g. `human:taylor`, `auto:confident` |
 | `reason` | TEXT | For rejections |
 | `before_state` | JSON | State snapshot before action |
 | `after_state` | JSON | State snapshot after action |
-| `created_at` | TIMESTAMP | |
 | `adjustments` | JSON | Any field adjustments made at approval |
+| `filter_used` | JSON | Batch filter criteria (for batch operations) |
+| `confidence_at_decision` | REAL | Book confidence score at decision time |
+| `autonomy_mode` | TEXT | Mode active when decision was made |
+| `session_id` | TEXT | Session identifier for grouping actions |
+| `performed_at` | TIMESTAMP | When action occurred (default CURRENT_TIMESTAMP) |
 
 ### `audit_retention`
 Cleanup schedule per audit type.
@@ -92,7 +99,7 @@ Cleanup schedule per audit type.
 | Column | Type |
 |--------|------|
 | `audit_type` | TEXT PK |
-| `retain_days` | INTEGER |
+| `retain_days` | INTEGER NOT NULL |
 | `last_cleanup` | TIMESTAMP |
 
 ---
@@ -100,27 +107,44 @@ Cleanup schedule per audit type.
 ## Autonomy Tables
 
 ### `autonomy_config`
-Singleton (id=1). Current autonomy mode and thresholds.
+Singleton (id=1). Current autonomy mode and guard-rail settings.
 
 | Column | Type | Default |
 |--------|------|---------|
+| `id` | INTEGER PK | CHECK (id = 1) |
 | `current_mode` | TEXT | `supervised` |
 | `auto_approve_threshold` | REAL | `0.95` |
-| `escape_hatch_active` | BOOLEAN | `false` |
+| `auto_retry_threshold` | REAL | `0.70` |
+| `require_known_book_type` | BOOLEAN | `TRUE` |
+| `require_zero_issues` | BOOLEAN | `TRUE` |
+| `max_auto_approvals_per_day` | INTEGER | `50` |
+| `spot_check_percentage` | REAL | `0.10` |
+| `escape_hatch_active` | BOOLEAN | `FALSE` |
+| `escape_hatch_activated_at` | TIMESTAMP | — |
 | `escape_hatch_reason` | TEXT | — |
-| `escape_hatch_at` | TIMESTAMP | — |
+| `updated_at` | TIMESTAMP | CURRENT_TIMESTAMP |
 
 ### `autonomy_metrics`
 Periodic rollup of processing outcomes.
 
-| Column | Type |
-|--------|------|
-| `period_start/end` | DATE |
-| `total_processed` | INTEGER |
-| `auto_approved` | INTEGER |
-| `human_approved` | INTEGER |
-| `human_rejected` | INTEGER |
-| `human_adjusted` | INTEGER |
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK | Auto-increment |
+| `period_start` | DATE NOT NULL | UNIQUE with period_end |
+| `period_end` | DATE NOT NULL | |
+| `total_processed` | INTEGER | Default 0 |
+| `auto_approved` | INTEGER | Default 0 |
+| `human_approved` | INTEGER | Default 0 |
+| `human_rejected` | INTEGER | Default 0 |
+| `human_adjusted` | INTEGER | Default 0 |
+| `avg_confidence_auto_approved` | REAL | |
+| `avg_confidence_human_approved` | REAL | |
+| `avg_confidence_human_rejected` | REAL | |
+| `auto_approved_later_rolled_back` | INTEGER | Default 0 |
+| `human_approved_later_rolled_back` | INTEGER | Default 0 |
+| `metrics_by_type` | JSON | Per-book-type breakdown |
+| `confidence_buckets` | JSON | Distribution of confidence scores |
+| `created_at` | TIMESTAMP | |
 
 ### `autonomy_thresholds`
 Per-book-type calibrated thresholds (set by `CalibrationEngine`).
@@ -129,8 +153,10 @@ Per-book-type calibrated thresholds (set by `CalibrationEngine`).
 |--------|------|
 | `book_type` | TEXT PK |
 | `auto_approve_threshold` | REAL |
-| `sample_count` | INTEGER |
+| `sample_count` | INTEGER (default 0) |
 | `measured_accuracy` | REAL |
+| `last_calculated` | TIMESTAMP |
+| `calibration_data` | JSON |
 | `manual_override` | REAL |
 | `override_reason` | TEXT |
 
@@ -139,23 +165,34 @@ Human override records used for calibration.
 
 | Column | Type |
 |--------|------|
-| `book_id` | TEXT |
-| `original_decision` | TEXT |
+| `id` | INTEGER PK (auto-increment) |
+| `book_id` | TEXT NOT NULL |
+| `pipeline_id` | TEXT |
+| `original_decision` | TEXT NOT NULL |
 | `original_confidence` | REAL |
 | `original_book_type` | TEXT |
-| `human_decision` | TEXT |
+| `human_decision` | TEXT NOT NULL |
 | `human_adjustments` | JSON |
+| `feedback_category` | TEXT |
+| `feedback_notes` | TEXT |
+| `created_at` | TIMESTAMP |
 
 ### `spot_checks`
 Random audit samples of auto-approved books.
 
 | Column | Type |
 |--------|------|
-| `book_id` | TEXT |
+| `id` | INTEGER PK (auto-increment) |
+| `book_id` | TEXT NOT NULL |
+| `pipeline_id` | TEXT |
 | `original_classification` | TEXT |
 | `original_confidence` | REAL |
+| `auto_approved_at` | TIMESTAMP |
 | `classification_correct` | BOOLEAN |
 | `quality_acceptable` | BOOLEAN |
+| `reviewer` | TEXT |
+| `notes` | TEXT |
+| `checked_at` | TIMESTAMP (default CURRENT_TIMESTAMP) |
 
 ---
 
@@ -164,13 +201,19 @@ Random audit samples of auto-approved books.
 ### `health_metrics`
 Singleton (id=1). Current pipeline health snapshot.
 
-| Column | Type |
-|--------|------|
-| `active_count` | INTEGER |
-| `queued_count` | INTEGER |
-| `stuck_count` | INTEGER |
-| `error_rate` | REAL |
-| `last_updated` | TIMESTAMP |
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER PK | CHECK (id = 1) |
+| `active_count` | INTEGER NOT NULL | Default 0 |
+| `queued_count` | INTEGER NOT NULL | Default 0 |
+| `stuck_count` | INTEGER NOT NULL | Default 0 |
+| `completed_24h` | INTEGER NOT NULL | Default 0 |
+| `failed_count` | INTEGER NOT NULL | Default 0 |
+| `avg_processing_seconds` | REAL | |
+| `queue_by_priority` | JSON | Counts per priority level |
+| `stuck_pipelines` | JSON | Details of stuck pipelines |
+| `alerts` | JSON | Active alerts |
+| `updated_at` | TIMESTAMP NOT NULL | Default CURRENT_TIMESTAMP |
 
 ### `state_duration_stats`
 Expected duration per state (for stuck detection).
@@ -178,10 +221,11 @@ Expected duration per state (for stuck detection).
 | Column | Type |
 |--------|------|
 | `state` | TEXT PK |
-| `sample_count` | INTEGER |
-| `median_seconds` | REAL |
-| `p95_seconds` | REAL |
-| `max_seconds` | REAL |
+| `sample_count` | INTEGER NOT NULL (default 0) |
+| `median_seconds` | REAL NOT NULL (default 0) |
+| `p95_seconds` | REAL NOT NULL (default 0) |
+| `max_seconds` | REAL NOT NULL (default 0) |
+| `updated_at` | TIMESTAMP NOT NULL (default CURRENT_TIMESTAMP) |
 
 ---
 
@@ -193,12 +237,26 @@ Chapter/section chunks with embeddings for semantic search.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | TEXT PK | UUID |
-| `chapter_id` | TEXT | FK → chapters |
-| `book_id` | TEXT | FK → books |
-| `chunk_index` | INTEGER | Position within chapter |
-| `content` | TEXT | Chunk text |
-| `word_count` | INTEGER | |
+| `chapter_id` | TEXT NOT NULL | FK → chapters |
+| `book_id` | TEXT NOT NULL | FK → books |
+| `chunk_index` | INTEGER NOT NULL | Position within chapter |
+| `content` | TEXT NOT NULL | Chunk text |
+| `word_count` | INTEGER NOT NULL | |
 | `embedding` | BLOB | numpy float32 array (3072 dims, text-embedding-3-large) |
 | `embedding_model` | TEXT | Model used |
+| `content_hash` | TEXT | Content dedup hash |
+| `created_at` | TIMESTAMP | Default CURRENT_TIMESTAMP |
 
 **Note:** Embeddings are generated inline during `approve_book()` → EMBEDDING → COMPLETE. No separate embedding worker.
+
+---
+
+## Infrastructure Tables
+
+### `schema_migrations`
+Tracks which versioned ALTER TABLE migrations have been applied.
+
+| Column | Type |
+|--------|------|
+| `name` | TEXT PK |
+| `applied_at` | TIMESTAMP (default CURRENT_TIMESTAMP) |
