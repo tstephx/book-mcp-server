@@ -1234,10 +1234,18 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
         ).fetchone()
         if not book:
             # Try fuzzy match
-            book = conn.execute(
+            matches = conn.execute(
                 "SELECT id, title FROM books WHERE title LIKE ?",
                 (f"%{book_id}%",),
-            ).fetchone()
+            ).fetchall()
+            if len(matches) > 1:
+                console.print(f"[yellow]Ambiguous: '{book_id}' matches {len(matches)} books:[/yellow]")
+                for b in matches:
+                    console.print(f"  {b['id']}  {b['title']}")
+                console.print("Use the full book UUID to avoid ambiguity.")
+                return
+            if matches:
+                book = matches[0]
         if not book:
             console.print(f"[red]No book found matching '{book_id}'[/red]")
             return
@@ -1322,8 +1330,13 @@ def library_issues():
         if not issues:
             console.print("[green]No issues found — library is clean.[/green]")
         else:
-            total = sum(len(items) for _, items in issues)
-            console.print(f"\n[bold]{total} issues across {len(issues)} categories[/bold]")
+            total = 0
+            for label, items in issues:
+                if label == "Duplicate Titles":
+                    total += sum(row["cnt"] for row in items)
+                else:
+                    total += len(items)
+            console.print(f"\n[bold]{total} affected books across {len(issues)} categories[/bold]")
             console.print("Use [bold]update-title[/bold] to fix chapter titles, or manual SQL for book titles.")
 
     finally:

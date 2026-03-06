@@ -57,6 +57,23 @@ def test_update_title_nonexistent_chapter(db_with_book, monkeypatch):
     assert "not found" in result.output.lower() or "no chapter" in result.output.lower()
 
 
+def test_update_title_ambiguous_match(db_with_book, monkeypatch):
+    """update-title should warn when multiple books match a fuzzy search."""
+    # Add a second book with overlapping title
+    import sqlite3
+
+    conn = sqlite3.connect(db_with_book)
+    conn.execute("INSERT INTO books VALUES ('book-2', 'Test Book 2', 'Author', 500)")
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_with_book))
+    runner = CliRunner()
+    result = runner.invoke(main, ["update-title", "Test", "1", "New Title"])
+    assert result.exit_code == 0
+    assert "ambiguous" in result.output.lower()
+
+
 def test_update_title_nonexistent_book(db_with_book, monkeypatch):
     """update-title should error for nonexistent book."""
     monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_with_book))
