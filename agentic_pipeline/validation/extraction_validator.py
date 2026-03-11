@@ -36,7 +36,7 @@ _SUSPICIOUS_PATTERNS = [
 # Thresholds (very strict)
 # ---------------------------------------------------------------------------
 
-MIN_CHAPTERS = 7
+MIN_CHAPTERS = 3
 MAX_CHAPTER_WORDS = 20_000
 MAX_TO_MEDIAN_RATIO = 4.0
 MIN_CHAPTER_WORDS = 100

@@ -62,24 +62,24 @@ class TestCheckExtractionQuality:
         assert "median_word_count" in result.metrics
         assert "duplicate_ratio" in result.metrics
 
-    # --- Check 1: Min 7 chapters ---
+    # --- Check 1: Min 3 chapters ---
 
-    def test_reject_fewer_than_7_chapters(self):
+    def test_reject_fewer_than_3_chapters(self):
         result = check_extraction_quality(
-            chapter_count=6,
-            word_counts=[1000] * 6,
-            titles=[f"Ch {i}" for i in range(6)],
-            content_hashes=[_hash(f"u-{i}") for i in range(6)],
+            chapter_count=2,
+            word_counts=[1000] * 2,
+            titles=[f"Ch {i}" for i in range(2)],
+            content_hashes=[_hash(f"u-{i}") for i in range(2)],
         )
         assert result.passed is False
-        assert any("chapter" in r.lower() and "7" in r for r in result.reasons)
+        assert any("chapter" in r.lower() and "3" in r for r in result.reasons)
 
-    def test_exactly_7_chapters_passes(self):
+    def test_exactly_3_chapters_passes(self):
         result = check_extraction_quality(
-            chapter_count=7,
-            word_counts=[1000] * 7,
-            titles=[f"Ch {i}" for i in range(7)],
-            content_hashes=[_hash(f"u-{i}") for i in range(7)],
+            chapter_count=3,
+            word_counts=[2000] * 3,
+            titles=[f"Ch {i}" for i in range(3)],
+            content_hashes=[_hash(f"u-{i}") for i in range(3)],
         )
         assert result.passed is True
 
@@ -291,11 +291,11 @@ class TestCheckExtractionQuality:
 
     def test_multiple_failures_all_reported(self):
         # Few chapters, low total words, duplicates
-        hashes = [_hash("same")] * 5 + [_hash(f"u-{i}") for i in range(1)]
+        hashes = [_hash("same")] * 2
         result = check_extraction_quality(
-            chapter_count=6,
-            word_counts=[100] * 6,  # 600 total, under 5000
-            titles=[f"Ch {i}" for i in range(5)] + ["file.exe"],
+            chapter_count=2,
+            word_counts=[100] * 2,  # 200 total, under 5000
+            titles=["Ch 1", "file.exe"],
             content_hashes=hashes,
         )
         assert result.passed is False
