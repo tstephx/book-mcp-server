@@ -1,3 +1,11 @@
+---
+status: complete
+tags: [project/book-mcp-server, format/plan]
+type: project
+created: '2026-03-05'
+modified: '2026-03-05'
+---
+
 # Backlog Cleanup Implementation Plan — COMPLETE
 <!-- project: book-mcp-server -->
 

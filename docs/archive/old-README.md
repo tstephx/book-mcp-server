@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-17'
+modified: '2026-02-06'
+---
+
 # 📚 Book Library MCP Server (Production-Ready)
 
 **Production-ready** FastMCP server for accessing your processed book library through Claude Desktop.

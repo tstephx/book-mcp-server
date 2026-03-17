@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-22'
+modified: '2025-12-22'
+---
+
 # Book MCP Server Refactoring Proposal
 
 **Based on:** "Learn Model Context Protocol With Typescript" - Chapter 6: Clean Architecture

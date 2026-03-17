@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # Response Truncation Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

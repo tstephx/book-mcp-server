@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-01-31'
+modified: '2026-01-31'
+---
+
 # Session Summary - January 28, 2025
 
 ## Overview

@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-17'
+modified: '2025-12-17'
+---
+
 # Architecture Review: Semantic Search Enhancement
 
 ## 📋 Executive Summary

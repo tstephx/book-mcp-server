@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/adr]
+type: project
+created: '2026-02-24'
+modified: '2026-02-24'
+---
+
 # ADR 007: Slug ID Resolution for Book Tool Parameters
 
 **Status:** Accepted

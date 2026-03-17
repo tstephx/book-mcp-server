@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-03-04'
+modified: '2026-03-04'
+---
+
 # Book Library MCP Server — Quick Start
 
 Connect your book library to Claude Desktop in a few minutes.

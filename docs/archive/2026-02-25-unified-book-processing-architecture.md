@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-01-30'
+modified: '2026-02-06'
+---
+
 # Unified Book Processing Architecture
 
 **Status:** Implemented

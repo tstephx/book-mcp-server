@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-14'
+modified: '2026-02-14'
+---
+
 # EPUB Chapter Splitter Fix — Design
 
 ## Problem

@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-14'
+modified: '2026-02-14'
+---
+
 # Book MCP Server Documentation
 
 Comprehensive documentation for the Book Library MCP Server with semantic search capabilities.

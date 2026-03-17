@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-01-28'
+modified: '2026-01-28'
+---
+
 # Phase 4: Production Hardening Design
 
 > **Audience:** Product managers, directors, UX designers, and engineers who need to understand what we're building and why.

@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # Project Planning Tools
 
 Generate PM-ready project artifacts from your book library.

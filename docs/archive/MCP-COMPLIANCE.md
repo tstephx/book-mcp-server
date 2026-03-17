@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-22'
+modified: '2025-12-22'
+---
+
 # Architecture Compliance with MCP Best Practices
 
 **Date:** December 22, 2025  

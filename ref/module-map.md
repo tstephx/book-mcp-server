@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/reference]
+type: project
+created: '2026-03-05'
+modified: '2026-03-05'
+---
+
 # Module Map — agentic_pipeline
 
 Quick reference: "which file handles X?"

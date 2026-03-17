@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/readme]
+type: project
+created: '2026-02-24'
+modified: '2026-02-24'
+---
+
 # book-mcp-server
 
 Two MCP servers and a CLI pipeline for building and using a personal AI-searchable book library.

@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # Agentic Pipeline: Design Decisions & Rationale
 
 > **Status:** All phases complete (Phase 1–5). Embeddings use OpenAI `text-embedding-3-large` (migrated from sentence-transformers). This document reflects the original design rationale and remains accurate for architecture decisions.

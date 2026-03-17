@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # Project Planning Tools: Quick Reference
 
 A practical guide to choosing and using the right planning tool.

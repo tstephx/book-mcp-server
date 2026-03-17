@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-01-28'
+modified: '2026-02-06'
+---
+
 # Agentic Processing Pipeline Design
 
 **Date:** 2025-01-28

@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/reference]
+type: project
+created: '2026-03-05'
+modified: '2026-03-05'
+---
+
 # MCP Tools Reference
 
 ## Agentic Pipeline MCP Server (`agentic_mcp_server.py`)

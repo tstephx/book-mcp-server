@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-11'
+modified: '2026-02-11'
+---
+
 # Backlog Cleanup: DB Refactor, Test Coverage, Planning Tools LLM
 
 > **Date:** 2026-02-11

@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/adr]
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # ADR 005: RRF Hybrid Search (FTS5 + Semantic)
 
 **Status:** Accepted

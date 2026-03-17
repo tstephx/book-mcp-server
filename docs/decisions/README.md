@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/readme]
+type: project
+created: '2026-02-24'
+modified: '2026-02-24'
+---
+
 # Architecture Decision Records
 
 Decisions are numbered and immutable. Once recorded, they are not edited —

@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-03-04'
+modified: '2026-03-04'
+---
+
 # Manual Test Plan: Book MCP Server
 
 **System:** Book Library MCP Server + Agentic Pipeline MCP Server + CLI

@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/changelog]
+type: project
+created: '2026-03-04'
+modified: '2026-03-04'
+---
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

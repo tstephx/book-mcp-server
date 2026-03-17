@@ -1,3 +1,11 @@
+---
+status: active
+tags: [project/book-mcp-server, format/adr]
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # ADR 003: OpenAI text-embedding-3-large for Semantic Search
 
 **Status:** Accepted

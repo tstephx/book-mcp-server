@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-22'
+modified: '2025-12-22'
+---
+
 # Full-Text Search, Batch Operations, and Chapter Summaries Design
 
 **Status: Implemented**

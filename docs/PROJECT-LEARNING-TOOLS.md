@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-02-23'
+modified: '2026-02-23'
+---
+
 # Project Learning Path Generator
 
 ## Overview

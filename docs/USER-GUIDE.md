@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2026-03-04'
+modified: '2026-03-04'
+---
+
 # Book MCP Server User Guide
 
 A comprehensive guide to using your personal book library with Claude.

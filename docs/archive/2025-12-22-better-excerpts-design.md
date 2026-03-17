@@ -1,3 +1,11 @@
+---
+status: active
+tags: []
+type: project
+created: '2025-12-22'
+modified: '2025-12-22'
+---
+
 # Better Excerpts Design (Query-Relevant Passages)
 
 **Status: Implemented**
