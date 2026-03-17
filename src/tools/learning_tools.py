@@ -436,35 +436,77 @@ def _build_conversational_content(concept: str, depth: str, config: dict, analog
     return "\n".join(parts)
 
 
+def _find_best_paragraph(concept: str, text: str, min_len: int = 40) -> str:
+    """Find the paragraph in text most relevant to the concept.
+
+    Scores paragraphs by how many concept words they contain, preferring
+    paragraphs that look like definitions or explanations over raw formatting.
+    """
+    concept_words = set(concept.lower().split())
+    paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) >= min_len]
+
+    if not paragraphs:
+        return text[:500].strip()
+
+    # Skip paragraphs that are likely formatting artifacts (all-caps, lists of numbers, etc.)
+    def is_prose(p: str) -> bool:
+        words = p.split()
+        if len(words) < 5:
+            return False
+        upper_ratio = sum(1 for w in words if w.isupper()) / len(words)
+        return upper_ratio < 0.5
+
+    scored = []
+    for p in paragraphs:
+        if not is_prose(p):
+            continue
+        p_lower = p.lower()
+        score = sum(1 for w in concept_words if w in p_lower) * 10
+        # Bonus for definition-like patterns
+        if any(pat in p_lower for pat in ["is a ", "refers to", "allows you", "enables", "provides"]):
+            score += 5
+        scored.append((score, p))
+
+    if scored:
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored[0][1][:500]
+
+    return paragraphs[0][:500]
+
+
 def _generate_quick_summary(concept: str, sources: list) -> str:
     """Generate a quick summary from source excerpts"""
     if not sources:
         return f"{concept} is a technical concept used in software development."
 
-    # Use the most relevant excerpt as the basis
     best_excerpt = sources[0].get("excerpt", "")
     if best_excerpt:
-        # Return a cleaned version of the first paragraph
-        paragraphs = best_excerpt.split("\n\n")
-        return paragraphs[0][:500] if paragraphs else best_excerpt[:500]
+        return _find_best_paragraph(concept, best_excerpt)
 
     return f"Based on your library, {concept} appears in discussions about {sources[0]['book_title']}."
 
 
 def _synthesize_definition(concept: str, sources: list) -> str:
-    """Synthesize a definition from multiple sources"""
+    """Synthesize a definition by finding the best paragraph from each source."""
     if not sources:
         return ""
 
-    excerpts = [s.get("excerpt", "")[:400] for s in sources[:3] if s.get("excerpt")]
-    if excerpts:
-        return "\n\n".join(excerpts)
+    parts = []
+    for s in sources[:3]:
+        excerpt = s.get("excerpt", "")
+        if not excerpt:
+            continue
+        best = _find_best_paragraph(concept, excerpt, min_len=30)
+        if best:
+            parts.append(best)
+
+    if parts:
+        return "\n\n".join(parts)
     return ""
 
 
 def _generate_business_impact(concept: str, sources: list) -> str:
     """Generate business impact statement from source excerpts."""
-    # Try to extract impact-related content from sources
     impact_keywords = [
         "benefit",
         "advantage",
@@ -484,6 +526,12 @@ def _generate_business_impact(concept: str, sources: list) -> str:
         "customer",
         "business",
         "efficien",
+        "allows",
+        "provides",
+        "ensures",
+        "simplif",
+        "eliminat",
+        "automat",
     ]
 
     impact_sentences = []
@@ -492,8 +540,12 @@ def _generate_business_impact(concept: str, sources: list) -> str:
         if not excerpt:
             continue
         for sentence in _split_sentences(excerpt):
-            if any(kw in sentence.lower() for kw in impact_keywords) and len(sentence) > 30:
-                impact_sentences.append(sentence.strip())
+            sentence = sentence.strip()
+            # Skip short sentences, formatting artifacts, and header fragments
+            if len(sentence) < 30 or sentence.isupper() or sentence.startswith("#"):
+                continue
+            if any(kw in sentence.lower() for kw in impact_keywords):
+                impact_sentences.append(sentence)
                 if len(impact_sentences) >= 3:
                     break
         if len(impact_sentences) >= 3:
