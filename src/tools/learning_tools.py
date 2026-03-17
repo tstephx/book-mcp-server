@@ -253,28 +253,47 @@ def register_learning_tools(mcp):
 
 
 def _find_relevant_sources(query: str, limit: int = 5, min_similarity: float = 0.30) -> list:
-    """Find relevant sources from the library using chunk-level semantic search"""
+    """Find relevant sources from the library using chunk-level semantic search.
+
+    Boosts results from books whose title matches the query to avoid pulling
+    generic infrastructure chapters when a dedicated book exists.
+    """
     try:
         embeddings_matrix, chunk_metadata = load_chunk_embeddings()
         if embeddings_matrix is None:
             return []
 
+        # Find books whose title matches the concept (case-insensitive)
+        query_words = set(query.lower().split())
+        title_matched_book_ids = set()
+        for meta in chunk_metadata:
+            book_title_words = set(meta.get("book_title", "").lower().split())
+            if query_words & book_title_words:
+                title_matched_book_ids.add(meta.get("book_id"))
+
         with embedding_model_context() as generator:
             query_embedding = generator.generate(query)
 
             # Search at chunk level (fetch extra to ensure enough chapters after aggregation)
-            top_results = find_top_k(query_embedding, embeddings_matrix, k=limit * 3, min_similarity=min_similarity)
+            top_results = find_top_k(query_embedding, embeddings_matrix, k=limit * 5, min_similarity=min_similarity)
 
             chunk_results = []
             for idx, similarity in top_results:
                 meta = chunk_metadata[idx]
+                # Boost similarity for title-matched books
+                boosted_similarity = similarity
+                if meta.get("book_id") in title_matched_book_ids:
+                    boosted_similarity = min(1.0, similarity + 0.15)
                 chunk_results.append(
                     {
                         **meta,
                         "id": meta["chapter_id"],
-                        "similarity": similarity,
+                        "similarity": boosted_similarity,
                     }
                 )
+
+            # Re-sort after boosting
+            chunk_results.sort(key=lambda x: x["similarity"], reverse=True)
 
             # Aggregate to chapter level (best chunk per chapter)
             sources = best_chunk_per_chapter(chunk_results)[:limit]

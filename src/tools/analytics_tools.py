@@ -284,8 +284,10 @@ def register_analytics_tools(mcp: "FastMCP") -> None:
 
             for i in range(n):
                 for j in range(i + 1, n):
-                    # Skip if same book
+                    # Skip if same book (by ID or by title — catches duplicate ingestions)
                     if metadata[i]["book_id"] == metadata[j]["book_id"]:
+                        continue
+                    if metadata[i]["book_title"] == metadata[j]["book_title"]:
                         continue
 
                     similarity = cosine_similarity(embeddings[i], embeddings[j])

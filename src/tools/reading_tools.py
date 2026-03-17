@@ -254,8 +254,14 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                     ORDER BY rp.started_at DESC
                 """)
 
+                # Only include books with any reading activity to avoid 70K+ output
+                active_books = [b for b in books if (b["read_chapters"] or 0) > 0 or (b["reading_chapters"] or 0) > 0]
+                total_books = len(books)
+
                 return {
                     "library_progress": {
+                        "total_books": total_books,
+                        "books_started": len(active_books),
                         "total_chapters_read": total_read,
                         "total_chapters": total_chapters,
                         "percent_complete": round(total_read / total_chapters * 100, 1) if total_chapters > 0 else 0,
@@ -268,7 +274,7 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                         }
                         for r in currently_reading
                     ],
-                    "books": [
+                    "books_with_progress": [
                         {
                             "id": b["id"],
                             "title": b["title"],
@@ -280,8 +286,11 @@ def register_reading_tools(mcp: "FastMCP") -> None:
                             if b["total_chapters"] > 0
                             else 0,
                         }
-                        for b in books
+                        for b in active_books
                     ],
+                    "note": f"Showing {len(active_books)} books with reading activity. Use get_reading_progress(book_id) for a specific book's full chapter list."
+                    if len(active_books) < total_books
+                    else None,
                 }
 
         except Exception as e:
