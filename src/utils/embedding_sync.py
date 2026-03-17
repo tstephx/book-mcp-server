@@ -247,7 +247,7 @@ def update_embeddings_incremental(
 
         # Generate embeddings for batch
         try:
-            embeddings = generator.generate_batch(batch_contents, batch_size=batch_size)
+            embeddings = generator.generate_batch(batch_contents)
         except Exception as e:
             logger.error(f"Error generating embeddings for batch: {e}")
             errors += len(batch_valid)

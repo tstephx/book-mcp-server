@@ -1,3 +1,12 @@
+---
+status: active
+tags: [project/book-mcp-server, format/readme]
+type: project
+created: '2026-03-05'
+modified: '2026-03-05'
+related: ["[[Claude-Config/mcp-servers/book-library]]", "[[Claude-Config/mcp-servers/agentic-pipeline]]"]
+---
+
 # CLAUDE.md — book-mcp-server
 <!-- project-name: book-mcp-server -->
 
@@ -215,4 +224,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-03-05*
+*Last updated: 2026-03-16*
