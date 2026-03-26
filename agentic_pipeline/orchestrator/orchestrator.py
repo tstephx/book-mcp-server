@@ -485,8 +485,29 @@ class Orchestrator:
         result["pipeline_id"] = pipeline_id
         return result
 
+    def _get_failed_stage(self, pipeline_id: str) -> Optional[str]:
+        """Check pipeline_state_history to find which stage failed before NEEDS_RETRY."""
+        with get_pipeline_db(self.config.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT from_state, error_details FROM pipeline_state_history
+                WHERE pipeline_id = ? AND to_state = 'needs_retry'
+                ORDER BY rowid DESC LIMIT 1
+                """,
+                (pipeline_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return row["from_state"]
+
     def _retry_one(self, book: dict) -> dict:
-        """Retry a single book in NEEDS_RETRY state."""
+        """Retry a single book in NEEDS_RETRY state.
+
+        Smart routing: if the failure was in EMBEDDING (book already processed),
+        retry only embedding instead of re-running the full pipeline.
+        """
         retry_count = book.get("retry_count", 0)
 
         if retry_count >= self.config.max_retry_attempts:
@@ -509,7 +530,16 @@ class Orchestrator:
         new_count = self.repo.increment_retry_count(book["id"])
         self.logger.retry_scheduled(book["id"], new_count)
 
+        # Check what stage failed — if embedding, skip straight to embedding
+        failed_stage = self._get_failed_stage(book["id"])
+
         try:
+            if failed_stage == PipelineState.EMBEDDING.value:
+                logger.info("Retrying %s from embedding (skipping full reprocess)", book["id"])
+                return self._complete_approved(book["id"])
+
+            # Full reprocess — clean up existing book data to avoid duplicate conflicts
+            self._cleanup_book_data(book["id"])
             return self._process_book(book["id"], book["source_path"], book["content_hash"])
         except Exception as e:
             self.logger.error(book["id"], type(e).__name__, str(e))

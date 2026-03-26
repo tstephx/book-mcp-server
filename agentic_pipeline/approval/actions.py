@@ -143,7 +143,11 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
 
         if not result.success:
             logger.warning("Embedding failed for %s: %s", pipeline_id, result.error)
-            repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            repo.update_state(
+                pipeline_id,
+                PipelineState.NEEDS_RETRY,
+                error_details={"embedding_error": result.error, "failed_in": "embedding"},
+            )
             return {
                 "state": PipelineState.NEEDS_RETRY.value,
                 "embedding_error": result.error,
@@ -163,7 +167,11 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
 
     except Exception as e:
         logger.error("Embedding exception for %s: %s", pipeline_id, e)
-        repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+        repo.update_state(
+            pipeline_id,
+            PipelineState.NEEDS_RETRY,
+            error_details={"embedding_error": str(e), "failed_in": "embedding"},
+        )
         return {
             "state": PipelineState.NEEDS_RETRY.value,
             "embedding_error": str(e),

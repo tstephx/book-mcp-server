@@ -349,9 +349,11 @@ class PipelineRepository:
 
             # Remove the UNIQUE constraint collision by clearing old hash
             old_hash = old["content_hash"]
+            # Strip any existing "archived:" prefix before re-prefixing
+            raw_hash = old_hash.removeprefix("archived:")
             cursor.execute(
                 "UPDATE processing_pipelines SET content_hash = ? WHERE id = ?",
-                (f"archived:{old_hash}", pipeline_id),
+                (f"archived:{pipeline_id}:{raw_hash}", pipeline_id),
             )
 
             # Create new pipeline record

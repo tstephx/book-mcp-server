@@ -36,6 +36,7 @@ TRANSITIONS = {
     PipelineState.NEEDS_RETRY: {
         PipelineState.HASHING,
         PipelineState.PROCESSING,
+        PipelineState.EMBEDDING,
         PipelineState.REJECTED,
         PipelineState.FAILED,
     },
@@ -44,7 +45,7 @@ TRANSITIONS = {
     PipelineState.COMPLETE: {PipelineState.ARCHIVED},  # Can archive completed books
     PipelineState.REJECTED: {PipelineState.ARCHIVED},
     PipelineState.ARCHIVED: set(),  # Terminal
-    PipelineState.FAILED: set(),  # Terminal — intentionally not archivable (permanent operational record)
+    PipelineState.FAILED: {PipelineState.ARCHIVED},  # Terminal — archivable only via reingest
 }
 
 TERMINAL_STATES = {

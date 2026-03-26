@@ -76,8 +76,10 @@ def test_needs_retry_can_transition_to_failed():
     assert can_transition(PipelineState.NEEDS_RETRY, PipelineState.FAILED)
 
 
-def test_failed_has_no_outgoing_transitions():
+def test_failed_can_only_transition_to_archived():
     from agentic_pipeline.pipeline.states import PipelineState, can_transition
 
+    assert can_transition(PipelineState.FAILED, PipelineState.ARCHIVED)
     for state in PipelineState:
-        assert not can_transition(PipelineState.FAILED, state)
+        if state != PipelineState.ARCHIVED:
+            assert not can_transition(PipelineState.FAILED, state)
