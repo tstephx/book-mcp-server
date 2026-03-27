@@ -29,29 +29,33 @@ def _find_chapter_path(book_id: str, chapter_number: int, recorded_path: str) ->
     if chapter_path.exists():
         return chapter_path, chapter_path.is_dir()
 
-    # Try to find it in the books directory
-    book_dir = Config.BOOKS_DIR / book_id / "chapters"
+    # Try candidate directories: books/ (new pipeline) and processed/ (legacy)
+    candidates = [
+        Config.BOOKS_DIR / book_id / "chapters",
+        Config.BOOKS_DIR.parent / "processed" / book_id / "chapters",
+    ]
 
-    if not book_dir.exists():
-        raise FileNotFoundError(f"Book directory not found: {book_dir}")
+    for book_dir in candidates:
+        if not book_dir.exists():
+            continue
 
-    # Look for chapter file or folder by number prefix
-    potential_matches = list(book_dir.glob(f"{chapter_number:02d}-*"))
+        potential_matches = list(book_dir.glob(f"{chapter_number:02d}-*"))
+        if not potential_matches:
+            continue
 
-    if not potential_matches:
-        raise FileNotFoundError(f"Chapter {chapter_number} not found in {book_dir}")
+        # Prefer folders (split chapters) over files if both exist
+        for match in potential_matches:
+            if match.is_dir():
+                return match, True
 
-    # Prefer folders (split chapters) over files if both exist
-    for match in potential_matches:
-        if match.is_dir():
-            return match, True
+        # Otherwise return the first .md file
+        for match in potential_matches:
+            if match.suffix == ".md":
+                return match, False
 
-    # Otherwise return the first .md file
-    for match in potential_matches:
-        if match.suffix == ".md":
-            return match, False
+        return potential_matches[0], potential_matches[0].is_dir()
 
-    return potential_matches[0], potential_matches[0].is_dir()
+    raise FileNotFoundError(f"Chapter {chapter_number} for book {book_id} not found in any known location")
 
 
 def _read_file_content(file_path: Path, check_size: bool = True) -> str:
