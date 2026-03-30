@@ -323,7 +323,9 @@ def reingest(book_id: str, force_fallback: bool):
     # Process through the pipeline
     config = OrchestratorConfig.from_env()
     orchestrator = Orchestrator(config)
-    result = orchestrator._process_book(new_pid, source_path, record["content_hash"], force_fallback=force_fallback)
+    result = orchestrator.reprocess_existing(
+        new_pid, source_path, record["content_hash"], old_book_id=book_id, force_fallback=force_fallback
+    )
 
     state = result.get("state", "unknown")
     if state == "complete":
@@ -1229,9 +1231,7 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
     conn.row_factory = sqlite3.Row
     try:
         # Verify book exists
-        book = conn.execute(
-            "SELECT id, title FROM books WHERE id = ?", (book_id,)
-        ).fetchone()
+        book = conn.execute("SELECT id, title FROM books WHERE id = ?", (book_id,)).fetchone()
         if not book:
             # Try fuzzy match
             matches = conn.execute(
@@ -1256,9 +1256,7 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
             (book["id"], chapter_number),
         ).fetchone()
         if not chapter:
-            console.print(
-                f"[red]No chapter {chapter_number} found in '{book['title']}'[/red]"
-            )
+            console.print(f"[red]No chapter {chapter_number} found in '{book['title']}'[/red]")
             return
 
         old_title = chapter["title"]

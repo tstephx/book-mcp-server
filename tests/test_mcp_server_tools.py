@@ -195,5 +195,5 @@ def test_reprocess_existing_returns_pipeline_result(db_path, tmp_path):
     with patch.object(orchestrator, "_process_book", return_value=mock_result) as mock_pb:
         result = orchestrator.reprocess_existing(pid, "/book.epub", "testhash123")
 
-    mock_pb.assert_called_once_with(pid, "/book.epub", "testhash123")
+    mock_pb.assert_called_once_with(pid, "/book.epub", "testhash123", force_fallback=False)
     assert result["pipeline_id"] == pid

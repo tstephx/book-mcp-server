@@ -300,19 +300,34 @@ class Orchestrator:
             self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
             return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
-    def reprocess_existing(self, pipeline_id: str, book_path: str, content_hash: str) -> dict:
+    def reprocess_existing(
+        self,
+        pipeline_id: str,
+        book_path: str,
+        content_hash: str,
+        old_book_id: Optional[str] = None,
+        force_fallback: bool = False,
+    ) -> dict:
         """Drive an already-created pipeline record through the full processing states.
 
         Use this when the pipeline record has been created externally (e.g. by
         prepare_reingest) and the caller holds the pipeline_id. Unlike process_one(),
         this method skips hashing, idempotency checks, and record creation.
+
+        Args:
+            old_book_id: If provided, clean up old book/chapter data before processing
+                to avoid duplicates (used by reingest flow).
+            force_fallback: If True, force LLM fallback processing.
         """
         import time
+
+        if old_book_id:
+            self._cleanup_book_data(old_book_id)
 
         start_time = time.time()
         self.logger.processing_started(pipeline_id, book_path)
         try:
-            result = self._process_book(pipeline_id, book_path, content_hash)
+            result = self._process_book(pipeline_id, book_path, content_hash, force_fallback=force_fallback)
             duration = time.time() - start_time
             self.logger.processing_complete(pipeline_id, duration)
             return result
