@@ -14,7 +14,6 @@ import argparse
 import json
 import os
 import sqlite3
-import sys
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -366,7 +365,7 @@ def main():
         if not toc_titles:
             stats["no_toc"] += 1
             if args.verbose:
-                print(f"  No TOC titles found")
+                print("  No TOC titles found")
             continue
 
         if ext == ".epub":
@@ -401,7 +400,7 @@ def main():
     else:
         print("\nDRY RUN — no file written")
 
-    print(f"\n--- Results ---")
+    print("\n--- Results ---")
     print(f"Total books:       {stats['total']}")
     print(f"Source found:      {stats['source_found']}")
     print(f"Source missing:    {stats['source_missing']}")
