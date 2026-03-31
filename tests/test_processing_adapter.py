@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+pytest.importorskip("book_ingestion", reason="book_ingestion not installed (CI)")
+
 from agentic_pipeline.adapters.processing_adapter import (
     ProcessingAdapter,
     ProcessingResult,

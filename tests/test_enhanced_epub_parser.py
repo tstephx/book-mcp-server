@@ -5,6 +5,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+pytest.importorskip("book_ingestion", reason="book_ingestion not installed (CI)")
+
 from agentic_pipeline.converters.enhanced_epub_parser import (
     EnhancedEPUBParser,
     EPUBStructure,

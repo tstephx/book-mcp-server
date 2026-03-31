@@ -5,6 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("book_ingestion", reason="book_ingestion not installed (CI)")
+
 from agentic_pipeline.adapters.llm_fallback_adapter import LLMFallbackAdapter
 from book_ingestion.ports.llm_fallback import LLMFallbackRequest
 
