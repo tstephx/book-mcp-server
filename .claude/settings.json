@@ -22,5 +22,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "commands-database-operations@buildwithclaude": true
   }
 }

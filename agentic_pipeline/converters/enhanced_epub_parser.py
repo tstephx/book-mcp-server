@@ -81,7 +81,7 @@ class EnhancedEPUBParser:
     SKIP_PATTERNS = re.compile(
         r"^(cover|cover page|title|title page|copyright|contents|toc|"
         r"table of contents|dedication|acknowledgments?|preface|foreword|"
-        r"introduction|about the authors?|about this book|index|glossary|"
+        r"about the authors?|about this book|index|glossary|"
         r"bibliography|appendix|colophon|front matter|back matter|"
         r"half title|full title|also by|praise for|endorsements|notes|"
         r"references|who this book is for|what this book covers|"
