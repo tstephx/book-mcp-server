@@ -1223,13 +1223,10 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
     NEW_TITLE is the new title to set.
     """
     from .db.config import get_db_path
-
-    import sqlite3
+    from .db.connection import get_pipeline_db
 
     db_path = get_db_path()
-    conn = sqlite3.connect(str(db_path), timeout=10)
-    conn.row_factory = sqlite3.Row
-    try:
+    with get_pipeline_db(str(db_path)) as conn:
         # Verify book exists
         book = conn.execute("SELECT id, title FROM books WHERE id = ?", (book_id,)).fetchone()
         if not book:
@@ -1268,23 +1265,17 @@ def update_title(book_id: str, chapter_number: int, new_title: str):
         console.print(f"[green]Updated chapter {chapter_number}:[/green]")
         console.print(f"  Old: {old_title}")
         console.print(f"  New: {new_title}")
-    finally:
-        conn.close()
 
 
 @main.command("library-issues")
 def library_issues():
     """Report library data quality issues (empty titles, duplicates, etc.)."""
     from .db.config import get_db_path
-
-    import sqlite3
+    from .db.connection import get_pipeline_db
 
     db_path = get_db_path()
-    conn = sqlite3.connect(str(db_path), timeout=10)
-    conn.row_factory = sqlite3.Row
     issues = []
-
-    try:
+    with get_pipeline_db(str(db_path)) as conn:
         # Empty or missing titles
         empty = conn.execute(
             "SELECT id, title, author FROM books WHERE title IS NULL OR TRIM(title) = '' OR title = '(Title Missing)'"
@@ -1336,9 +1327,6 @@ def library_issues():
                     total += len(items)
             console.print(f"\n[bold]{total} affected books across {len(issues)} categories[/bold]")
             console.print("Use [bold]update-title[/bold] to fix chapter titles, or manual SQL for book titles.")
-
-    finally:
-        conn.close()
 
 
 if __name__ == "__main__":
