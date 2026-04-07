@@ -10,10 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from book_ingestion import (
-    BookIngestionApp,
-    ProcessingMode,
-)
+from book_ingestion import BookIngestionApp, ProcessingMode
 from src.utils.chunker import chunk_chapter
 from src.utils.openai_embeddings import OpenAIEmbeddingGenerator
 
@@ -81,19 +78,12 @@ class ProcessingAdapter:
         self.db_path = Path(db_path)
         self.output_dir = output_dir or self.db_path.parent / "processed"
 
-        # Create LLM fallback if enabled
-        llm_fallback = None
-        if enable_llm_fallback:
-            llm_fallback = LLMFallbackAdapter(confidence_threshold=llm_fallback_threshold)
-
-        # Create the book ingestion app
-        self._app = BookIngestionApp.create(
-            db_path=self.db_path,
-            output_dir=self.output_dir,
-            llm_fallback=llm_fallback,
-            processing_mode=ProcessingMode(processing_mode),
-            llm_fallback_threshold=llm_fallback_threshold,
-        )
+        # Store config for per-call app creation (BookIngestionApp holds a SQLite
+        # connection; creating it here would bind it to the main thread and fail
+        # when process_book() is called from a ThreadPoolExecutor worker thread)
+        self._enable_llm_fallback = enable_llm_fallback
+        self._llm_fallback_threshold = llm_fallback_threshold
+        self._processing_mode = processing_mode
 
         # Lazy-loaded embedding generator
         self._embedding_generator: Optional[OpenAIEmbeddingGenerator] = None
@@ -123,7 +113,19 @@ class ProcessingAdapter:
         logger.info(f"Processing book: {book_path}")
 
         try:
-            result = self._app.process(
+            # Create app in the calling thread — BookIngestionApp holds a SQLite
+            # connection and cannot be shared across threads
+            llm_fallback = None
+            if self._enable_llm_fallback:
+                llm_fallback = LLMFallbackAdapter(confidence_threshold=self._llm_fallback_threshold)
+            app = BookIngestionApp.create(
+                db_path=self.db_path,
+                output_dir=self.output_dir,
+                llm_fallback=llm_fallback,
+                processing_mode=ProcessingMode(self._processing_mode),
+                llm_fallback_threshold=self._llm_fallback_threshold,
+            )
+            result = app.process(
                 file_path=book_path,
                 title=title,
                 author=author,

@@ -14,6 +14,28 @@ from agentic_pipeline.adapters.processing_adapter import (
 )
 
 
+def _make_mock_app(mock_result):
+    """Return a mock BookIngestionApp whose .process() returns mock_result."""
+    mock_app = MagicMock()
+    mock_app.process.return_value = mock_result
+    return mock_app
+
+
+def _make_success_result(book_id="test-123", quality_score=85, chapters=None):
+    mock_result = MagicMock()
+    mock_result.success = True
+    mock_result.book_id = book_id
+    mock_result.pipeline_result = MagicMock()
+    mock_result.pipeline_result.quality_report.quality_score = quality_score
+    mock_result.pipeline_result.detection_confidence = 0.9
+    mock_result.pipeline_result.detection_method = "toc"
+    mock_result.pipeline_result.needs_review = False
+    mock_result.pipeline_result.warnings = []
+    mock_result.pipeline_result.chapters = chapters or [{"word_count": 1000}]
+    mock_result.llm_fallback_used = False
+    return mock_result
+
+
 class TestProcessingAdapterInit:
     """Tests for ProcessingAdapter initialization."""
 
@@ -34,8 +56,8 @@ class TestProcessingAdapterInit:
 
         assert adapter.output_dir == output_dir
 
-    def test_creates_llm_fallback_when_enabled(self, tmp_path):
-        """LLM fallback is created when enabled."""
+    def test_stores_llm_fallback_config(self, tmp_path):
+        """LLM fallback config is stored for per-call use."""
         db_path = tmp_path / "test.db"
 
         adapter = ProcessingAdapter(
@@ -44,8 +66,8 @@ class TestProcessingAdapterInit:
             llm_fallback_threshold=0.6,
         )
 
-        # The adapter should have configured LLM fallback
-        assert adapter._app is not None
+        assert adapter._enable_llm_fallback is True
+        assert adapter._llm_fallback_threshold == 0.6
 
 
 class TestProcessingAdapterProcessBook:
@@ -56,20 +78,13 @@ class TestProcessingAdapterProcessBook:
         db_path = tmp_path / "test.db"
         adapter = ProcessingAdapter(db_path=db_path)
 
-        # Mock the internal app to avoid actual processing
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.book_id = "test-123"
-        mock_result.pipeline_result = MagicMock()
-        mock_result.pipeline_result.quality_report.quality_score = 85
-        mock_result.pipeline_result.detection_confidence = 0.9
-        mock_result.pipeline_result.detection_method = "toc"
-        mock_result.pipeline_result.needs_review = False
-        mock_result.pipeline_result.warnings = []
-        mock_result.pipeline_result.chapters = [{"word_count": 1000}]
-        mock_result.llm_fallback_used = False
+        mock_result = _make_success_result()
+        mock_app = _make_mock_app(mock_result)
 
-        with patch.object(adapter._app, "process", return_value=mock_result):
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
             result = adapter.process_book(
                 book_path="/fake/book.epub",
                 save_to_storage=False,
@@ -86,10 +101,8 @@ class TestProcessingAdapterProcessBook:
         db_path = tmp_path / "test.db"
         adapter = ProcessingAdapter(db_path=db_path)
 
-        # Mock app to raise an error
-        with patch.object(
-            adapter._app,
-            "process",
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
             side_effect=RuntimeError("Conversion failed"),
         ):
             result = adapter.process_book(
@@ -111,7 +124,12 @@ class TestProcessingAdapterProcessBook:
         mock_result.error = "Chapter detection failed"
         mock_result.pipeline_result = None
 
-        with patch.object(adapter._app, "process", return_value=mock_result):
+        mock_app = _make_mock_app(mock_result)
+
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
             result = adapter.process_book(
                 book_path="/fake/book.epub",
                 save_to_storage=False,
@@ -130,23 +148,25 @@ class TestProcessingAdapterFields:
         db_path = tmp_path / "test.db"
         adapter = ProcessingAdapter(db_path=db_path)
 
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.book_id = "test-789"
-        mock_result.pipeline_result = MagicMock()
-        mock_result.pipeline_result.quality_report.quality_score = 75
-        mock_result.pipeline_result.detection_confidence = 0.8
+        mock_result = _make_success_result(
+            book_id="test-789",
+            quality_score=75,
+            chapters=[
+                {"word_count": 1000},
+                {"word_count": 2000},
+                {"word_count": 3000},
+            ],
+        )
         mock_result.pipeline_result.detection_method = "pattern"
         mock_result.pipeline_result.needs_review = True
         mock_result.pipeline_result.warnings = ["low confidence"]
-        mock_result.pipeline_result.chapters = [
-            {"word_count": 1000},
-            {"word_count": 2000},
-            {"word_count": 3000},
-        ]
-        mock_result.llm_fallback_used = False
 
-        with patch.object(adapter._app, "process", return_value=mock_result):
+        mock_app = _make_mock_app(mock_result)
+
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
             result = adapter.process_book(
                 book_path="/fake/book.epub",
                 save_to_storage=False,
@@ -160,28 +180,29 @@ class TestProcessingAdapterFields:
         db_path = tmp_path / "test.db"
         adapter = ProcessingAdapter(db_path=db_path)
 
-        mock_result = MagicMock()
-        mock_result.success = True
-        mock_result.book_id = "test-abc"
-        mock_result.pipeline_result = MagicMock()
-        mock_result.pipeline_result.quality_report.quality_score = 70
+        mock_result = _make_success_result(
+            book_id="test-abc",
+            quality_score=70,
+            chapters=[
+                {"title": "Chapter 1"},  # No word_count
+                {"word_count": 2000},
+            ],
+        )
         mock_result.pipeline_result.detection_confidence = 0.75
         mock_result.pipeline_result.detection_method = "heuristic"
-        mock_result.pipeline_result.needs_review = False
-        mock_result.pipeline_result.warnings = []
-        mock_result.pipeline_result.chapters = [
-            {"title": "Chapter 1"},  # No word_count
-            {"word_count": 2000},
-        ]
         mock_result.llm_fallback_used = True
 
-        with patch.object(adapter._app, "process", return_value=mock_result):
+        mock_app = _make_mock_app(mock_result)
+
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
             result = adapter.process_book(
                 book_path="/fake/book.epub",
                 save_to_storage=False,
             )
 
-        # Should handle missing word_count gracefully (defaults to 0)
         assert result.word_count == 2000
         assert result.llm_fallback_used is True
 
