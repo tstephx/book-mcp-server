@@ -224,4 +224,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-04-16*
