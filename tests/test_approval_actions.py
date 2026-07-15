@@ -74,6 +74,76 @@ def test_approve_book(db_path):
     assert pipeline["approved_by"] == "human:taylor"
 
 
+class TestApproveBookForeground:
+    """A caller that exits on return must embed before returning.
+
+    Regression: approve_book() spawns embedding on a daemon thread, which dies
+    with the process. That is correct for the long-lived MCP server but silently
+    wrong for `agentic-pipeline approve`, which prints and exits — the book was
+    left in APPROVED with no chunks and no error. It only ever completed because
+    a background worker happened to sweep up APPROVED books.
+    """
+
+    def test_foreground_embeds_before_returning(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        calls = []
+
+        def fake_complete(db, pid, pipeline):
+            calls.append(pid)
+            return {"state": PipelineState.COMPLETE.value, "chapters_embedded": 7}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        assert calls == [pid], "embedding must run before approve_book returns"
+        assert result["success"] is True
+        assert result["state"] == PipelineState.COMPLETE.value
+        assert result["chapters_embedded"] == 7
+
+    def test_foreground_surfaces_embedding_failure(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        def fake_complete(db, pid, pipeline):
+            return {"state": PipelineState.NEEDS_RETRY.value, "embedding_error": "quota exceeded"}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        assert result["state"] == PipelineState.NEEDS_RETRY.value
+        assert result["embedding_error"] == "quota exceeded"
+
+    def test_foreground_does_not_spawn_a_thread(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        def fake_complete(db, pid, pipeline):
+            return {"state": PipelineState.COMPLETE.value, "chapters_embedded": 1}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            with patch.object(actions.threading, "Thread") as MockThread:
+                pid = _create_pending_pipeline(db_path)
+                actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        MockThread.assert_not_called()
+
+    def test_background_remains_the_default(self, db_path):
+        """The MCP server must keep its non-blocking behaviour."""
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        with patch.object(actions, "_run_embedding_background"):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="mcp")
+
+        assert result["state"] == PipelineState.APPROVED.value
+        assert result["embedding"] == "queued"
+
+
 def test_reject_book(db_path):
     from agentic_pipeline.approval.actions import reject_book
     from agentic_pipeline.db.pipelines import PipelineRepository

@@ -82,7 +82,8 @@ def approve(pipeline_id: str):
     from .approval.actions import approve_book
 
     db_path = get_db_path()
-    result = approve_book(db_path, pipeline_id, actor="human:cli")
+    # background=False: this process exits on return and would kill a daemon thread.
+    result = approve_book(db_path, pipeline_id, actor="human:cli", background=False)
 
     if result["success"]:
         state = result.get("state", "approved")

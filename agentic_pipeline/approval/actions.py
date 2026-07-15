@@ -188,11 +188,21 @@ def approve_book(
     pipeline_id: str,
     actor: str,
     adjustments: Optional[dict] = None,
+    background: bool = True,
 ) -> dict:
-    """Approve a book. Returns immediately; embedding runs in a background thread.
+    """Approve a book, driving PENDING_APPROVAL → APPROVED → EMBEDDING → COMPLETE.
 
-    The pipeline transitions PENDING_APPROVAL → APPROVED on return.
-    The background thread then drives APPROVED → EMBEDDING → COMPLETE (or NEEDS_RETRY).
+    Args:
+        background: When True (default), embedding runs on a daemon thread and
+            this returns as soon as the book is APPROVED — right for the MCP
+            server, which outlives the thread. Callers that exit on return (the
+            CLI) MUST pass False: a daemon thread dies with the process, leaving
+            the book APPROVED with no chunks and no error reported.
+
+    Returns:
+        With background=True: state=APPROVED, embedding="queued".
+        With background=False: the embedding outcome — state=COMPLETE with
+        chapters_embedded, or state=NEEDS_RETRY with embedding_error.
     """
     repo = PipelineRepository(db_path)
     pipeline = repo.get(pipeline_id)
@@ -226,6 +236,10 @@ def approve_book(
         adjustments=adjustments,
         confidence=confidence,
     )
+
+    if not background:
+        # Caller exits on return — embed here or the work never happens.
+        return {"success": True, "pipeline_id": pipeline_id, **_complete_approved(db_path, pipeline_id, pipeline)}
 
     # Fire-and-forget: embedding runs in background, MCP caller is not blocked
     thread = threading.Thread(
