@@ -3,11 +3,17 @@
 import uuid
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.pipeline.states import PipelineState, can_transition
+
+# How long a book may sit in PROCESSING without being touched before we treat it
+# as orphaned by a crash. Must exceed the longest realistic extraction — a large
+# EPUB takes ~90s — or a worker restart will steal a book another actor is
+# actively processing. Matches OrchestratorConfig.processing_timeout.
+STALE_PROCESSING_SECONDS = 600
 
 
 class PipelineRepository:
@@ -371,23 +377,36 @@ class PipelineRepository:
             return new_id
 
     def reset_stale_processing(self) -> int:
-        """Reset books stuck in processing state (orphaned by a previous crash).
+        """Reset books orphaned in processing state by a crashed worker.
 
-        Any book in 'processing' state with a NULL heartbeat was never actively
-        worked on by this worker instance — safe to reset to 'detected'.
+        Staleness is judged by how long the record has sat untouched: a crashed
+        book's updated_at stops advancing, while one being actively processed
+        keeps moving. Books touched within STALE_PROCESSING_SECONDS are left
+        alone — they may belong to another worker or a CLI reingest running
+        right now, and resetting one mid-flight lets two actors drive the same
+        record until the transition validator kills it.
+
+        The previous guard was `last_heartbeat IS NULL`, but no code has ever
+        written last_heartbeat, so it matched every row and reset every
+        in-flight book. Dropped rather than kept as a no-op.
 
         Returns:
             Number of books reset.
         """
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=STALE_PROCESSING_SECONDS)).isoformat()
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
+            # julianday() parses both 'YYYY-MM-DDTHH:MM:SS+00:00' and
+            # 'YYYY-MM-DD HH:MM:SS'; a plain string compare would not.
             cursor.execute(
                 """
                 UPDATE processing_pipelines
                 SET state = ?, retry_count = 0
-                WHERE state = ? AND last_heartbeat IS NULL
+                WHERE state = ?
+                  AND updated_at IS NOT NULL
+                  AND julianday(updated_at) < julianday(?)
             """,
-                (PipelineState.DETECTED.value, PipelineState.PROCESSING.value),
+                (PipelineState.DETECTED.value, PipelineState.PROCESSING.value, cutoff),
             )
             conn.commit()
             return cursor.rowcount
