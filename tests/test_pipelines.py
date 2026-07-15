@@ -5,6 +5,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from conftest import transition_to
 
@@ -16,6 +17,118 @@ def _set_updated_at(db_path, pipeline_id, seconds_ago):
     conn.execute("UPDATE processing_pipelines SET updated_at = ? WHERE id = ?", (ts, pipeline_id))
     conn.commit()
     conn.close()
+
+
+class TestConcurrentClaim:
+    """Two actors must not both drive one pipeline.
+
+    Regression: the worker reads find_by_state(DETECTED) then acts, with no
+    atomic claim. A CLI reingest driving the same record raced it; both ran
+    detected->hashing->classifying, then one tried SELECTING_STRATEGY against a
+    state the other had already moved to PROCESSING. The loser's crash routed
+    the book to NEEDS_RETRY, the retry loop exhausted it, and two books were
+    destroyed with their data already cleaned up.
+    """
+
+    def test_losing_a_race_raises_instead_of_overwriting(self, db_path):
+        """If another actor moves the record between our read and our write, fail."""
+        from agentic_pipeline.db import pipelines as pl
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        repo = PipelineRepository(db_path)
+        pid = repo.create("/path/to/book.epub", "abc123")
+
+        real = pl.can_transition
+
+        def steal_then_allow(old, new):
+            """Simulate a rival claiming the record inside our read-write window."""
+            rival = sqlite3.connect(db_path)
+            rival.execute(
+                "UPDATE processing_pipelines SET state = ? WHERE id = ?",
+                (PipelineState.HASHING.value, pid),
+            )
+            rival.commit()
+            rival.close()
+            return real(old, new)
+
+        with patch.object(pl, "can_transition", steal_then_allow):
+            with pytest.raises(ConcurrentModificationError):
+                repo.update_state(pid, PipelineState.HASHING)
+
+    def test_the_rivals_write_is_not_clobbered(self, db_path):
+        """The loser must leave the winner's state intact."""
+        from agentic_pipeline.db import pipelines as pl
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        repo = PipelineRepository(db_path)
+        pid = repo.create("/path/to/book.epub", "abc123")
+        real = pl.can_transition
+
+        def steal_then_allow(old, new):
+            rival = sqlite3.connect(db_path)
+            rival.execute(
+                "UPDATE processing_pipelines SET state = ? WHERE id = ?",
+                (PipelineState.HASHING.value, pid),
+            )
+            rival.commit()
+            rival.close()
+            return real(old, new)
+
+        with patch.object(pl, "can_transition", steal_then_allow):
+            with pytest.raises(ConcurrentModificationError):
+                repo.update_state(pid, PipelineState.HASHING)
+
+        assert repo.get(pid)["state"] == PipelineState.HASHING.value
+
+    def test_expected_state_refuses_to_touch_a_record_we_no_longer_own(self, db_path):
+        """A recovery path must not reset a record another actor has taken.
+
+        The worker reads a book as DETECTED, then on error forces NEEDS_RETRY.
+        If the rival already moved it to HASHING, that reset is still a *valid*
+        transition — so only an explicit ownership assertion stops the clobber.
+        """
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        repo = PipelineRepository(db_path)
+        pid = repo.create("/path/to/book.epub", "abc123")
+        repo.update_state(pid, PipelineState.HASHING)  # rival claimed it
+
+        # We still believe it is DETECTED, as the worker's stale read would.
+        with pytest.raises(ConcurrentModificationError):
+            repo.update_state(pid, PipelineState.NEEDS_RETRY, expected_state=PipelineState.DETECTED)
+
+        assert repo.get(pid)["state"] == PipelineState.HASHING.value
+
+    def test_expected_state_allows_the_owner_through(self, db_path):
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        repo = PipelineRepository(db_path)
+        pid = repo.create("/path/to/book.epub", "abc123")
+
+        repo.update_state(pid, PipelineState.HASHING, expected_state=PipelineState.DETECTED)
+
+        assert repo.get(pid)["state"] == PipelineState.HASHING.value
+
+    def test_uncontended_transition_still_works(self, db_path):
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        repo = PipelineRepository(db_path)
+        pid = repo.create("/path/to/book.epub", "abc123")
+
+        repo.update_state(pid, PipelineState.HASHING)
+
+        assert repo.get(pid)["state"] == PipelineState.HASHING.value
+
+    def test_concurrent_error_is_not_swallowed_as_invalid_transition(self, db_path):
+        """ConcurrentModificationError must be distinguishable from a bad transition."""
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError
+
+        assert not issubclass(ConcurrentModificationError, ValueError)
 
 
 class TestResetStaleProcessing:

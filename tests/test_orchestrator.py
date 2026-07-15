@@ -198,6 +198,42 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     assert pipeline["approved_by"] == "auto:high_confidence"
 
 
+def test_worker_losing_a_race_does_not_clobber_the_winner(db_path, config):
+    """Losing a claim means another actor owns the book — leave it alone.
+
+    Regression: the worker's `except Exception` forced NEEDS_RETRY on any error.
+    A lost claim is not a processing failure; forcing NEEDS_RETRY would yank the
+    record out from under the actor that legitimately won it.
+    """
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+    import threading
+    import time
+
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "hash-race")
+
+    orchestrator = Orchestrator(config)
+
+    def lose_the_race(pipeline_id, book_path, content_hash):
+        raise ConcurrentModificationError(f"{pipeline_id} was claimed by another actor")
+
+    orchestrator._process_book = lose_the_race
+
+    def run_and_stop():
+        time.sleep(0.1)
+        orchestrator.shutdown_requested = True
+
+    stopper = threading.Thread(target=run_and_stop)
+    stopper.start()
+    orchestrator.run_worker()
+    stopper.join()
+
+    # The winner's record must be untouched — not dragged to NEEDS_RETRY.
+    assert repo.get(pid)["state"] == PipelineState.DETECTED.value
+
+
 def test_orchestrator_worker_processes_queue(db_path, config):
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.db.pipelines import PipelineRepository
