@@ -226,6 +226,23 @@ class PipelineRepository:
             )
             conn.commit()
 
+    def update_source_path(self, pipeline_id: str, source_path: str) -> None:
+        """Point the record at the file's current location.
+
+        Called after archiving moves the source. Without it the record keeps
+        naming a path that no longer exists and reingest cannot find the book.
+        """
+        with get_pipeline_db(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE processing_pipelines
+                SET source_path = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (source_path, datetime.now(timezone.utc).isoformat(), pipeline_id),
+            )
+            conn.commit()
+
     def update_processing_result(self, pipeline_id: str, processing_result: dict) -> None:
         """Update the processing result from book-ingestion.
 

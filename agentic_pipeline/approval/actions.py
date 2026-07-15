@@ -73,6 +73,32 @@ def _get_processed_dir() -> Optional[Path]:
     return Path(processed_dir_str).resolve() if processed_dir_str else None
 
 
+def resolve_source_file(source_path: Optional[str]) -> Optional[Path]:
+    """Locate a book's source file, following it into the archive if it moved.
+
+    Records written before archiving updated source_path still name the original
+    watch-dir path, which auto-archive emptied. Fall back to the same basename
+    under processed_dir.
+
+    Returns None when the file cannot be found — the caller decides whether that
+    is fatal.
+    """
+    if not source_path:
+        return None
+
+    src = Path(source_path)
+    if src.exists():
+        return src
+
+    processed_dir = _get_processed_dir()
+    if processed_dir:
+        archived = Path(processed_dir) / src.name
+        if archived.exists():
+            return archived
+
+    return None
+
+
 def _archive_source_file(
     source_path: str,
     processed_dir: Optional[Path] = None,
@@ -155,10 +181,16 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
 
         repo.update_state(pipeline_id, PipelineState.COMPLETE)
 
-        # Archive source file if configured
+        # Archive source file if configured, and follow it in the record —
+        # otherwise source_path names a file that is no longer there and
+        # reingest refuses to run.
         source_path = pipeline.get("source_path")
         if source_path:
-            _archive_source_file(source_path)
+            archived_name = _archive_source_file(source_path)
+            processed_dir = _get_processed_dir()
+            if archived_name and processed_dir:
+                # archived_name, not the original: collisions rename to stem_1.
+                repo.update_source_path(pipeline_id, str(Path(processed_dir) / archived_name))
 
         return {
             "state": PipelineState.COMPLETE.value,

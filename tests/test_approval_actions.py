@@ -74,6 +74,109 @@ def test_approve_book(db_path):
     assert pipeline["approved_by"] == "human:taylor"
 
 
+class TestResolveSourceFile:
+    """Find a book whose record predates the archive-tracking fix."""
+
+    def test_prefers_the_recorded_path(self, tmp_path):
+        from agentic_pipeline.approval.actions import resolve_source_file
+
+        book = tmp_path / "b.epub"
+        book.write_bytes(b"x")
+
+        assert resolve_source_file(str(book)) == book
+
+    def test_falls_back_to_the_processed_dir(self, tmp_path):
+        """142 of 307 completed books point at a path auto-archive emptied."""
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        archived = processed / "b.epub"
+        archived.write_bytes(b"x")
+        stale = tmp_path / "watch" / "b.epub"  # never existed / moved away
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale)) == archived
+
+    def test_returns_none_when_the_file_is_gone(self, tmp_path):
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub")) is None
+
+    def test_handles_no_processed_dir_configured(self, tmp_path):
+        from agentic_pipeline.approval import actions
+
+        with patch.object(actions, "_get_processed_dir", return_value=None):
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub")) is None
+
+    def test_handles_empty_source_path(self):
+        from agentic_pipeline.approval.actions import resolve_source_file
+
+        assert resolve_source_file(None) is None
+        assert resolve_source_file("") is None
+
+
+class TestArchiveRecordsNewLocation:
+    """Archiving moves the file; the record must learn where it went.
+
+    Regression: _complete_approved() called _archive_source_file() and discarded
+    its return, so source_path kept pointing at a file that no longer existed.
+    reingest checks that path and refuses — broken for 142 of 307 completed books
+    (46%). Collisions make it worse: the archive renames to 'stem_1.epub', so
+    even guessing by basename fails.
+    """
+
+    @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+    def test_source_path_points_at_the_archived_file(self, MockAdapter, db_path, tmp_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.db.pipelines import PipelineRepository
+
+        MockAdapter.return_value.generate_embeddings.return_value = _mock_embedding_result()
+
+        watch, processed = tmp_path / "watch", tmp_path / "processed"
+        watch.mkdir()
+        processed.mkdir()
+        book = watch / "b.epub"
+        book.write_bytes(b"epub")
+
+        pid, pipeline = _setup_approved_pipeline(db_path)
+        PipelineRepository(db_path).update_source_path(pid, str(book))
+        pipeline = PipelineRepository(db_path).get(pid)
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            actions._complete_approved(db_path, pid, pipeline)
+
+        assert PipelineRepository(db_path).get(pid)["source_path"] == str(processed / "b.epub")
+
+    @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+    def test_records_the_collision_renamed_filename(self, MockAdapter, db_path, tmp_path):
+        """A colliding archive becomes stem_1.epub — record that, not the original."""
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.db.pipelines import PipelineRepository
+
+        MockAdapter.return_value.generate_embeddings.return_value = _mock_embedding_result()
+
+        watch, processed = tmp_path / "watch", tmp_path / "processed"
+        watch.mkdir()
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"older book, same name")
+        book = watch / "b.epub"
+        book.write_bytes(b"epub")
+
+        pid, pipeline = _setup_approved_pipeline(db_path)
+        PipelineRepository(db_path).update_source_path(pid, str(book))
+        pipeline = PipelineRepository(db_path).get(pid)
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            actions._complete_approved(db_path, pid, pipeline)
+
+        assert PipelineRepository(db_path).get(pid)["source_path"] == str(processed / "b_1.epub")
+
+
 class TestApproveBookForeground:
     """A caller that exits on return must embed before returning.
 
