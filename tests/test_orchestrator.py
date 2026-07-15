@@ -275,6 +275,9 @@ def test_worker_survives_a_book_that_already_moved_to_needs_retry(db_path, confi
     stopper.join()
 
     assert orchestrator.shutdown_requested is True
+    # The book keeps the state _process_book left it in; the recovery path saw
+    # it was no longer DETECTED and declined to touch it.
+    assert repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value
 
 
 def test_worker_losing_a_race_does_not_clobber_the_winner(db_path, config):
