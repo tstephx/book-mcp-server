@@ -14,6 +14,7 @@ class BookType(Enum):
     NARRATIVE_NONFICTION = "narrative_nonfiction"
     PERIODICAL = "periodical"
     RESEARCH_COLLECTION = "research_collection"
+    TRAVEL_GUIDE = "travel_guide"
     UNKNOWN = "unknown"
 
     @classmethod

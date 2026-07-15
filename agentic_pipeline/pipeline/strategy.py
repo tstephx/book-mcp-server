@@ -13,9 +13,9 @@ STRATEGY_MAP = {
     "technical_reference": "technical_tutorial_v1",
     "textbook": "technical_tutorial_v1",
     "narrative_nonfiction": "narrative_v1",
-    "newspaper": "periodical_v1",
-    "magazine": "periodical_v1",
+    "periodical": "periodical_v1",
     "research_collection": "technical_tutorial_v1",
+    "travel_guide": "conservative_v1",
     "unknown": "conservative_v1",
 }
 

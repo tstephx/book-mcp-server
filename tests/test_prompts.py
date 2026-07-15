@@ -15,6 +15,17 @@ def test_load_classify_prompt():
     assert "technical_tutorial" in prompt
 
 
+def test_classify_prompt_offers_every_book_type():
+    """The model can only pick a type the prompt describes."""
+    from agentic_pipeline.agents.classifier_types import BookType
+    from agentic_pipeline.agents.prompts import load_prompt
+
+    prompt = load_prompt("classify")
+
+    for book_type in BookType:
+        assert book_type.value in prompt, f"classify.txt does not offer '{book_type.value}'"
+
+
 def test_format_classify_prompt():
     from agentic_pipeline.agents.prompts import load_prompt
 

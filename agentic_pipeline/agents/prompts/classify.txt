@@ -7,6 +7,7 @@ You are a book classifier. Analyze the provided text and classify it.
 - narrative_nonfiction: Stories, biographies, essays (e.g., "Steve Jobs")
 - periodical: Magazines, newspapers, journals
 - research_collection: Academic papers, proceedings
+- travel_guide: Destination guidebooks with itineraries, sightseeing, and practical travel advice (e.g., "Rick Steves Italy", "Lonely Planet Japan")
 - unknown: Cannot determine with confidence
 
 ## Instructions

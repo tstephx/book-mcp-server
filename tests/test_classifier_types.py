@@ -14,11 +14,35 @@ def test_book_type_enum_has_required_types():
         "NARRATIVE_NONFICTION",
         "PERIODICAL",
         "RESEARCH_COLLECTION",
+        "TRAVEL_GUIDE",
         "UNKNOWN",
     ]
 
     for book_type in required:
         assert hasattr(BookType, book_type), f"Missing type: {book_type}"
+
+
+def test_book_type_from_string_travel_guide():
+    from agentic_pipeline.agents.classifier_types import BookType
+
+    assert BookType.from_string("travel_guide") is BookType.TRAVEL_GUIDE
+    assert BookType.TRAVEL_GUIDE.value == "travel_guide"
+
+
+def test_travel_guide_round_trips_through_profile_dict():
+    from agentic_pipeline.agents.classifier_types import BookProfile, BookType
+
+    profile = BookProfile.from_dict(
+        {
+            "book_type": "travel_guide",
+            "confidence": 0.9,
+            "suggested_tags": ["italy", "sicily"],
+            "reasoning": "Guidebook with itineraries and practical advice",
+        }
+    )
+
+    assert profile.book_type is BookType.TRAVEL_GUIDE
+    assert profile.to_dict()["book_type"] == "travel_guide"
 
 
 def test_book_profile_creation():
