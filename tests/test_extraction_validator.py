@@ -3,15 +3,18 @@
 import hashlib
 import sqlite3
 import tempfile
+import zipfile
 from pathlib import Path
 from statistics import median
 
 import pytest
 
 from agentic_pipeline.validation.extraction_validator import (
+    MIN_SOURCE_COVERAGE,
     ExtractionValidator,
     ValidationResult,
     check_extraction_quality,
+    count_source_words,
 )
 
 
@@ -36,6 +39,108 @@ def _good_defaults(overrides: dict | None = None):
     if overrides:
         defaults.update(overrides)
     return defaults
+
+
+def _epub(path: Path, docs: dict[str, str]) -> str:
+    """Write a minimal EPUB-shaped zip and return its path."""
+    with zipfile.ZipFile(path, "w") as z:
+        for name, body in docs.items():
+            z.writestr(name, body)
+    return str(path)
+
+
+# ===========================================================================
+# Source completeness (regression: books silently extracted at 10% of source)
+# ===========================================================================
+
+
+class TestSourceCompleteness:
+    """An extraction that drops most of the book must fail validation.
+
+    Regression: Lonely Planet the World extracted 23,226 of 244,834 words
+    (9.5%) via epub_anchor at 0.9 confidence. Every internal check passed
+    because none compared the extraction against the source, so the
+    force_fallback retry — which recovers 100% — never fired.
+    """
+
+    def test_reject_extraction_keeping_far_less_than_source(self):
+        # _good_defaults extracts 10,000 words; source has 100,000 -> 10% kept
+        result = check_extraction_quality(**_good_defaults(), raw_source_words=100_000)
+
+        assert result.passed is False
+        assert any("10%" in r for r in result.reasons), result.reasons
+
+    def test_coverage_exactly_at_threshold_passes(self):
+        # Boundary: 10,000 / 20,000 == 0.5 == MIN_SOURCE_COVERAGE
+        raw = int(10_000 / MIN_SOURCE_COVERAGE)
+
+        result = check_extraction_quality(**_good_defaults(), raw_source_words=raw)
+
+        assert result.passed is True, result.reasons
+
+    def test_full_coverage_passes(self):
+        result = check_extraction_quality(**_good_defaults(), raw_source_words=10_000)
+
+        assert result.passed is True, result.reasons
+
+    def test_omitting_source_words_skips_the_check(self):
+        """Existing callers pass no source words and must keep working."""
+        result = check_extraction_quality(**_good_defaults())
+
+        assert result.passed is True
+        assert "source_coverage" not in result.metrics
+
+    def test_zero_source_words_skips_the_check(self):
+        """An unreadable source yields 0 — must not divide by zero or reject."""
+        result = check_extraction_quality(**_good_defaults(), raw_source_words=0)
+
+        assert result.passed is True, result.reasons
+
+    def test_source_coverage_metric_is_a_float_ratio(self):
+        raw = int(10_000 / MIN_SOURCE_COVERAGE)
+
+        result = check_extraction_quality(**_good_defaults(), raw_source_words=raw)
+
+        assert isinstance(result.metrics["source_coverage"], float)
+        assert result.metrics["source_coverage"] == pytest.approx(MIN_SOURCE_COVERAGE)
+
+
+class TestCountSourceWords:
+    """Counting raw words in the source file, used to measure coverage."""
+
+    def test_counts_words_across_epub_documents(self, tmp_path):
+        path = _epub(
+            tmp_path / "b.epub",
+            {
+                "a.xhtml": "<html><body><p>one two three</p></body></html>",
+                "b.xhtml": "<html><body><p>four five</p></body></html>",
+            },
+        )
+
+        assert count_source_words(path) == 5
+
+    def test_ignores_script_and_style_content(self, tmp_path):
+        path = _epub(
+            tmp_path / "b.epub",
+            {
+                "a.xhtml": (
+                    "<html><head><style>body {color: red; margin: 0}</style>"
+                    "<script>var x = 1; alert('hi')</script></head>"
+                    "<body><p>only these four words</p></body></html>"
+                )
+            },
+        )
+
+        assert count_source_words(path) == 4
+
+    def test_returns_none_for_non_epub(self, tmp_path):
+        path = tmp_path / "b.pdf"
+        path.write_bytes(b"%PDF-1.4 not a zip")
+
+        assert count_source_words(str(path)) is None
+
+    def test_returns_none_for_missing_file(self, tmp_path):
+        assert count_source_words(str(tmp_path / "nope.epub")) is None
 
 
 # ===========================================================================

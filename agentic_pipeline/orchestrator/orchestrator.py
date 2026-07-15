@@ -374,7 +374,7 @@ class Orchestrator:
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
         validator = ExtractionValidator()
-        validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
+        validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path)
 
         if not validation.passed:
             # Check if we can retry with force_fallback
@@ -415,7 +415,9 @@ class Orchestrator:
 
                 # Re-validate
                 self._transition(pipeline_id, PipelineState.VALIDATING)
-                validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
+                validation = validator.validate(
+                    book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path
+                )
 
             if not validation.passed:
                 reason = "; ".join(validation.reasons)
