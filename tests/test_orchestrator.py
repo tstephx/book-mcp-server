@@ -198,6 +198,85 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     assert pipeline["approved_by"] == "auto:high_confidence"
 
 
+def test_worker_survives_an_unexpected_error_in_the_loop(db_path, config):
+    """An unexpected exception must not kill the daemon.
+
+    The loop only caught sqlite3.OperationalError; anything else propagated out
+    of run_worker and ended the process. Under launchd KeepAlive that becomes a
+    silent respawn cycle, and every restart runs startup recovery — which is how
+    a single bug turns into repeated theft of in-flight work.
+    """
+    from agentic_pipeline.orchestrator import Orchestrator
+    import threading
+    import time
+
+    config.worker_poll_interval = 0.01  # don't wait out the post-error backoff
+    orchestrator = Orchestrator(config)
+    calls = []
+
+    real_find = orchestrator.repo.find_by_state
+
+    def explode_once(state, limit=None):
+        calls.append(state)
+        if len(calls) == 1:
+            raise RuntimeError("unexpected boom from the queue")
+        return real_find(state, limit=limit)
+
+    orchestrator.repo.find_by_state = explode_once
+
+    def run_and_stop():
+        time.sleep(0.15)
+        orchestrator.shutdown_requested = True
+
+    stopper = threading.Thread(target=run_and_stop)
+    stopper.start()
+    orchestrator.run_worker()  # must survive and return normally
+    stopper.join()
+
+    assert len(calls) > 1, "worker died on the first error instead of continuing"
+
+
+def test_worker_survives_a_book_that_already_moved_to_needs_retry(db_path, config):
+    """The recovery path must not kill the worker.
+
+    Regression: the `except Exception` handler called update_state(NEEDS_RETRY)
+    on a book that _process_book had already put in NEEDS_RETRY. That raised
+    `Invalid transition: needs_retry -> needs_retry` *inside* an except block, so
+    it propagated past the loop's OperationalError-only filter and killed the
+    process. launchd's KeepAlive respawned it, startup recovery stole whatever
+    was in flight, and the cycle repeated — twice today, silently.
+    """
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+    import threading
+    import time
+
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "hash-crash")
+
+    orchestrator = Orchestrator(config)
+
+    def fail_after_marking_retry(pipeline_id, book_path, content_hash):
+        # Exactly what the real _process_book does before an unexpected error.
+        repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+        raise RuntimeError("conversion blew up")
+
+    orchestrator._process_book = fail_after_marking_retry
+    orchestrator._retry_one = lambda book: {"state": "failed"}  # don't loop on it
+
+    def run_and_stop():
+        time.sleep(0.1)
+        orchestrator.shutdown_requested = True
+
+    stopper = threading.Thread(target=run_and_stop)
+    stopper.start()
+    orchestrator.run_worker()  # must return, not raise
+    stopper.join()
+
+    assert orchestrator.shutdown_requested is True
+
+
 def test_worker_losing_a_race_does_not_clobber_the_winner(db_path, config):
     """Losing a claim means another actor owns the book — leave it alone.
 

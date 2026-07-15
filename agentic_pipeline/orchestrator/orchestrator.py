@@ -682,7 +682,16 @@ class Orchestrator:
                     self.logger.error("worker", "DatabaseLocked", "DB locked, retrying in 5s")
                     time.sleep(5)
                 else:
-                    raise
+                    self.logger.error("worker", type(e).__name__, str(e))
+                    time.sleep(self.config.worker_poll_interval)
+            except Exception as e:
+                # Never let one bad iteration end the daemon. Dying here is worse
+                # than it looks: KeepAlive respawns us, startup recovery runs
+                # again, and a single repeating bug becomes a silent crash-loop
+                # that reclaims work other actors are holding.
+                self.logger.error("worker", type(e).__name__, str(e))
+                logger.exception("Unexpected error in worker loop; continuing")
+                time.sleep(self.config.worker_poll_interval)
 
         self.logger.worker_stopped()
 
