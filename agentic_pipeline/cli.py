@@ -1415,5 +1415,79 @@ def doctor(do_fix: bool, no_backup: bool, manifest_path):
         sys.exit(1)
 
 
+@main.command()
+@click.option("--swap", "do_swap", is_flag=True, help="Apply staged chunks to production (requires PASS verdict).")
+@click.option("--fresh", is_flag=True, help="Drop staging and start over.")
+@click.option("--yes", is_flag=True, help="Skip the embedding-cost confirmation.")
+def rechunk(do_swap: bool, fresh: bool, yes: bool) -> None:
+    """Re-chunk the library into staging, eval it, and (with --swap) apply.
+
+    Default mode stages + embeds + evals; production chunks are never
+    written. --swap applies a PASSed staging atomically (backup first).
+    Exit codes: 0 = PASS (or swap applied), 1 = FAIL verdict or refusal.
+    """
+    import sqlite3 as sqlite3_mod
+
+    from .db.config import get_db_path
+    from .db.migrations import run_migrations
+    from .library import rechunk as rc
+
+    db_path = get_db_path()
+    run_migrations(db_path)
+
+    if do_swap:
+        try:
+            report = rc.swap(db_path)
+        except rc.SwapRefused as e:
+            click.echo(f"REFUSED: {e}", err=True)
+            raise SystemExit(1)
+        click.echo(f"Swapped: {report['chunks']} chunks live (backup: {report['backup']})")
+        click.echo(f"data_version bumped to {report['data_version']}.")
+        return
+
+    conn = sqlite3_mod.connect(db_path, timeout=10)
+    conn.row_factory = sqlite3_mod.Row
+    try:
+        if fresh:
+            rc.drop_staging(conn)
+        rc.ensure_staging(conn)
+        report = rc.stage_all(conn)
+        click.echo(
+            f"Staged {report['staged_chunks']} chunks from {report['chapters']} chapters "
+            f"({report['reused_embeddings']} embeddings reused, "
+            f"{report['pending_embeddings']} pending)."
+        )
+        if report["carried_chapters"]:
+            click.echo(f"Carried as-is (source gone): {len(report['carried_chapters'])} chapters")
+        for ch in report["carried_chapters"]:
+            click.echo(f"  - {ch}")
+
+        est = rc.estimate_embedding_cost(conn)
+        if est["pending"]:
+            click.echo(f"Embedding {est['pending']} chunks (~{est['est_tokens']:,} tokens, ~${est['est_usd']:.2f}).")
+            if not yes and not click.confirm("Proceed with embedding spend?"):
+                click.echo("Aborted before embedding. Staging kept; rerun to resume.")
+                raise SystemExit(1)
+            rc.embed_pending(conn)
+    finally:
+        conn.close()
+
+    verdict = rc.run_gate_eval(db_path)
+    if verdict.get("baseline"):  # tolerate short-circuit verdicts in tests
+        for source in ("auto", "manual"):
+            for mode in ("semantic", "hybrid"):
+                b = verdict["baseline"][source][mode]
+                s = verdict["staged"][source][mode]
+                gate_tag = " <- GATE" if mode == "semantic" else ""
+                click.echo(
+                    f"{source:>6}/{mode:<8} hit@5 {b['hit_at_5']:.2f} -> {s['hit_at_5']:.2f}  "
+                    f"MRR {b['mrr']:.3f} -> {s['mrr']:.3f}{gate_tag}"
+                )
+    click.echo(
+        f"VERDICT: {'PASS — run `agentic-pipeline rechunk --swap` to apply' if verdict['pass'] else 'FAIL — no swap'}"
+    )
+    raise SystemExit(0 if verdict["pass"] else 1)
+
+
 if __name__ == "__main__":
     main()

@@ -1,0 +1,12 @@
+[
+  {"query": "best time of year to visit Mount Etna and how to get to the summit craters", "gold_chapter_id": null, "gold_book_id": "bda648c5-9fc9-48cc-a769-d991beaa237c", "source": "manual"},
+  {"query": "day trip from Palermo to see the mosaics at Monreale cathedral", "gold_chapter_id": null, "gold_book_id": "bda648c5-9fc9-48cc-a769-d991beaa237c", "source": "manual"},
+  {"query": "how LSM-tree compaction differs from B-tree page updates", "gold_chapter_id": null, "gold_book_id": "15b71d36-f610-4a94-9337-5c22a98d1fe0", "source": "manual"},
+  {"query": "why exactly-once message delivery is hard in distributed stream processing", "gold_chapter_id": null, "gold_book_id": "15b71d36-f610-4a94-9337-5c22a98d1fe0", "source": "manual"},
+  {"query": "examples of Jakob's law applied to product interface design", "gold_chapter_id": null, "gold_book_id": "ea312aeb-ecd2-49c8-bfc4-e5ec050d569e", "source": "manual"},
+  {"query": "which Naples neighborhood is best for authentic pizza", "gold_chapter_id": null, "gold_book_id": "a5501b6d-cf89-48fc-9e02-bb9b9dd12af1", "source": "manual"},
+  {"query": "planning an overland route across multiple continents", "gold_chapter_id": null, "gold_book_id": "c177f9f1-153e-4bc4-80a0-b62470b1e2d7", "source": "manual"},
+  {"query": "how to chain shell commands with pipes and redirect output to files", "gold_chapter_id": null, "gold_book_id": "6b3da714-e04b-4c03-91d7-b0cfff15f108", "source": "manual"},
+  {"query": "how Angular signals change detection differs from zone.js", "gold_chapter_id": null, "gold_book_id": "601a9cdb-d86a-4729-b4e9-5947f5b4740b", "source": "manual"},
+  {"query": "building a responsive layout with Tailwind utility classes", "gold_chapter_id": null, "gold_book_id": "6fe782d5-5196-448b-8cc7-27b4c6bebb31", "source": "manual"}
+]

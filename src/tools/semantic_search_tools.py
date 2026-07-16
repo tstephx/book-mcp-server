@@ -5,7 +5,7 @@ from typing import Optional
 
 
 from ..utils.openai_embeddings import OpenAIEmbeddingGenerator
-from ..utils.chunk_loader import load_chunk_embeddings
+from ..utils.chunk_loader import load_chunk_embeddings, best_chunk_per_chapter
 from ..utils.reranker import rerank_results
 from ..utils.vector_store import find_top_k
 from ..schemas.tool_schemas import SemanticSearchInput
@@ -95,9 +95,15 @@ def register_semantic_search_tools(mcp):
                         "chapter_title": meta["chapter_title"],
                         "chapter_number": meta["chapter_number"],
                         "similarity": round(similarity, 3),
-                        "chunk_content": meta["content"],
+                        "content": meta["content"],
                     }
                 )
+
+            # One result per chapter: overlapped windows from the same
+            # chapter must not crowd the top-k (spec decision 3).
+            # best_chunk_per_chapter keeps the best-scoring chunk per
+            # chapter and attaches its text as "excerpt".
+            candidates = best_chunk_per_chapter(candidates)
 
             # Rerank
             if rerank and candidates:
@@ -105,7 +111,7 @@ def register_semantic_search_tools(mcp):
                     validated.query,
                     candidates,
                     top_n=validated.limit,
-                    content_key="chunk_content",
+                    content_key="excerpt",
                 )
             else:
                 candidates = candidates[: validated.limit]
@@ -120,7 +126,7 @@ def register_semantic_search_tools(mcp):
                         "chapter_number": r["chapter_number"],
                         "similarity": r.get("similarity", 0),
                         "rerank_score": r.get("rerank_score"),
-                        "excerpt": _truncate(r["chunk_content"], 500),
+                        "excerpt": _truncate(r["excerpt"], 500),
                     }
                 )
 

@@ -10,7 +10,7 @@ modified: '2026-03-05'
 
 Entry point: `agentic-pipeline` → `agentic_pipeline/cli.py` (Click)
 
-30 commands organized by category.
+31 commands organized by category.
 
 ## Pipeline Operations
 
@@ -55,6 +55,7 @@ Entry point: `agentic-pipeline` → `agentic_pipeline/cli.py` (Click)
 | `update-title` | `BOOK_ID CHAPTER_NUMBER NEW_TITLE` | Update a chapter's title |
 | `validate` | `[--json]` | Check library books for quality issues |
 | `audit-quality` | `[--json]` | Audit library books for extraction quality issues |
+| `rechunk` | `[--fresh] [--swap] [--yes]` | Re-chunk the whole library into `chunks_staging`, embed, and score against the gold query sets (`eval/gold-queries*.json`). Hash-keyed: reruns reuse existing staged embeddings; interruption is resumable by rerunning. Production `chunks` untouched. Exit 0 = eval PASS, 1 = FAIL. `--fresh` drops staging first. `--yes` skips the embedding-cost confirmation. `--swap` applies a PASSed staging: stages any delta (books approved since the eval), backs up the DB, atomically replaces `chunks`, bumps `library_meta.data_version` (running MCP servers self-invalidate their chunk cache). Refuses without a PASS verdict. |
 
 ## Embedding & Chunking
 

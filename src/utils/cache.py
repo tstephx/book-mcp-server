@@ -34,6 +34,7 @@ class CachedEmbeddings:
     matrix: np.ndarray
     metadata: list[dict]
     loaded_at: float
+    data_version: Optional[int] = None
 
 
 class LibraryCache:
@@ -113,13 +114,25 @@ class LibraryCache:
     # Tier 1a: Chunk Embeddings Cache (separate from chapter embeddings)
     # ─────────────────────────────────────────────────────────────
 
-    def get_chunk_embeddings(self) -> Optional[tuple[np.ndarray, list[dict]]]:
-        """Get cached chunk embeddings matrix and metadata"""
+    def get_chunk_embeddings(self, current_version: Optional[int] = None) -> Optional[tuple[np.ndarray, list[dict]]]:
+        """Get cached chunk embeddings; self-invalidate on data_version mismatch.
+
+        Passing current_version=None skips the check (legacy behavior).
+        """
         if not self.enabled:
             return None
 
         with self._lock:
             if self._chunk_embeddings is not None:
+                if current_version is not None and self._chunk_embeddings.data_version != current_version:
+                    logger.info(
+                        "Chunk embeddings cache stale "
+                        f"(cached v{self._chunk_embeddings.data_version}, "
+                        f"db v{current_version}) — invalidating"
+                    )
+                    self._chunk_embeddings = None
+                    self._misses += 1
+                    return None
                 self._hits += 1
                 logger.debug("Chunk embeddings cache hit")
                 return self._chunk_embeddings.matrix, self._chunk_embeddings.metadata
@@ -127,14 +140,27 @@ class LibraryCache:
             self._misses += 1
             return None
 
-    def set_chunk_embeddings(self, matrix: np.ndarray, metadata: list[dict]) -> None:
+    def set_chunk_embeddings(
+        self,
+        matrix: np.ndarray,
+        metadata: list[dict],
+        data_version: Optional[int] = None,
+    ) -> None:
         """Cache chunk embeddings matrix and metadata"""
         if not self.enabled:
             return
 
         with self._lock:
-            self._chunk_embeddings = CachedEmbeddings(matrix=matrix, metadata=metadata, loaded_at=time())
-            logger.info(f"Cached chunk embeddings: {matrix.shape[0]} chunks, {matrix.nbytes / 1024 / 1024:.1f} MB")
+            self._chunk_embeddings = CachedEmbeddings(
+                matrix=matrix,
+                metadata=metadata,
+                loaded_at=time(),
+                data_version=data_version,
+            )
+            logger.info(
+                f"Cached chunk embeddings: {matrix.shape[0]} chunks, "
+                f"{matrix.nbytes / 1024 / 1024:.1f} MB (data_version={data_version})"
+            )
 
     def invalidate_chunk_embeddings(self) -> None:
         """Invalidate chunk embeddings cache"""

@@ -12,6 +12,7 @@ import numpy as np
 
 from ..database import get_db_connection
 from .cache import get_cache
+from .data_version import get_data_version
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,10 @@ def load_chunk_embeddings(
     if cache is None:
         cache = get_cache()
 
+    current_version = get_data_version()
+
     if cache is not None:
-        cached = cache.get_chunk_embeddings()
+        cached = cache.get_chunk_embeddings(current_version=current_version)
         if cached:
             return cached
 
@@ -90,7 +93,7 @@ def load_chunk_embeddings(
     matrix = np.vstack(embeddings)
 
     if cache is not None:
-        cache.set_chunk_embeddings(matrix, metadata)
+        cache.set_chunk_embeddings(matrix, metadata, data_version=current_version)
 
     logger.info(f"Loaded {len(metadata)} chunk embeddings from DB")
     return matrix, metadata
