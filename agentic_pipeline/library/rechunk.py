@@ -253,6 +253,11 @@ def run_gate_eval(db_path, gold_paths=None, embedder=None) -> dict:
     baseline = run_eval(db_path, gold_paths, table="chunks", embedder=embedder)
     staged = run_eval(db_path, gold_paths, table="chunks_staging", embedder=embedder)
 
+    if baseline["auto"]["semantic"]["n"] == 0:
+        raise RuntimeError("gold set has zero 'auto' entries — gate cannot evaluate the auto arm")
+    if baseline["manual"]["semantic"]["n"] == 0:
+        raise RuntimeError("gold set has zero 'manual' entries — gate cannot evaluate the manual arm")
+
     conn = _sqlite3.connect(str(db_path))
     try:
         snapshot = snapshot_marker(conn)

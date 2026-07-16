@@ -226,7 +226,10 @@ class TestVerdictPersistence:
         rc.embed_pending(conn, generator=FakeGenerator())
 
         gold = tmp_path / "gold.json"
-        gold.write_text('[{"query": "q", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "auto"}]')
+        gold.write_text(
+            '[{"query": "q", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "auto"},'
+            ' {"query": "q2", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "manual"}]'
+        )
 
         class FakeEmbedder:
             def generate(self, text):
@@ -247,6 +250,26 @@ class TestVerdictPersistence:
 
     def test_load_verdict_none_when_absent(self, tmp_path):
         assert rc.load_verdict(tmp_path / "library.db") is None
+
+    def test_run_gate_eval_refuses_empty_manual_gold_subset(self, staged_db, tmp_path, monkeypatch):
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        rc.stage_all(conn)
+        rc.embed_pending(conn, generator=FakeGenerator())
+
+        gold = tmp_path / "gold.json"
+        gold.write_text('[{"query": "q", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "auto"}]')
+
+        class FakeEmbedder:
+            def generate(self, text):
+                return np.full(4, 5.0, dtype=np.float32)
+
+        monkeypatch.setattr(
+            "src.utils.retrieval_eval.full_text_search",
+            lambda q, limit=10: {"results": []},
+        )
+        with pytest.raises(RuntimeError, match="manual"):
+            rc.run_gate_eval(db, [gold], embedder=FakeEmbedder())
 
 
 class TestRechunkCli:
