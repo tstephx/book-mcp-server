@@ -155,3 +155,19 @@ class TestStaging:
         assert est["est_usd"] > 0
         rc.embed_pending(conn, generator=FakeGenerator())
         assert rc.estimate_embedding_cost(conn)["pending"] == 0
+
+
+class ShortGenerator:
+    """Returns one vector fewer than requested — must raise, never loop."""
+
+    def generate_batch(self, texts):
+        return np.stack([np.full(4, 1.0, dtype=np.float32) for _ in texts[:-1]]) if len(texts) > 1 else np.empty((0, 4), dtype=np.float32)
+
+
+class TestEmbedPendingGuard:
+    def test_short_generator_batch_raises(self, staged_db):
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        rc.stage_all(conn)
+        with pytest.raises(RuntimeError, match="vectors for"):
+            rc.embed_pending(conn, generator=ShortGenerator())

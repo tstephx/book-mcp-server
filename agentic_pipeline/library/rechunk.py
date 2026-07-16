@@ -184,6 +184,10 @@ def embed_pending(conn, generator=None, batch_size: int = 256) -> int:
         if not rows:
             break
         vectors = generator.generate_batch([r["content"] for r in rows])
+        if len(vectors) != len(rows):
+            # zip would silently drop the tail, leaving rows NULL forever and
+            # re-selecting them next iteration — an infinite loop
+            raise RuntimeError(f"generate_batch returned {len(vectors)} vectors for {len(rows)} rows")
         for row, vec in zip(rows, vectors):
             buf = io.BytesIO()
             np.save(buf, np.asarray(vec, dtype=np.float32))
