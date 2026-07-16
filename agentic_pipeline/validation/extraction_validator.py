@@ -7,12 +7,19 @@ queries the chapters table and delegates to the pure function.
 
 from __future__ import annotations
 
+import logging
 import re
+import zipfile
 from collections import Counter
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
+from pathlib import Path
 from statistics import median
+from typing import Optional
 
 from agentic_pipeline.db.connection import get_pipeline_db
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Suspicious title patterns
@@ -43,6 +50,56 @@ MIN_CHAPTER_WORDS = 100
 MIN_TOTAL_WORDS = 5_000
 MAX_DUPLICATE_RATIO = 0.10
 
+# Fraction of the source file's words the extraction must retain. Anchor-based
+# detection can find a handful of chapters, report high confidence, and silently
+# drop the rest of the book; only comparing against the source catches that.
+MIN_SOURCE_COVERAGE = 0.5
+
+_HTML_SUFFIXES = (".xhtml", ".html", ".htm")
+_SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style).*?</\1>")
+
+
+class _TextExtractor(HTMLParser):
+    """Collect character data, ignoring tags."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.chunks: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.chunks.append(data)
+
+
+def count_source_words(source_path: str) -> Optional[int]:
+    """Count words in an EPUB's HTML documents.
+
+    Returns None when the count can't be established (missing file, not a zip,
+    unsupported format such as PDF). Callers treat None as "skip the check"
+    rather than as a failure.
+    """
+    path = Path(source_path)
+    if not path.is_file() or path.suffix.lower() != ".epub":
+        return None
+
+    try:
+        with zipfile.ZipFile(path) as archive:
+            total = 0
+            for name in archive.namelist():
+                if not name.lower().endswith(_HTML_SUFFIXES):
+                    continue
+                try:
+                    html = archive.read(name).decode("utf-8", "ignore")
+                except (KeyError, OSError):
+                    continue
+                parser = _TextExtractor()
+                parser.feed(_SCRIPT_STYLE_RE.sub(" ", html))
+                total += len(" ".join(parser.chunks).split())
+    except (zipfile.BadZipFile, OSError) as e:
+        logger.warning(f"Could not read source words from {path.name}: {e}")
+        return None
+
+    return total
+
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -69,11 +126,17 @@ def check_extraction_quality(
     word_counts: list[int],
     titles: list[str],
     content_hashes: list[str],
+    raw_source_words: Optional[int] = None,
 ) -> ValidationResult:
     """Run all extraction quality checks and return a ValidationResult.
 
     All checks are evaluated (no short-circuiting) so that every problem is
     surfaced in a single pass.
+
+    Args:
+        raw_source_words: Word count of the source file, for the completeness
+            check. None or 0 skips it — the other checks only measure internal
+            consistency and cannot tell a whole book from a tenth of one.
     """
     reasons: list[str] = []
     warnings: list[str] = []
@@ -138,6 +201,18 @@ def check_extraction_quality(
         examples = suspicious[:5]
         reasons.append(f"{len(suspicious)} suspicious chapter title(s): {examples}")
 
+    # --- Check 8: Source completeness ---
+    # Skipped when the source word count is unavailable (PDF, unreadable file).
+    if raw_source_words:
+        coverage = total_words / raw_source_words
+        metrics["source_coverage"] = coverage
+        if coverage < MIN_SOURCE_COVERAGE:
+            reasons.append(
+                f"Extraction kept only {coverage:.0%} of the source "
+                f"({total_words:,} of {raw_source_words:,} words, "
+                f"minimum {MIN_SOURCE_COVERAGE:.0%})"
+            )
+
     passed = len(reasons) == 0
     return ValidationResult(passed=passed, reasons=reasons, warnings=warnings, metrics=metrics)
 
@@ -194,12 +269,14 @@ def find_flagged_books(db_path: str) -> tuple[int, list[dict]]:
 class ExtractionValidator:
     """Queries the chapters table for a book and validates extraction quality."""
 
-    def validate(self, book_id: str, db_path: str) -> ValidationResult:
+    def validate(self, book_id: str, db_path: str, source_path: Optional[str] = None) -> ValidationResult:
         """Load chapter data from DB and run quality checks.
 
         Args:
             book_id: The book's ID in the books/chapters tables.
             db_path: Path to the SQLite database.
+            source_path: Original book file, enabling the completeness check.
+                Omitted or unreadable skips that check.
 
         Returns:
             ValidationResult with pass/fail, reasons, warnings, and metrics.
@@ -228,4 +305,5 @@ class ExtractionValidator:
             word_counts=word_counts,
             titles=titles,
             content_hashes=content_hashes,
+            raw_source_words=count_source_words(source_path) if source_path else None,
         )

@@ -3,11 +3,27 @@
 import uuid
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.pipeline.states import PipelineState, can_transition
+
+# How long a book may sit in PROCESSING without being touched before we treat it
+# as orphaned by a crash. Must exceed the longest realistic extraction — a large
+# EPUB takes ~90s — or a worker restart will steal a book another actor is
+# actively processing. Matches OrchestratorConfig.processing_timeout.
+STALE_PROCESSING_SECONDS = 600
+
+
+class ConcurrentModificationError(RuntimeError):
+    """Another actor moved this pipeline between our read and our write.
+
+    Deliberately not a ValueError: an invalid transition is a logic error in one
+    actor, whereas this means two actors are driving the same record and the
+    caller should back off rather than retry. Callers that poll a queue (the
+    worker) should treat it as "someone else claimed it" and move on.
+    """
 
 
 class PipelineRepository:
@@ -57,8 +73,22 @@ class PipelineRepository:
         new_state: PipelineState,
         agent_output: Optional[dict] = None,
         error_details: Optional[dict] = None,
+        expected_state: Optional[PipelineState] = None,
     ) -> None:
-        """Update pipeline state and record history."""
+        """Update pipeline state and record history.
+
+        Args:
+            expected_state: Assert we still own the record. Pass the state this
+                caller last observed; if another actor has since moved it, raise
+                ConcurrentModificationError instead of writing. Needed because
+                the swap alone cannot help a caller acting on a stale read — a
+                worker that read DETECTED and then forces NEEDS_RETRY would be
+                making a perfectly valid transition over a rival's HASHING.
+
+        Raises:
+            ConcurrentModificationError: another actor moved the record.
+            ValueError: the transition is not permitted by the state machine.
+        """
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
@@ -71,6 +101,13 @@ class PipelineRepository:
             old_state = row["state"]
             old_updated = row["updated_at"]
             now = datetime.now(timezone.utc).isoformat()
+
+            # Ownership check: the caller acted on an earlier read of this record.
+            if expected_state is not None and old_state != expected_state.value:
+                raise ConcurrentModificationError(
+                    f"Pipeline {pipeline_id} is '{old_state}', not the expected "
+                    f"'{expected_state.value}' — another actor owns it"
+                )
 
             # Validate transition
             try:
@@ -93,15 +130,25 @@ class PipelineRepository:
                 except (ValueError, TypeError):
                     pass
 
-            # Update pipeline state
+            # Update pipeline state — compare-and-swap against the state we
+            # validated. Reading the state and writing it are not atomic across
+            # connections, so without `AND state = ?` two actors both see
+            # 'detected', both write, and both believe they own the record.
             cursor.execute(
                 """
                 UPDATE processing_pipelines
                 SET state = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND state = ?
                 """,
-                (new_state.value, now, pipeline_id),
+                (new_state.value, now, pipeline_id, old_state),
             )
+
+            if cursor.rowcount == 0:
+                # Someone else moved it first. Leave their state alone.
+                raise ConcurrentModificationError(
+                    f"Pipeline {pipeline_id} was moved from '{old_state}' by another "
+                    f"actor while transitioning to '{new_state.value}'"
+                )
 
             # Record state history
             cursor.execute(
@@ -176,6 +223,23 @@ class PipelineRepository:
                 WHERE id = ?
                 """,
                 (json.dumps(validation_result), datetime.now(timezone.utc).isoformat(), pipeline_id),
+            )
+            conn.commit()
+
+    def update_source_path(self, pipeline_id: str, source_path: str) -> None:
+        """Point the record at the file's current location.
+
+        Called after archiving moves the source. Without it the record keeps
+        naming a path that no longer exists and reingest cannot find the book.
+        """
+        with get_pipeline_db(self.db_path) as conn:
+            conn.execute(
+                """
+                UPDATE processing_pipelines
+                SET source_path = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (source_path, datetime.now(timezone.utc).isoformat(), pipeline_id),
             )
             conn.commit()
 
@@ -371,23 +435,36 @@ class PipelineRepository:
             return new_id
 
     def reset_stale_processing(self) -> int:
-        """Reset books stuck in processing state (orphaned by a previous crash).
+        """Reset books orphaned in processing state by a crashed worker.
 
-        Any book in 'processing' state with a NULL heartbeat was never actively
-        worked on by this worker instance — safe to reset to 'detected'.
+        Staleness is judged by how long the record has sat untouched: a crashed
+        book's updated_at stops advancing, while one being actively processed
+        keeps moving. Books touched within STALE_PROCESSING_SECONDS are left
+        alone — they may belong to another worker or a CLI reingest running
+        right now, and resetting one mid-flight lets two actors drive the same
+        record until the transition validator kills it.
+
+        The previous guard was `last_heartbeat IS NULL`, but no code has ever
+        written last_heartbeat, so it matched every row and reset every
+        in-flight book. Dropped rather than kept as a no-op.
 
         Returns:
             Number of books reset.
         """
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=STALE_PROCESSING_SECONDS)).isoformat()
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
+            # julianday() parses both 'YYYY-MM-DDTHH:MM:SS+00:00' and
+            # 'YYYY-MM-DD HH:MM:SS'; a plain string compare would not.
             cursor.execute(
                 """
                 UPDATE processing_pipelines
                 SET state = ?, retry_count = 0
-                WHERE state = ? AND last_heartbeat IS NULL
+                WHERE state = ?
+                  AND updated_at IS NOT NULL
+                  AND julianday(updated_at) < julianday(?)
             """,
-                (PipelineState.DETECTED.value, PipelineState.PROCESSING.value),
+                (PipelineState.DETECTED.value, PipelineState.PROCESSING.value, cutoff),
             )
             conn.commit()
             return cursor.rowcount

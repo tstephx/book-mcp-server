@@ -82,7 +82,8 @@ def approve(pipeline_id: str):
     from .approval.actions import approve_book
 
     db_path = get_db_path()
-    result = approve_book(db_path, pipeline_id, actor="human:cli")
+    # background=False: this process exits on return and would kill a daemon thread.
+    result = approve_book(db_path, pipeline_id, actor="human:cli", background=False)
 
     if result["success"]:
         state = result.get("state", "approved")
@@ -295,6 +296,7 @@ def reingest(book_id: str, force_fallback: bool):
     """
     from .db.config import get_db_path
     from .db.pipelines import PipelineRepository
+    from .approval.actions import resolve_source_file
     from .config import OrchestratorConfig
     from .orchestrator import Orchestrator
 
@@ -308,11 +310,19 @@ def reingest(book_id: str, force_fallback: bool):
         console.print("[dim]Use 'agentic-pipeline backfill' first if this is a legacy book[/dim]")
         return
 
-    source_path = record["source_path"]
-    if not source_path or not Path(source_path).exists():
-        console.print(f"[red]Source file not found: {source_path}[/red]")
-        console.print("[dim]The original book file is needed for reingestion[/dim]")
+    # Records written before archiving tracked the move still name the original
+    # watch-dir path; follow the file into processed_dir. The content_hash is
+    # what proves the archived candidate is this book and not a namesake —
+    # collisions are archived as stem_N, so the basename alone is ambiguous.
+    resolved = resolve_source_file(record["source_path"], expected_hash=record["content_hash"])
+    if resolved is None:
+        console.print(f"[red]Source file not found: {record['source_path']}[/red]")
+        console.print("[dim]Not at that path, and no archived file matching this book's hash.[/dim]")
         return
+
+    source_path = str(resolved)
+    if source_path != record["source_path"]:
+        console.print(f"[dim]Source moved; found in archive: {resolved.name}[/dim]")
 
     console.print(f"[blue]Reingesting: {source_path}[/blue]")
     console.print(f"[dim]Archiving old record: {book_id}[/dim]")

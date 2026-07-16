@@ -1,5 +1,6 @@
 """Approval actions - approve, reject, rollback."""
 
+import hashlib
 import logging
 import json
 import os
@@ -71,6 +72,82 @@ def _get_processed_dir() -> Optional[Path]:
     """Get processed directory from environment."""
     processed_dir_str = os.environ.get("PROCESSED_DIR")
     return Path(processed_dir_str).resolve() if processed_dir_str else None
+
+
+def _hash_file(path: Path) -> str:
+    """SHA-256 of file contents. Mirrors Orchestrator._compute_hash."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def resolve_source_file(source_path: Optional[str], expected_hash: Optional[str] = None) -> Optional[Path]:
+    """Locate a book's source file, following it into the archive if it moved.
+
+    Records written before archiving tracked the move still name the original
+    watch-dir path, which auto-archive emptied. We can look for the same
+    basename under processed_dir — but that is a *guess*, not a lookup:
+    _archive_source_file() renames collisions to stem_1.epub, so two books can
+    share an original filename and the basename will resolve to whichever one
+    got archived first. Handing back the wrong book is worse than finding
+    nothing: reingest wipes the book's chapters and refills them from the file
+    we return.
+
+    So the fallback is only taken when expected_hash is supplied and the
+    candidate's contents match it. Without a hash we cannot tell the right book
+    from a namesake, so we fail closed and return None.
+
+    Args:
+        expected_hash: the record's content_hash. Required to use the archive
+            fallback; ignored when the file is still at source_path, which is a
+            recorded location rather than a guess.
+
+    Returns:
+        The file, or None if it cannot be found or cannot be proven to be the
+        right one.
+    """
+    if not source_path:
+        return None
+
+    src = Path(source_path)
+    if src.exists():
+        return src
+
+    processed_dir = _get_processed_dir()
+    if not processed_dir:
+        return None
+
+    archived = Path(processed_dir) / src.name
+    if not archived.exists():
+        return None
+
+    if not expected_hash:
+        logger.warning(
+            "Found %s in the archive but no expected hash was given; refusing to "
+            "assume it is the right book (collisions share basenames)",
+            src.name,
+        )
+        return None
+
+    try:
+        actual = _hash_file(archived)
+    except OSError as e:
+        logger.warning("Could not hash archived candidate %s: %s", archived.name, e)
+        return None
+
+    if actual != expected_hash:
+        logger.warning(
+            "Archived %s is a different book (hash %s != %s) — most likely a "
+            "filename collision renamed the real file to stem_N",
+            src.name,
+            actual[:12],
+            expected_hash[:12],
+        )
+        return None
+
+    return archived
 
 
 def _archive_source_file(
@@ -155,10 +232,16 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
 
         repo.update_state(pipeline_id, PipelineState.COMPLETE)
 
-        # Archive source file if configured
+        # Archive source file if configured, and follow it in the record —
+        # otherwise source_path names a file that is no longer there and
+        # reingest refuses to run.
         source_path = pipeline.get("source_path")
         if source_path:
-            _archive_source_file(source_path)
+            archived_name = _archive_source_file(source_path)
+            processed_dir = _get_processed_dir()
+            if archived_name and processed_dir:
+                # archived_name, not the original: collisions rename to stem_1.
+                repo.update_source_path(pipeline_id, str(Path(processed_dir) / archived_name))
 
         return {
             "state": PipelineState.COMPLETE.value,
@@ -188,11 +271,21 @@ def approve_book(
     pipeline_id: str,
     actor: str,
     adjustments: Optional[dict] = None,
+    background: bool = True,
 ) -> dict:
-    """Approve a book. Returns immediately; embedding runs in a background thread.
+    """Approve a book, driving PENDING_APPROVAL → APPROVED → EMBEDDING → COMPLETE.
 
-    The pipeline transitions PENDING_APPROVAL → APPROVED on return.
-    The background thread then drives APPROVED → EMBEDDING → COMPLETE (or NEEDS_RETRY).
+    Args:
+        background: When True (default), embedding runs on a daemon thread and
+            this returns as soon as the book is APPROVED — right for the MCP
+            server, which outlives the thread. Callers that exit on return (the
+            CLI) MUST pass False: a daemon thread dies with the process, leaving
+            the book APPROVED with no chunks and no error reported.
+
+    Returns:
+        With background=True: state=APPROVED, embedding="queued".
+        With background=False: the embedding outcome — state=COMPLETE with
+        chapters_embedded, or state=NEEDS_RETRY with embedding_error.
     """
     repo = PipelineRepository(db_path)
     pipeline = repo.get(pipeline_id)
@@ -226,6 +319,10 @@ def approve_book(
         adjustments=adjustments,
         confidence=confidence,
     )
+
+    if not background:
+        # Caller exits on return — embed here or the work never happens.
+        return {"success": True, "pipeline_id": pipeline_id, **_complete_approved(db_path, pipeline_id, pipeline)}
 
     # Fire-and-forget: embedding runs in background, MCP caller is not blocked
     thread = threading.Thread(

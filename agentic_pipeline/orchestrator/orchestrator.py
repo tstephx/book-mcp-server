@@ -14,7 +14,7 @@ from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
 from agentic_pipeline.db.connection import get_pipeline_db
-from agentic_pipeline.db.pipelines import PipelineRepository
+from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
 from agentic_pipeline.orchestrator.errors import (
@@ -140,6 +140,19 @@ class Orchestrator:
 
         except Exception as e:
             return f"[Epub extraction failed: {path.name} - {e}]"
+
+    def _recover_to_retry(self, pipeline_id: str, claimed_from: PipelineState) -> None:
+        """Send a failed book back to NEEDS_RETRY — but only if we still own it.
+
+        The worker polls a state, works the book, and on error resets it. If a
+        rival claimed the record in between, that reset is still a *valid*
+        transition (e.g. HASHING -> NEEDS_RETRY), so nothing but an explicit
+        ownership assertion stops us yanking the book out from under them.
+        """
+        try:
+            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY, expected_state=claimed_from)
+        except ConcurrentModificationError:
+            logger.debug("Not resetting %s — another actor owns it now", pipeline_id)
 
     def _transition(self, pipeline_id: str, to_state: PipelineState):
         """Transition pipeline to new state with logging."""
@@ -295,9 +308,13 @@ class Orchestrator:
             self.logger.processing_complete(pipeline_id, duration)
             return result
 
+        except ConcurrentModificationError as e:
+            # Another actor owns this record now — do not force it to NEEDS_RETRY.
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            return {"pipeline_id": pipeline_id, "state": "claimed_by_another_actor", "error": str(e)}
         except Exception as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            self._recover_to_retry(pipeline_id, PipelineState.DETECTED)
             return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
     def reprocess_existing(
@@ -331,9 +348,17 @@ class Orchestrator:
             duration = time.time() - start_time
             self.logger.processing_complete(pipeline_id, duration)
             return result
+        except ConcurrentModificationError as e:
+            # Another actor owns this record now — do not force it to NEEDS_RETRY.
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            return {
+                "pipeline_id": pipeline_id,
+                "state": "claimed_by_another_actor",
+                "error": str(e),
+            }
         except Exception as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            self._recover_to_retry(pipeline_id, PipelineState.DETECTED)
             return {
                 "pipeline_id": pipeline_id,
                 "state": PipelineState.NEEDS_RETRY.value,
@@ -374,7 +399,7 @@ class Orchestrator:
         # VALIDATING
         self._transition(pipeline_id, PipelineState.VALIDATING)
         validator = ExtractionValidator()
-        validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
+        validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path)
 
         if not validation.passed:
             # Check if we can retry with force_fallback
@@ -415,7 +440,9 @@ class Orchestrator:
 
                 # Re-validate
                 self._transition(pipeline_id, PipelineState.VALIDATING)
-                validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path))
+                validation = validator.validate(
+                    book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path
+                )
 
             if not validation.passed:
                 reason = "; ".join(validation.reasons)
@@ -616,9 +643,13 @@ class Orchestrator:
                 if approved:
                     try:
                         self._complete_approved(approved[0]["id"])
+                    except ConcurrentModificationError:
+                        # Another actor claimed it between our read and our write.
+                        # Not a failure — do not drag their record to NEEDS_RETRY.
+                        logger.debug("Skipping %s — claimed by another actor", approved[0]["id"])
                     except Exception as e:
                         self.logger.error(approved[0]["id"], type(e).__name__, str(e))
-                        self.repo.update_state(approved[0]["id"], PipelineState.NEEDS_RETRY)
+                        self._recover_to_retry(approved[0]["id"], PipelineState.APPROVED)
                     continue
 
                 # Priority 2: Process new books
@@ -630,9 +661,12 @@ class Orchestrator:
                             pending[0]["source_path"],
                             pending[0]["content_hash"],
                         )
+                    except ConcurrentModificationError:
+                        # A CLI reingest (or another worker) got there first.
+                        logger.debug("Skipping %s — claimed by another actor", pending[0]["id"])
                     except Exception as e:
                         self.logger.error(pending[0]["id"], type(e).__name__, str(e))
-                        self.repo.update_state(pending[0]["id"], PipelineState.NEEDS_RETRY)
+                        self._recover_to_retry(pending[0]["id"], PipelineState.DETECTED)
                     continue
 
                 # Priority 3: Retry failed
@@ -640,6 +674,8 @@ class Orchestrator:
                 if retryable:
                     try:
                         self._retry_one(retryable[0])
+                    except ConcurrentModificationError:
+                        logger.debug("Skipping %s — claimed by another actor", retryable[0]["id"])
                     except Exception as e:
                         self.logger.error(retryable[0]["id"], type(e).__name__, str(e))
                     continue
@@ -658,7 +694,16 @@ class Orchestrator:
                     self.logger.error("worker", "DatabaseLocked", "DB locked, retrying in 5s")
                     time.sleep(5)
                 else:
-                    raise
+                    self.logger.error("worker", type(e).__name__, str(e))
+                    time.sleep(self.config.worker_poll_interval)
+            except Exception as e:
+                # Never let one bad iteration end the daemon. Dying here is worse
+                # than it looks: KeepAlive respawns us, startup recovery runs
+                # again, and a single repeating bug becomes a silent crash-loop
+                # that reclaims work other actors are holding.
+                self.logger.error("worker", type(e).__name__, str(e))
+                logger.exception("Unexpected error in worker loop; continuing")
+                time.sleep(self.config.worker_poll_interval)
 
         self.logger.worker_stopped()
 

@@ -74,6 +74,226 @@ def test_approve_book(db_path):
     assert pipeline["approved_by"] == "human:taylor"
 
 
+def _sha(data: bytes) -> str:
+    """SHA-256 of raw bytes, matching Orchestrator._compute_hash."""
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
+class TestResolveSourceFile:
+    """Find a book whose record predates the archive-tracking fix."""
+
+    def test_prefers_the_recorded_path(self, tmp_path):
+        from agentic_pipeline.approval.actions import resolve_source_file
+
+        book = tmp_path / "b.epub"
+        book.write_bytes(b"x")
+
+        assert resolve_source_file(str(book)) == book
+
+    def test_falls_back_to_the_processed_dir(self, tmp_path):
+        """142 of 307 completed books point at a path auto-archive emptied."""
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        archived = processed / "b.epub"
+        archived.write_bytes(b"x")
+        stale = tmp_path / "watch" / "b.epub"  # never existed / moved away
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale), expected_hash=_sha(b"x")) == archived
+
+    def test_refuses_an_archived_file_whose_content_differs(self, tmp_path):
+        """The basename is a guess — collisions rename to stem_1.epub.
+
+        Two books can share an original filename; the archive keeps the first as
+        b.epub and renames the second to b_1.epub. A record for the *second*
+        book still names .../b.epub, so a basename-only fallback hands back the
+        FIRST book's bytes. reingest would then wipe this book's chapters and
+        refill them from a different book — silent cross-book corruption.
+        """
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"a DIFFERENT book that merely shares a filename")
+        stale = tmp_path / "watch" / "b.epub"
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale), expected_hash=_sha(b"the real book")) is None
+
+    def test_fallback_requires_a_hash_to_verify_against(self, tmp_path):
+        """Fail closed: without a hash we cannot tell the right book from a namesake."""
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"x")
+        stale = tmp_path / "watch" / "b.epub"
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale)) is None
+
+    def test_recorded_path_is_trusted_without_a_hash(self, tmp_path):
+        """A file still at its recorded path is not a guess — no verification needed."""
+        from agentic_pipeline.approval import actions
+
+        book = tmp_path / "b.epub"
+        book.write_bytes(b"x")
+
+        assert actions.resolve_source_file(str(book)) == book
+
+    def test_returns_none_when_the_file_is_gone(self, tmp_path):
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub"), expected_hash="abc") is None
+
+    def test_handles_no_processed_dir_configured(self, tmp_path):
+        from agentic_pipeline.approval import actions
+
+        with patch.object(actions, "_get_processed_dir", return_value=None):
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub"), expected_hash="abc") is None
+
+    def test_handles_empty_source_path(self):
+        from agentic_pipeline.approval.actions import resolve_source_file
+
+        assert resolve_source_file(None) is None
+        assert resolve_source_file("") is None
+
+
+class TestArchiveRecordsNewLocation:
+    """Archiving moves the file; the record must learn where it went.
+
+    Regression: _complete_approved() called _archive_source_file() and discarded
+    its return, so source_path kept pointing at a file that no longer existed.
+    reingest checks that path and refuses — broken for 142 of 307 completed books
+    (46%). Collisions make it worse: the archive renames to 'stem_1.epub', so
+    even guessing by basename fails.
+    """
+
+    @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+    def test_source_path_points_at_the_archived_file(self, MockAdapter, db_path, tmp_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.db.pipelines import PipelineRepository
+
+        MockAdapter.return_value.generate_embeddings.return_value = _mock_embedding_result()
+
+        watch, processed = tmp_path / "watch", tmp_path / "processed"
+        watch.mkdir()
+        processed.mkdir()
+        book = watch / "b.epub"
+        book.write_bytes(b"epub")
+
+        pid, pipeline = _setup_approved_pipeline(db_path)
+        PipelineRepository(db_path).update_source_path(pid, str(book))
+        pipeline = PipelineRepository(db_path).get(pid)
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            actions._complete_approved(db_path, pid, pipeline)
+
+        assert PipelineRepository(db_path).get(pid)["source_path"] == str(processed / "b.epub")
+
+    @patch("agentic_pipeline.adapters.processing_adapter.ProcessingAdapter", autospec=True)
+    def test_records_the_collision_renamed_filename(self, MockAdapter, db_path, tmp_path):
+        """A colliding archive becomes stem_1.epub — record that, not the original."""
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.db.pipelines import PipelineRepository
+
+        MockAdapter.return_value.generate_embeddings.return_value = _mock_embedding_result()
+
+        watch, processed = tmp_path / "watch", tmp_path / "processed"
+        watch.mkdir()
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"older book, same name")
+        book = watch / "b.epub"
+        book.write_bytes(b"epub")
+
+        pid, pipeline = _setup_approved_pipeline(db_path)
+        PipelineRepository(db_path).update_source_path(pid, str(book))
+        pipeline = PipelineRepository(db_path).get(pid)
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            actions._complete_approved(db_path, pid, pipeline)
+
+        assert PipelineRepository(db_path).get(pid)["source_path"] == str(processed / "b_1.epub")
+
+
+class TestApproveBookForeground:
+    """A caller that exits on return must embed before returning.
+
+    Regression: approve_book() spawns embedding on a daemon thread, which dies
+    with the process. That is correct for the long-lived MCP server but silently
+    wrong for `agentic-pipeline approve`, which prints and exits — the book was
+    left in APPROVED with no chunks and no error. It only ever completed because
+    a background worker happened to sweep up APPROVED books.
+    """
+
+    def test_foreground_embeds_before_returning(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        calls = []
+
+        def fake_complete(db, pid, pipeline):
+            calls.append(pid)
+            return {"state": PipelineState.COMPLETE.value, "chapters_embedded": 7}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        assert calls == [pid], "embedding must run before approve_book returns"
+        assert result["success"] is True
+        assert result["state"] == PipelineState.COMPLETE.value
+        assert result["chapters_embedded"] == 7
+
+    def test_foreground_surfaces_embedding_failure(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        def fake_complete(db, pid, pipeline):
+            return {"state": PipelineState.NEEDS_RETRY.value, "embedding_error": "quota exceeded"}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        assert result["state"] == PipelineState.NEEDS_RETRY.value
+        assert result["embedding_error"] == "quota exceeded"
+
+    def test_foreground_does_not_spawn_a_thread(self, db_path):
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        def fake_complete(db, pid, pipeline):
+            return {"state": PipelineState.COMPLETE.value, "chapters_embedded": 1}
+
+        with patch.object(actions, "_complete_approved", fake_complete):
+            with patch.object(actions.threading, "Thread") as MockThread:
+                pid = _create_pending_pipeline(db_path)
+                actions.approve_book(db_path, pid, actor="human:cli", background=False)
+
+        MockThread.assert_not_called()
+
+    def test_background_remains_the_default(self, db_path):
+        """The MCP server must keep its non-blocking behaviour."""
+        from agentic_pipeline.approval import actions
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        with patch.object(actions, "_run_embedding_background"):
+            pid = _create_pending_pipeline(db_path)
+            result = actions.approve_book(db_path, pid, actor="mcp")
+
+        assert result["state"] == PipelineState.APPROVED.value
+        assert result["embedding"] == "queued"
+
+
 def test_reject_book(db_path):
     from agentic_pipeline.approval.actions import reject_book
     from agentic_pipeline.db.pipelines import PipelineRepository

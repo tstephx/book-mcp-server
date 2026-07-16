@@ -4,7 +4,7 @@ from pathlib import Path
 
 from agentic_pipeline.audit import AuditTrail
 from agentic_pipeline.batch.filters import BatchFilter
-from agentic_pipeline.db.pipelines import PipelineRepository
+from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
 
 
@@ -38,9 +38,19 @@ class BatchOperations:
 
         embedded = 0
         embedding_failures = []
+        skipped = []
+        approved = []
 
         for pipeline in matches:
-            self.repo.update_state(pipeline["id"], PipelineState.APPROVED)
+            try:
+                self.repo.update_state(pipeline["id"], PipelineState.APPROVED)
+            except ConcurrentModificationError as e:
+                # Claimed between filter.apply() and now. One contended book must
+                # not abort the batch, nor cost us the audit entry below.
+                skipped.append({"id": pipeline["id"], "reason": str(e)})
+                continue
+
+            approved.append(pipeline)
             self.repo.mark_approved(pipeline["id"], approved_by=f"batch:{actor}", confidence=None)
             embed_result = _complete_approved(self.db_path, pipeline["id"], pipeline)
             if embed_result["state"] == PipelineState.COMPLETE.value:
@@ -53,20 +63,21 @@ class BatchOperations:
                     }
                 )
 
-        # Log batch operation to audit
+        # Log batch operation to audit — always, even on a partial run.
         self.audit.log(
-            book_id=f"batch:{len(matches)}_books",
+            book_id=f"batch:{len(approved)}_books",
             action="BATCH_APPROVED",
             actor=actor,
             filter_used=filter.to_dict(),
         )
 
         return {
-            "approved": len(matches),
+            "approved": len(approved),
             "would_approve": len(matches),
             "embedded": embedded,
             "embedding_failures": embedding_failures,
-            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
+            "skipped": skipped,
+            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in approved],
         }
 
     def reject(
@@ -87,13 +98,22 @@ class BatchOperations:
                 "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
             }
 
-        for pipeline in matches:
-            self.repo.update_state(
-                pipeline["id"], PipelineState.REJECTED, error_details={"reason": reason, "actor": actor}
-            )
+        rejected = []
+        skipped = []
 
+        for pipeline in matches:
+            try:
+                self.repo.update_state(
+                    pipeline["id"], PipelineState.REJECTED, error_details={"reason": reason, "actor": actor}
+                )
+            except ConcurrentModificationError as e:
+                skipped.append({"id": pipeline["id"], "reason": str(e)})
+                continue
+            rejected.append(pipeline)
+
+        # Log batch operation to audit — always, even on a partial run.
         self.audit.log(
-            book_id=f"batch:{len(matches)}_books",
+            book_id=f"batch:{len(rejected)}_books",
             action="BATCH_REJECTED",
             actor=actor,
             reason=reason,
@@ -101,9 +121,10 @@ class BatchOperations:
         )
 
         return {
-            "rejected": len(matches),
+            "rejected": len(rejected),
             "would_reject": len(matches),
-            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
+            "skipped": skipped,
+            "books": [{"id": m["id"], "source_path": m["source_path"]} for m in rejected],
         }
 
     def set_priority(
