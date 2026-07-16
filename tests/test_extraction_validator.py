@@ -711,7 +711,9 @@ class TestAuditQualityCLI:
 class TestPdfSourceWords:
     @staticmethod
     def _make_pdf(path, n_words: int):
-        import fitz
+        # PyMuPDF is an optional runtime dep (production degrades to None
+        # without it); skip these tests where it isn't installed, e.g. CI.
+        fitz = pytest.importorskip("fitz")
 
         words = [f"word{i}" for i in range(n_words)]
         doc = fitz.open()
