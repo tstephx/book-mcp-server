@@ -72,6 +72,18 @@ def test_default_chapter_tokens_env_override(monkeypatch):
     import importlib
     import src.config as config_module
 
-    monkeypatch.setenv("DEFAULT_CHAPTER_TOKENS", "4000")
-    importlib.reload(config_module)
-    assert config_module.Config.DEFAULT_CHAPTER_TOKENS == 4000
+    orig_config = config_module.Config
+    try:
+        monkeypatch.setenv("DEFAULT_CHAPTER_TOKENS", "4000")
+        importlib.reload(config_module)
+        assert config_module.Config.DEFAULT_CHAPTER_TOKENS == 4000
+    finally:
+        # importlib.reload() replaces config_module.Config with a brand-new
+        # class object. Modules that did `from .config import Config` at
+        # import time (e.g. src/database.py) keep a reference to the OLD
+        # class, so leaving the reload in place silently breaks identity
+        # for every test collected after this one (e.g. monkeypatch.setattr
+        # on the new class no-ops against code reading the old one).
+        # Restore the original class object so module identity is intact
+        # for later tests, regardless of whether the assertion above passed.
+        config_module.Config = orig_config
