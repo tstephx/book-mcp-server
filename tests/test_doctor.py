@@ -1,5 +1,6 @@
 """Tests for the integrity doctor."""
 
+import json
 import sqlite3
 import time
 
@@ -285,9 +286,6 @@ class TestCheckLostBooks:
         assert d["pipeline_id"] == lost_pid
         assert d["basename"] == "chapter_1.epub"
         assert d["live_copy"] is False
-
-
-import json
 
 
 class TestCheckNullContentHash:
