@@ -45,16 +45,17 @@ Quick reference: "which file handles X?"
 
 | File | Responsibility |
 |------|---------------|
-| `classifier.py` | `ClassifierAgent` — LLM-based book classification. Delegates to `LLMProvider` (OpenAI default, Anthropic alternative) |
+| `classifier.py` | `ClassifierAgent` — LLM-based book classification. Delegates to `LLMProvider` (claude-code primary, OpenAI fallback by default; `CLASSIFIER_PROVIDER` env var forces single-provider mode) |
 | `classifier_types.py` | `BookType` enum and classifier data classes |
 
 ### `agents/providers/`
 
 | File | Responsibility |
 |------|---------------|
-| `base.py` | `LLMProvider` ABC — defines `classify(text, metadata) -> BookProfile` contract and `name` property |
-| `openai_provider.py` | `OpenAIProvider(LLMProvider)` — calls `gpt-4.1-mini` via OpenAI SDK; normalizes unicode before sending |
-| `anthropic_provider.py` | `AnthropicProvider(LLMProvider)` — calls `claude-haiku-4-5-20251001` via Anthropic SDK; reads `ANTHROPIC_API_KEY` from env |
+| `base.py` | `LLMProvider` ABC — defines `classify(text, metadata) -> BookProfile` contract and `name` property. Also exports `parse_profile_json()`, the shared response parser (markdown-fence-tolerant JSON → `BookProfile`) used by all providers. |
+| `claude_code_provider.py` | `ClaudeCodeProvider(LLMProvider)` — classification via `claude -p` subprocess (subscription billing, no API key); default primary provider since 2026-07-16 |
+| `openai_provider.py` | `OpenAIProvider(LLMProvider)` — calls `gpt-4.1-mini` via OpenAI SDK; normalizes unicode before sending; default fallback provider |
+| `anthropic_provider.py` | `AnthropicProvider(LLMProvider)` — calls `claude-haiku-4-5-20251001` via Anthropic SDK; reads `ANTHROPIC_API_KEY` from env; no longer in the default primary/fallback chain but still selectable via explicit `primary=`/`fallback=` injection |
 
 ### `agents/prompts/`
 
