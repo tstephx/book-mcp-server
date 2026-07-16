@@ -2,8 +2,10 @@
 
 `stage_all` re-chunks every chapter into chunks_staging, reconciling by
 content_hash so embeddings survive reruns (decision 5: no stale-embedding
-state is representable). Production `chunks` is only written by `swap()`
-(Task 10), inside one transaction, behind the eval gate.
+state is representable). Within this module, production `chunks` is only
+written by `swap()` (Task 10), inside one transaction, behind the eval gate
+(the pipeline's processing adapter also appends chunks during normal book
+approval).
 """
 
 import io
@@ -348,6 +350,13 @@ def swap(db_path, generator=None) -> dict:
         staged_n = conn.execute("SELECT COUNT(*) FROM chunks_staging").fetchone()[0]
         if staged_n == 0:
             raise SwapRefused("staging is empty")
+
+        try:
+            meta_row = conn.execute("SELECT data_version FROM library_meta WHERE id = 1").fetchone()
+        except _sqlite3.OperationalError:
+            meta_row = None
+        if meta_row is None:
+            raise SwapRefused("library_meta not initialized — run `agentic-pipeline init` (migrations) first")
 
         backup = create_backup(db_path)
 

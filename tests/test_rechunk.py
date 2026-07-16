@@ -271,6 +271,26 @@ class TestVerdictPersistence:
         with pytest.raises(RuntimeError, match="manual"):
             rc.run_gate_eval(db, [gold], embedder=FakeEmbedder())
 
+    def test_run_gate_eval_refuses_empty_auto_gold_subset(self, staged_db, tmp_path, monkeypatch):
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        rc.stage_all(conn)
+        rc.embed_pending(conn, generator=FakeGenerator())
+
+        gold = tmp_path / "gold.json"
+        gold.write_text('[{"query": "q", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "manual"}]')
+
+        class FakeEmbedder:
+            def generate(self, text):
+                return np.full(4, 5.0, dtype=np.float32)
+
+        monkeypatch.setattr(
+            "src.utils.retrieval_eval.full_text_search",
+            lambda q, limit=10: {"results": []},
+        )
+        with pytest.raises(RuntimeError, match="auto"):
+            rc.run_gate_eval(db, [gold], embedder=FakeEmbedder())
+
 
 def _prep_passing_swap(conn, db, tmp_path):
     """Stage + embed + write a PASS verdict with a current snapshot."""
@@ -324,6 +344,34 @@ class TestSwap:
         conn.execute("UPDATE chunks_staging SET embedding = NULL WHERE rowid = 1")
         conn.commit()
         with pytest.raises(rc.SwapRefused):
+            rc.swap(db)
+
+    def test_swap_refused_when_staging_missing(self, staged_db, tmp_path):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        conn.execute("DROP TABLE chunks_staging")
+        conn.commit()
+        with pytest.raises(rc.SwapRefused, match="does not exist"):
+            rc.swap(db)
+
+    def test_swap_refused_when_staging_empty(self, staged_db, tmp_path, monkeypatch):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        conn.execute("DELETE FROM chunks_staging")
+        conn.commit()
+        # ch2's live chunk would otherwise get re-staged by the delta step
+        # (it's still joinable against `chunks`); stub it out so this test
+        # isolates the "staging is empty" precondition itself.
+        monkeypatch.setattr(rc, "_stage_delta", lambda conn, marker, generator=None: 0)
+        with pytest.raises(rc.SwapRefused, match="empty"):
+            rc.swap(db)
+
+    def test_swap_refused_without_library_meta_row(self, staged_db, tmp_path):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        conn.execute("DELETE FROM library_meta")
+        conn.commit()
+        with pytest.raises(rc.SwapRefused, match="library_meta"):
             rc.swap(db)
 
     def test_swap_replaces_chunks_bumps_version_drops_staging(self, staged_db, tmp_path):
