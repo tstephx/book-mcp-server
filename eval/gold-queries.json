@@ -1,0 +1,302 @@
+[
+  {
+    "query": "Why should leftover fresh sourdough pasta dough be frozen rather than dried, and what happens to the dough if it's left at room temperature?",
+    "gold_chapter_id": "35da4498-2673-4059-a808-a327da6e582a-ch17",
+    "gold_book_id": "35da4498-2673-4059-a808-a327da6e582a",
+    "source": "auto"
+  },
+  {
+    "query": "In the MountainCar-v0 environment with the new Gymnasium API, what reward does the agent receive at each time step versus when the game ends, and how does the old done flag relate to terminated and truncated?",
+    "gold_chapter_id": "6ee24f00-0f4c-44e5-acd5-460e858aa76c-ch7",
+    "gold_book_id": "6ee24f00-0f4c-44e5-acd5-460e858aa76c",
+    "source": "auto"
+  },
+  {
+    "query": "In the Lunch Well cookbook's coconut salmon turmeric omelet recipe, how much of the coconut milk egg batter do you add to the skillet per omelet, and how long do you cook it before covering with a lid?",
+    "gold_chapter_id": "a1d29b60-9634-4dee-a0c9-69e03a19de05-ch3",
+    "gold_book_id": "a1d29b60-9634-4dee-a0c9-69e03a19de05",
+    "source": "auto"
+  },
+  {
+    "query": "In IPv6, what does a /32 prefix indicate compared to its meaning in IPv4, and what prefix length is used for host routes instead?",
+    "gold_chapter_id": "7ef45e35-bf02-489d-b4a5-a9cf29ccda0e-ch32",
+    "gold_book_id": "7ef45e35-bf02-489d-b4a5-a9cf29ccda0e",
+    "source": "auto"
+  },
+  {
+    "query": "Why did the gumball machine's State Pattern implementation use an interface instead of an abstract class, and what benefit would an abstract class have offered?",
+    "gold_chapter_id": "08d044f8-de36-440f-8509-66bcf66c3558-ch24",
+    "gold_book_id": "08d044f8-de36-440f-8509-66bcf66c3558",
+    "source": "auto"
+  },
+  {
+    "query": "What are the six components represented by the letters in the ASCEND Practice acronym for career coaching clients?",
+    "gold_chapter_id": "841604ab-2524-4353-862f-c4e554bdd0ba-ch7",
+    "gold_book_id": "841604ab-2524-4353-862f-c4e554bdd0ba",
+    "source": "auto"
+  },
+  {
+    "query": "In Python, what does wrapping `lambda: print('Lambda!')` in parentheses and adding a second pair of parentheses do, and what syntax declares an anonymous lambda that takes num1 and num2 and returns their sum when called with (8, 9)?",
+    "gold_chapter_id": "0ea09e3d-b52c-4a16-b196-c2c881c7c170-ch11",
+    "gold_book_id": "0ea09e3d-b52c-4a16-b196-c2c881c7c170",
+    "source": "auto"
+  },
+  {
+    "query": "In the acknowledgments of The DevOps Handbook second edition, who at IT Revolution is specifically thanked for her heroic work pulling the second edition together?",
+    "gold_chapter_id": "c9a46b1e-033e-40c9-a247-0dfd554dca27-ch4",
+    "gold_book_id": "c9a46b1e-033e-40c9-a247-0dfd554dca27",
+    "source": "auto"
+  },
+  {
+    "query": "When extending the Light class with ColorLight, how do you override the test() function so it alerts the light's current color value instead of its state?",
+    "gold_chapter_id": "2adce0fe-1c79-40d9-95fa-0e27bfae320b-ch22",
+    "gold_book_id": "2adce0fe-1c79-40d9-95fa-0e27bfae320b",
+    "source": "auto"
+  },
+  {
+    "query": "What self-referential joke about the word 'surely' did Paul Samuelson include in a footnote to his 'Overlapping Generations Model' paper?",
+    "gold_chapter_id": "438ed6e4-d90f-4996-9dd3-460c45fbba67-ch2",
+    "gold_book_id": "438ed6e4-d90f-4996-9dd3-460c45fbba67",
+    "source": "auto"
+  },
+  {
+    "query": "According to the index of Linux Basics for Hackers, on which pages is the l2ping command for Bluetooth covered?",
+    "gold_chapter_id": "5ffa0673-6e03-4642-93cf-74881b628b30-ch17",
+    "gold_book_id": "5ffa0673-6e03-4642-93cf-74881b628b30",
+    "source": "auto"
+  },
+  {
+    "query": "In Go, after starting a sleep command with exec.Command and cmd.Start(), how do you use os.FindProcess with cmd.Process.Pid and the Wait() method to obtain an os.ProcessState and check via Exited() and Success() whether the process ran successfully?",
+    "gold_chapter_id": "5689d5e3-9f5d-42be-9e5d-702a74e20a73-ch18",
+    "gold_book_id": "5689d5e3-9f5d-42be-9e5d-702a74e20a73",
+    "source": "auto"
+  },
+  {
+    "query": "How much did Amazon's leaked October 2025 document say the company would save in labor costs between 2025 and 2027 by replacing workers with AI-powered robots?",
+    "gold_chapter_id": "bf04ef73-c79b-48bb-9a84-3c7d17ca2e88-ch3",
+    "gold_book_id": "bf04ef73-c79b-48bb-9a84-3c7d17ca2e88",
+    "source": "auto"
+  },
+  {
+    "query": "When using git bisect, what command lets you finish the bisection while staying on the bad commit you found, instead of returning to the branch you started from?",
+    "gold_chapter_id": "2fce00f4-9991-44fb-b592-2acd64365665-ch3",
+    "gold_book_id": "2fce00f4-9991-44fb-b592-2acd64365665",
+    "source": "auto"
+  },
+  {
+    "query": "In Consumer Reports' smartphone ratings methodology, what timeframe does the predicted reliability score cover for estimating whether newly purchased phone models will develop problems or break?",
+    "gold_chapter_id": "aa457a40-3768-407a-9dd3-b3d1761f35c3-ch16",
+    "gold_book_id": "aa457a40-3768-407a-9dd3-b3d1761f35c3",
+    "source": "auto"
+  },
+  {
+    "query": "In Roger Antonsen's \"90 Rotating Equilateral Triangles\" Processing sketch, why does the triangle drawn with triangle(0,0,100,100,200,-200) in the initial listing rotate around one of its vertices instead of its center, and what kind of triangle does it actually produce?",
+    "gold_chapter_id": "916e63de-5a12-4d2d-88c5-a34bcf58a91e-ch6",
+    "gold_book_id": "916e63de-5a12-4d2d-88c5-a34bcf58a91e",
+    "source": "auto"
+  },
+  {
+    "query": "What is the name of the Metro line 2 stop for Naples' main train station, and why is it called that?",
+    "gold_chapter_id": "a5501b6d-cf89-48fc-9e02-bb9b9dd12af1-ch4",
+    "gold_book_id": "a5501b6d-cf89-48fc-9e02-bb9b9dd12af1",
+    "source": "auto"
+  },
+  {
+    "query": "Why does the author argue that responsive branching based on entry skills and continual observation of learner performance lets elearning deliver optimal performance outcomes in the shortest time, compared to classroom programs that deliver the same content in the same sequence for all learners?",
+    "gold_chapter_id": "bf174a97-4934-4897-a315-7838520d0789-ch8",
+    "gold_book_id": "bf174a97-4934-4897-a315-7838520d0789",
+    "source": "auto"
+  },
+  {
+    "query": "When doing the exercise of circling activities to turn toward your siblings, what kind of changes should you look for after several weeks instead of drastic immediate ones?",
+    "gold_chapter_id": "ec5c70d8-2e31-46c6-bbc3-ed58670e0631-ch59",
+    "gold_book_id": "ec5c70d8-2e31-46c6-bbc3-ed58670e0631",
+    "source": "auto"
+  },
+  {
+    "query": "When simulating compliance checks for 100 data records with the simulate_data_compliance function, what percentage of compliant records did the example output display?",
+    "gold_chapter_id": "e1bc8ce3-bde1-44a7-8377-f155f4b791b4-ch2",
+    "gold_book_id": "e1bc8ce3-bde1-44a7-8377-f155f4b791b4",
+    "source": "auto"
+  },
+  {
+    "query": "In the multiplayer game example querying game.player_stats for region 'NA' with score > 5000 and win_count > 10, why does Postgres have to perform a Bitmap Heap Scan visiting 68 heap blocks instead of getting everything from the idx_region_score_win_count index?",
+    "gold_chapter_id": "4deb3a68-d357-4133-9a70-e21241ac994f-ch17",
+    "gold_book_id": "4deb3a68-d357-4133-9a70-e21241ac994f",
+    "source": "auto"
+  },
+  {
+    "query": "What is the evocative name for the process by which a compiler breaks an array operation into chunks whose size depends on the data type's bit width and the vector register width?",
+    "gold_chapter_id": "65f84283-aba0-4eaf-975f-e0e775584206-ch7",
+    "gold_book_id": "65f84283-aba0-4eaf-975f-e0e775584206",
+    "source": "auto"
+  },
+  {
+    "query": "When creating a Postgres function that takes a tenant_id text argument, how do you make it return only specific columns (id, full_name, job_title, is_available) from service_users as a JSON array instead of jsonb_agg including all row values?",
+    "gold_chapter_id": "9bfc3df9-34d3-4ce2-91fb-18b733d7beb3-ch11",
+    "gold_book_id": "9bfc3df9-34d3-4ce2-91fb-18b733d7beb3",
+    "source": "auto"
+  },
+  {
+    "query": "Which street in Naples' historic center is famous for its artisan workshops making presepi (nativity scenes), and what does the name Spaccanapoli mean?",
+    "gold_chapter_id": "bb3b72ef-cb05-44c4-948c-018b8f3149d4-ch3",
+    "gold_book_id": "bb3b72ef-cb05-44c4-948c-018b8f3149d4",
+    "source": "auto"
+  },
+  {
+    "query": "According to brain researcher Audrey van der Meer's study cited in a 2024 Inc. magazine article, how do brain connectivity patterns differ when writing by hand versus typing on a keyboard?",
+    "gold_chapter_id": "e31c2cce-b647-4e51-b2cd-be8ef2e509d5-ch3",
+    "gold_book_id": "e31c2cce-b647-4e51-b2cd-be8ef2e509d5",
+    "source": "auto"
+  },
+  {
+    "query": "In the Tree of Thoughts explore_and_prune implementation, what does the illustrative evaluate_thought heuristic use to score a branch, and what does the algorithm return when every branch falls below the prune threshold?",
+    "gold_chapter_id": "e7c6ec68-de99-4afc-9302-a319f2bfa00e-ch11",
+    "gold_book_id": "e7c6ec68-de99-4afc-9302-a319f2bfa00e",
+    "source": "auto"
+  },
+  {
+    "query": "In the Turmeric Bean Tartine recipe from Lunch Well, what type of canned beans are simmered in coconut milk with tomato paste?",
+    "gold_chapter_id": "70f0bd9c-fab8-42b1-95ee-a11c9ea57666-ch3",
+    "gold_book_id": "70f0bd9c-fab8-42b1-95ee-a11c9ea57666",
+    "source": "auto"
+  },
+  {
+    "query": "When using PyInstaller's --add-data option to bundle a data file like an icon, what path separator should I use between source and destination on Linux/Mac versus Windows?",
+    "gold_chapter_id": "05b8e4a3-7393-41d4-8ace-4a1a969c2590-ch39",
+    "gold_book_id": "05b8e4a3-7393-41d4-8ace-4a1a969c2590",
+    "source": "auto"
+  },
+  {
+    "query": "In an ROC curve plot, what do the bottom left-hand and top right-hand corners of the unit square represent, and why does a classifier whose point lies on the main diagonal correspond to randomly classifying observations as positive with some fixed probability?",
+    "gold_chapter_id": "79cc8874-6294-49c7-a3fd-2c1ae88b55bb-ch7",
+    "gold_book_id": "79cc8874-6294-49c7-a3fd-2c1ae88b55bb",
+    "source": "auto"
+  },
+  {
+    "query": "Which pencil grades are used to create the pitted texture of the lemon's peel, and which grade darkens the shadow beneath the lemon to 100 percent value?",
+    "gold_chapter_id": "de5fde4a-257a-4682-8764-3f1f1afdd8cc-ch5",
+    "gold_book_id": "de5fde4a-257a-4682-8764-3f1f1afdd8cc",
+    "source": "auto"
+  },
+  {
+    "query": "In Excel's PEMDAS order of operations, what does the caret symbol do, and in the formula =E1*F1/G1, which operation does Excel perform first?",
+    "gold_chapter_id": "39b8ce19-b3c8-4604-97f7-db2bd07bf3f8-ch3",
+    "gold_book_id": "39b8ce19-b3c8-4604-97f7-db2bd07bf3f8",
+    "source": "auto"
+  },
+  {
+    "query": "Which processor powers the Orange Pi RV2 single-board computer, and what clock speed range and AI performance does it offer?",
+    "gold_chapter_id": "462f0159-da9d-476a-93f0-ca330780d3d3-ch4",
+    "gold_book_id": "462f0159-da9d-476a-93f0-ca330780d3d3",
+    "source": "auto"
+  },
+  {
+    "query": "In the WizCoin example, which dunder method must you implement so two WizCoin objects can be added with the + operator, and what value should it return when the right-hand operand is not a WizCoin instance?",
+    "gold_chapter_id": "7d319817-5630-4b34-ab8b-2b78972b2ac8-ch18",
+    "gold_book_id": "7d319817-5630-4b34-ab8b-2b78972b2ac8",
+    "source": "auto"
+  },
+  {
+    "query": "Why does Figma's Dev Mode omit certain filters or visual effects from its generated code snippets rather than translating them?",
+    "gold_chapter_id": "15d477b8-26c0-4cdc-a6f8-3b56b88aea75-ch12",
+    "gold_book_id": "15d477b8-26c0-4cdc-a6f8-3b56b88aea75",
+    "source": "auto"
+  },
+  {
+    "query": "What concrete replacements does the author suggest for abstract terms like 'high-net-worth individuals', 'the intelligence community', and 'civil society', and why do journalists open articles with a named person in a predicament?",
+    "gold_chapter_id": "677e9b5f-d0f5-444a-8f46-05494faa7dac-ch2",
+    "gold_book_id": "677e9b5f-d0f5-444a-8f46-05494faa7dac",
+    "source": "auto"
+  },
+  {
+    "query": "What maximum input context length in tokens do GPT-5 and Claude 3.7 Sonnet both offer, according to this book's chapter on memory for agentic systems?",
+    "gold_chapter_id": "254debdb-64fe-4f0f-b544-86abf7ba9e2a-ch17",
+    "gold_book_id": "254debdb-64fe-4f0f-b544-86abf7ba9e2a",
+    "source": "auto"
+  },
+  {
+    "query": "When building the Django message board homepage with a ListView subclass, what is the name of the context variable you loop over in home.html to display each post's text field?",
+    "gold_chapter_id": "0a4da387-2651-4563-99e8-ba7f7ecfbb23-ch8",
+    "gold_book_id": "0a4da387-2651-4563-99e8-ba7f7ecfbb23",
+    "source": "auto"
+  },
+  {
+    "query": "At what water temperature should new linen be washed, and what type of detergent should be used?",
+    "gold_chapter_id": "79136d80-0d19-4387-acdb-dc0a136ea46a-ch5",
+    "gold_book_id": "79136d80-0d19-4387-acdb-dc0a136ea46a",
+    "source": "auto"
+  },
+  {
+    "query": "When configuring an OpenVPN server to push a route for the 192.168.1.0/24 local subnet to clients, what iptables FORWARD rules should be added to allow traffic from the 10.8.0.0/24 VPN tunnel to reach that local network?",
+    "gold_chapter_id": "1c23ab10-9b35-4717-a1e6-1dc986df336f-ch6",
+    "gold_book_id": "1c23ab10-9b35-4717-a1e6-1dc986df336f",
+    "source": "auto"
+  },
+  {
+    "query": "How much does the Makita GBU01M1 battery handheld leaf blower weigh in pounds, and what is its price?",
+    "gold_chapter_id": "e7bf2ea5-56f1-4001-971c-22e8efcc5ccd-ch5",
+    "gold_book_id": "e7bf2ea5-56f1-4001-971c-22e8efcc5ccd",
+    "source": "auto"
+  },
+  {
+    "query": "In the ASD-risk gene classification experiments comparing GCN, GraphSAGE, and MLP, what specificity and sensitivity did the GraphSAGE model achieve?",
+    "gold_chapter_id": "647d376d-ca55-46ee-a3df-b3f6df2bdaca-ch16",
+    "gold_book_id": "647d376d-ca55-46ee-a3df-b3f6df2bdaca",
+    "source": "auto"
+  },
+  {
+    "query": "In the Scrapy email scraper's parse_link function, which 'bad words' cause a page URL to be skipped for email extraction, and what regular expression is used to find email ids in the page source?",
+    "gold_chapter_id": "72baecae-291a-4e32-be11-ee2f2f50d9b2-ch1",
+    "gold_book_id": "72baecae-291a-4e32-be11-ee2f2f50d9b2",
+    "source": "auto"
+  },
+  {
+    "query": "In the needle-and-haystack example illustrating satisficing, what are the dimensions of the 'best' needle for sewing the patch, and how many other needles is it hidden among?",
+    "gold_chapter_id": "f7952006-bc83-43b1-b1c3-b684b254e447-ch2",
+    "gold_book_id": "f7952006-bc83-43b1-b1c3-b684b254e447",
+    "source": "auto"
+  },
+  {
+    "query": "What blog post title does the author mention as an example of travel safety fears being exaggerated even for familiar destinations like Italy?",
+    "gold_chapter_id": "c177f9f1-153e-4bc4-80a0-b62470b1e2d7-ch3",
+    "gold_book_id": "c177f9f1-153e-4bc4-80a0-b62470b1e2d7",
+    "source": "auto"
+  },
+  {
+    "query": "In the Angular e-shop deferrable views example, which product ID does the getFeatured method fetch from the Fake Store API to display as the featured product?",
+    "gold_chapter_id": "e05ca1a5-6f08-41f6-a455-42bd9d67e8e7-ch40",
+    "gold_book_id": "e05ca1a5-6f08-41f6-a455-42bd9d67e8e7",
+    "source": "auto"
+  },
+  {
+    "query": "When building a fine-tuning JSONL training file to make a model output code without explanations or comments, how many total examples are recommended and how are they allocated across the code-only and no-comments objectives?",
+    "gold_chapter_id": "23b5c16f-b197-45d9-90fe-34dcceb677f8-ch7",
+    "gold_book_id": "23b5c16f-b197-45d9-90fe-34dcceb677f8",
+    "source": "auto"
+  },
+  {
+    "query": "In the arancini recipe yielding 8 servings, how much grated fontina cheese and how many cups of panko are called for?",
+    "gold_chapter_id": "6a03c6b6-3a36-4153-bb34-f28745743cbb-ch5",
+    "gold_book_id": "6a03c6b6-3a36-4153-bb34-f28745743cbb",
+    "source": "auto"
+  },
+  {
+    "query": "When cropping the legs of a standing or moving figure in a shot, where should the frame cut them \u2014 and why not below the knees?",
+    "gold_chapter_id": "488a2445-8dd4-4355-8e2d-cd73c0c6948c-ch3",
+    "gold_book_id": "488a2445-8dd4-4355-8e2d-cd73c0c6948c",
+    "source": "auto"
+  },
+  {
+    "query": "Which Florence neighborhood does the guide describe as somewhat urban and dreary but offering inexpensive hotels and characteristic eateries?",
+    "gold_chapter_id": "263beb61-72cd-4583-be6c-acdfae48b3b4-ch1",
+    "gold_book_id": "263beb61-72cd-4583-be6c-acdfae48b3b4",
+    "source": "auto"
+  },
+  {
+    "query": "Why does the instructor create a custom library for the CO2 sensor instead of using the manufacturer's existing library on a small microcontroller like the ATtiny?",
+    "gold_chapter_id": "c41efd65-06ab-4ce9-86f4-81babb3d52f0-ch1",
+    "gold_book_id": "c41efd65-06ab-4ce9-86f4-81babb3d52f0",
+    "source": "auto"
+  }
+]
