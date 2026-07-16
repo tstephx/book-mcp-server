@@ -1,0 +1,10 @@
+# Allow-list for `wt step copy-ignored` (worktrunk). Gitignore syntax.
+# Entries copy only if BOTH gitignored AND matched here. Added by the Phase 1
+# pre-flight sweep (2026-07-15), which flagged this repo's gitignored footprint:
+# 40 MB review queue (needs-chapter-review/) plus processing logs — per-run
+# state a worktree should not inherit.
+
+.mcp.json
+entities.json
+mempalace.yaml
+**/.claude/settings.local.json
