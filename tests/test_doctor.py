@@ -3,6 +3,7 @@
 import json
 import sqlite3
 import time
+from pathlib import Path
 
 import pytest
 
@@ -738,3 +739,96 @@ class TestBackfills:
         assert row["book_type"] == "travel_guide"
         assert row["classification_confidence"] == 0.95
         assert row["classified_by"] == "backfill:doctor"
+
+
+class TestApplyFixes:
+    def _seed_everything(self, db_path, tmp_path):
+        """One violation of each category, all fixable."""
+        src = tmp_path / "lost.epub"
+        src.write_bytes(b"book")
+        chfile = tmp_path / "ch.md"
+        chfile.write_text("prose")
+        # NOTE (adjustment): _seed_complete_pipeline's content_hash defaults to
+        # f"hash-{pipeline_id or 'x'}"; two calls with the default None both
+        # collide on "hash-x" against processing_pipelines' UNIQUE(content_hash).
+        # Pass distinct pipeline_id values, as other multi-seed tests in this
+        # file already do.
+        lost_pid = _seed_complete_pipeline(db_path, pipeline_id="lost", source_path=str(src))
+        typed_pid = _seed_complete_pipeline(db_path, pipeline_id="typed", source_path="/w/typed.epub")
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="orph", chapter_id="GONE", book_id=lost_pid)
+        _seed_book(conn, book_id=typed_pid, book_type=None)
+        _seed_chapter(conn, chapter_id="nohash", book_id=typed_pid, content_hash=None, file_path=str(chfile))
+        conn.execute(
+            "UPDATE processing_pipelines SET book_profile=? WHERE id=?",
+            (json.dumps({"book_type": "textbook", "confidence": 0.8}), typed_pid),
+        )
+        conn.commit()
+        conn.close()
+        return lost_pid
+
+    def test_full_fix_then_clean_then_idempotent(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import apply_fixes, has_violations, run_checks
+
+        self._seed_everything(db_path, tmp_path)
+
+        report = apply_fixes(db_path)
+
+        assert report.backup_path is not None and Path(report.backup_path).exists()
+        assert report.manifest_path is not None
+        assert report.fixed["orphaned_chunks"] == 1
+        assert report.fixed["lost_books"] == 1  # archived
+        assert report.fixed["null_content_hash"] == 1
+        assert report.fixed["null_book_type"] == 1
+        assert len(report.reingest_commands) == 1
+        assert has_violations(run_checks(db_path)) is False
+        assert report.has_failures is False
+
+        # Second run: nothing to do, NO new backup (Decision 8)
+        before = sorted(db_path.parent.glob(f"{db_path.name}.backup-doctor-*"))
+        report2 = apply_fixes(db_path)
+        after = sorted(db_path.parent.glob(f"{db_path.name}.backup-doctor-*"))
+        assert sum(report2.fixed.values()) == 0
+        assert report2.backup_path is None
+        assert before == after
+
+    def test_no_backup_flag(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import apply_fixes
+
+        self._seed_everything(db_path, tmp_path)
+        report = apply_fixes(db_path, backup=False)
+
+        assert report.backup_path is None
+        assert report.fixed["orphaned_chunks"] == 1
+
+    def test_unfixable_items_are_reported_not_failures(self, db_path):
+        """A source-gone chapter is report-only skip, not a fix failure."""
+        from agentic_pipeline.health.doctor import apply_fixes
+
+        conn = _connect(db_path)
+        _seed_book(conn)
+        _seed_chapter(conn, chapter_id="gone", content_hash=None, file_path="/nope.md")
+        conn.commit()
+        conn.close()
+
+        report = apply_fixes(db_path)
+
+        assert report.fixed["null_content_hash"] == 0
+        assert len(report.skipped["null_content_hash"]) == 1
+        assert report.has_failures is False  # unfixable ≠ failed
+
+    def test_every_category_has_a_fix_handler(self):
+        """Contract rule: enumeration completeness over CATEGORIES."""
+        from agentic_pipeline.health.doctor import CATEGORIES, FIX_HANDLED_CATEGORIES
+
+        assert set(FIX_HANDLED_CATEGORIES) == set(CATEGORIES)
+
+    def test_fixreport_field_types(self, db_path):
+        from agentic_pipeline.health.doctor import apply_fixes
+
+        report = apply_fixes(db_path)
+        assert report.backup_path is None or isinstance(report.backup_path, str)
+        assert isinstance(report.fixed, dict)
+        assert isinstance(report.skipped, dict)
+        assert isinstance(report.reingest_commands, list)
+        assert isinstance(report.has_failures, bool)

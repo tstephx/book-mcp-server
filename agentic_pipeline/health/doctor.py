@@ -387,3 +387,78 @@ def fix_backfill_book_types(db_path, finding: Finding):
             fixed += 1
         conn.commit()
     return fixed, skipped
+
+
+# Every category doctor can detect, it can also fix (or explicitly reports).
+# The enum-completeness test pins this to CATEGORIES so a fifth check can
+# never be added without deciding its fix story.
+FIX_HANDLED_CATEGORIES = (
+    CATEGORY_ORPHANED_CHUNKS,  # fix: delete
+    CATEGORY_LOST_BOOKS,  # fix: archive + repoint + manifest
+    CATEGORY_NULL_CONTENT_HASH,  # fix: backfill from files
+    CATEGORY_NULL_BOOK_TYPE,  # fix: backfill from profiles
+)
+
+
+@dataclass
+class FixReport:
+    """What apply_fixes did, per category."""
+
+    backup_path: str | None = None
+    manifest_path: str | None = None
+    fixed: dict = field(default_factory=dict)
+    skipped: dict = field(default_factory=dict)
+    reingest_commands: list = field(default_factory=list)
+    # skips that are fix FAILURES (vs. report-only "cannot ever fix" items)
+    failure_categories: set = field(default_factory=set)
+
+    @property
+    def has_failures(self) -> bool:
+        return bool(self.failure_categories)
+
+
+def apply_fixes(db_path, *, backup: bool = True, manifest_path=None) -> FixReport:
+    """Run checks fresh, then repair in spec order. Idempotent."""
+    findings = {f.category: f for f in run_checks(db_path)}
+    report = FixReport()
+
+    will_mutate = (
+        findings[CATEGORY_ORPHANED_CHUNKS].count > 0
+        or findings[CATEGORY_LOST_BOOKS].count > 0
+        or findings[CATEGORY_NULL_CONTENT_HASH].fixable_count > 0
+        or findings[CATEGORY_NULL_BOOK_TYPE].fixable_count > 0
+    )
+
+    # 1. Backup — only when something will change (Decision 8).
+    if backup and will_mutate:
+        report.backup_path = str(create_backup(db_path))
+
+    # 2. Manifest — before anything is deleted.
+    manifest = write_manifest(db_path, findings[CATEGORY_LOST_BOOKS], manifest_path)
+    report.manifest_path = str(manifest) if manifest else None
+
+    # 3. Delete orphans.
+    report.fixed[CATEGORY_ORPHANED_CHUNKS] = fix_delete_orphans(db_path)
+    report.skipped[CATEGORY_ORPHANED_CHUNKS] = []
+
+    # 4 + 4.5. Archive dead pipelines, repoint recoverable sources.
+    archived, _repointed, arch_skipped = fix_archive_and_repoint(db_path, findings[CATEGORY_LOST_BOOKS])
+    report.fixed[CATEGORY_LOST_BOOKS] = archived
+    report.skipped[CATEGORY_LOST_BOOKS] = arch_skipped
+    if arch_skipped:
+        # a CAS/ownership skip is a genuine failure to complete the fix
+        report.failure_categories.add(CATEGORY_LOST_BOOKS)
+
+    # 5. Backfill hashes (missing files are report-only, not failures).
+    fixed, skipped = fix_backfill_hashes(db_path, findings[CATEGORY_NULL_CONTENT_HASH])
+    report.fixed[CATEGORY_NULL_CONTENT_HASH] = fixed
+    report.skipped[CATEGORY_NULL_CONTENT_HASH] = skipped
+
+    # 6. Backfill book types (invalid profiles are report-only).
+    fixed, skipped = fix_backfill_book_types(db_path, findings[CATEGORY_NULL_BOOK_TYPE])
+    report.fixed[CATEGORY_NULL_BOOK_TYPE] = fixed
+    report.skipped[CATEGORY_NULL_BOOK_TYPE] = skipped
+
+    # 7. Re-ingest commands — printed advice, never affects exit code.
+    report.reingest_commands = build_reingest_commands(findings[CATEGORY_LOST_BOOKS])
+    return report
