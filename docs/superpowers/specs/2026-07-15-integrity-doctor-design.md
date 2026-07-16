@@ -87,6 +87,30 @@ From the design interview:
     (unjoinable), the kept backup preserves them one-run-deep, and a failed
     re-ingest is debugged from its source file. No per-book pending state.
 
+From the second interview round:
+
+13. **`--fix` repoints each recoverable book's `source_path` to its resolved
+    file** (original path or `processed/<basename>`) via the existing
+    `update_source_path()`, so the printed `reingest` commands actually run.
+    Without this, `reingest` fails closed for books whose file moved and
+    whose `content_hash` is a `backfill:` sentinel (unverifiable by design —
+    123/307 pipelines carry one). Basename matching is acceptable HERE
+    specifically: lost books have no live copy to corrupt; reingest creates
+    a fresh record and extracts truth from whatever file is actually there.
+    One command is printed per distinct book (newest dead pipeline id), not
+    per dead id.
+14. **`doctor_report` returns counts plus capped samples** (~10 detail items
+    per category, `truncated: true` marker) — except `lost_books`, which
+    returns all 25 because it IS the actionable list. No megabyte payloads
+    into chat contexts.
+15. **Exit codes make the invariant scriptable.** Bare `doctor` exits 1 when
+    violations exist, 0 when clean — `agentic-pipeline doctor || alert`
+    works in cron with no flags. `--fix` exits 0 when everything it
+    attempted succeeded, 1 if anything landed in `skipped`; pending
+    re-ingests are printed advice, not failures, and do not affect the exit
+    code. `health` keeps its current exit behavior — it is a dashboard, not
+    a gate.
+
 ## Architecture
 
 New module `agentic_pipeline/health/doctor.py`, joining the existing
@@ -131,6 +155,9 @@ seeded-violation test proving it fails when it should.
    `complete → archived` via `update_state(..., expected_state=COMPLETE)`,
    reason in `agent_output`. A pipeline that moved since the check (CAS or
    ownership failure) is skipped and reported, not forced.
+4.5. **Repoint recoverable sources** — for each of the 20 re-ingestable
+   books, `update_source_path(dead_id, resolved_path)` so the step-7
+   commands run without the hash fallback (Decision 13).
 5. **Backfill `content_hash`** — for chapters whose `file_path` exists, using
    the same hash routine `src/utils/embedding_sync.py` uses when it writes
    `content_hash`, so backfilled values are byte-compatible with existing
@@ -142,7 +169,9 @@ seeded-violation test proving it fails when it should.
    `books.classified_by = 'backfill:doctor'` — only for values passing the
    enum validation in Decision 11. The rest (including the 1 book with no
    profile) are reported.
-7. **Print re-ingest commands** for the 20 recoverable books.
+7. **Print re-ingest commands** — one per distinct recoverable book (20
+   commands, newest dead pipeline id per book), now guaranteed runnable by
+   step 4.5.
 
 Properties:
 
@@ -191,7 +220,14 @@ TDD throughout, per the project's contract-testing rules:
 - `health` integration: violations present ⇒ the integrity line reports
   them; clean DB ⇒ `integrity: OK`.
 - MCP: `doctor_report` registered in both server entry points (existing
-  wrapper-registration test pattern) and returns JSON-shaped findings.
+  wrapper-registration test pattern); payload caps enforced (≤10 samples per
+  category, `truncated` flag set, `lost_books` complete).
+- Repoint step: after `--fix`, each recoverable book's pipeline
+  `source_path` names an existing file, and the printed `reingest` command
+  succeeds against a seeded DB with a `backfill:` sentinel hash — the exact
+  case that fails without repointing.
+- Exit codes: seeded violations ⇒ bare `doctor` exits 1; clean ⇒ 0;
+  `--fix` with a forced skip ⇒ 1; clean `--fix` ⇒ 0.
 
 ## Out of scope
 
