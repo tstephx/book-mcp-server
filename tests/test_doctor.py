@@ -527,3 +527,143 @@ class TestManifest:
         empty = Finding(category=CATEGORY_LOST_BOOKS, count=0, fixable_count=0)
         assert write_manifest(db_path, empty) is None
         assert not (db_path.parent / "doctor").exists()
+
+
+class TestDestructiveFixes:
+    def test_delete_orphans_removes_only_orphans(self, db_path):
+        from agentic_pipeline.health.doctor import check_orphaned_chunks, fix_delete_orphans
+
+        conn = _connect(db_path)
+        _seed_book(conn)
+        _seed_chapter(conn)
+        _seed_chunk(conn, chunk_id="healthy")
+        _seed_chunk(conn, chunk_id="o1", chapter_id="GONE")
+        # NOTE (trap fix): chunks has UNIQUE(chapter_id, chunk_index) and
+        # _seed_chunk defaults chunk_index=0. "healthy" and "o2" both default
+        # to chapter_id="c1" at index 0, which collides. Pass a distinct
+        # chunk_index for o2 to avoid the IntegrityError.
+        _seed_chunk(conn, chunk_id="o2", book_id="GONE", embedded=False, chunk_index=1)
+        conn.commit()
+        conn.close()
+
+        deleted = fix_delete_orphans(db_path)
+
+        assert deleted == 2
+        conn = _connect(db_path)
+        remaining = [r["id"] for r in conn.execute("SELECT id FROM chunks")]
+        conn.close()
+        assert remaining == ["healthy"]
+        assert check_orphaned_chunks(db_path).count == 0  # check and fix agree
+
+    def test_archive_moves_complete_to_archived_with_reason(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import check_lost_books, fix_archive_and_repoint
+
+        src = tmp_path / "lost.epub"
+        src.write_bytes(b"x")
+        pid = _seed_complete_pipeline(db_path, source_path=str(src))
+
+        lost = check_lost_books(db_path)
+        archived, repointed, skipped = fix_archive_and_repoint(db_path, lost)
+
+        assert (archived, repointed, skipped) == (1, 1, [])
+        conn = _connect(db_path)
+        row = conn.execute("SELECT state FROM processing_pipelines WHERE id = ?", (pid,)).fetchone()
+        hist = conn.execute(
+            """SELECT agent_output FROM pipeline_state_history
+               WHERE pipeline_id = ? AND to_state = 'archived'""",
+            (pid,),
+        ).fetchone()
+        conn.close()
+        assert row["state"] == "archived"
+        assert "doctor" in (hist["agent_output"] or "")
+        # after archiving, the check goes quiet — alarm-fatigue decision
+        assert check_lost_books(db_path).count == 0
+
+    def test_concurrently_moved_pipeline_is_skipped_not_forced(self, db_path):
+        """Seed a state change between check and fix — CAS must protect it."""
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.health.doctor import check_lost_books, fix_archive_and_repoint
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        pid = _seed_complete_pipeline(db_path, source_path="/nowhere/x.epub")
+        lost = check_lost_books(db_path)
+        # a rival archives it first
+        PipelineRepository(db_path).update_state(pid, PipelineState.ARCHIVED)
+
+        archived, repointed, skipped = fix_archive_and_repoint(db_path, lost)
+
+        assert archived == 0
+        assert len(skipped) == 1 and skipped[0]["pipeline_id"] == pid
+
+    def test_repoint_makes_reingest_resolvable_despite_sentinel_hash(self, db_path, tmp_path, monkeypatch):
+        """The spec's sharpest decision: backfill:-sentinel books must become
+        reingestable. After repoint, resolve_source_file succeeds WITHOUT the
+        hash fallback (the file is at source_path)."""
+        from agentic_pipeline.approval.actions import resolve_source_file
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.health.doctor import check_lost_books, fix_archive_and_repoint
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "sentinel.epub").write_bytes(b"book bytes")
+        monkeypatch.setenv("PROCESSED_DIR", str(processed))
+        pid = _seed_complete_pipeline(db_path, source_path="/watch/sentinel.epub")
+        conn = _connect(db_path)
+        conn.execute(
+            "UPDATE processing_pipelines SET content_hash = 'backfill:deadbeef' WHERE id = ?",
+            (pid,),
+        )
+        conn.commit()
+        conn.close()
+
+        fix_archive_and_repoint(db_path, check_lost_books(db_path))
+
+        record = PipelineRepository(db_path).get(pid)
+        assert record["source_path"] == str(processed / "sentinel.epub")
+        resolved = resolve_source_file(record["source_path"], expected_hash=record["content_hash"])
+        assert resolved == processed / "sentinel.epub"
+
+    def test_reingest_commands_deduped_per_basename_newest_id(self, db_path):
+        from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, Finding, build_reingest_commands
+
+        lost = Finding(
+            category=CATEGORY_LOST_BOOKS,
+            count=3,
+            fixable_count=3,
+            details=[
+                {
+                    "pipeline_id": "old-id",
+                    "basename": "dupe.epub",
+                    "source_available": True,
+                    "resolved_path": "/p/dupe.epub",
+                    "source_path": "",
+                    "chunk_count": 1,
+                    "live_copy": False,
+                    "sample": "",
+                },
+                {
+                    "pipeline_id": "new-id",
+                    "basename": "dupe.epub",
+                    "source_available": True,
+                    "resolved_path": "/p/dupe.epub",
+                    "source_path": "",
+                    "chunk_count": 1,
+                    "live_copy": False,
+                    "sample": "",
+                },
+                {
+                    "pipeline_id": "gone-id",
+                    "basename": "gone.epub",
+                    "source_available": False,
+                    "resolved_path": None,
+                    "source_path": "",
+                    "chunk_count": 1,
+                    "live_copy": False,
+                    "sample": "",
+                },
+            ],
+        )
+
+        commands = build_reingest_commands(lost)
+
+        assert commands == ["agentic-pipeline reingest new-id"]  # last wins, gone excluded

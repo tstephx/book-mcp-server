@@ -16,6 +16,8 @@ from pathlib import Path
 
 from agentic_pipeline.agents.classifier_types import BookType
 from agentic_pipeline.db.connection import get_pipeline_db
+from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+from agentic_pipeline.pipeline.states import PipelineState
 
 logger = logging.getLogger(__name__)
 
@@ -280,3 +282,50 @@ def write_manifest(db_path, lost_books: Finding, manifest_path=None) -> Path | N
         ]
     manifest_path.write_text("\n".join(lines) + "\n")
     return manifest_path
+
+
+def fix_delete_orphans(db_path) -> int:
+    """Delete every orphaned chunk. Single transaction; same WHERE as the check."""
+    with get_pipeline_db(str(db_path)) as conn:
+        cursor = conn.execute(f"DELETE FROM chunks WHERE {_ORPHAN_WHERE}")
+        conn.commit()
+        return cursor.rowcount
+
+
+def fix_archive_and_repoint(db_path, lost_books: Finding):
+    """Archive dead pipelines (CAS-guarded) and repoint recoverable sources.
+
+    Returns (archived_count, repointed_count, skipped) where each skipped
+    entry is {"pipeline_id": ..., "reason": ...}. A pipeline that moved since
+    the check is skipped, never forced (Decision 5); repointing uses the
+    already-resolved path so printed reingest commands run without the
+    hash fallback (Decision 13).
+    """
+    repo = PipelineRepository(db_path)
+    archived = repointed = 0
+    skipped: list[dict] = []
+    for d in lost_books.details:
+        try:
+            repo.update_state(
+                d["pipeline_id"],
+                PipelineState.ARCHIVED,
+                agent_output={"reason": "doctor: book absent from library; see manifest"},
+                expected_state=PipelineState.COMPLETE,
+            )
+            archived += 1
+        except ConcurrentModificationError as e:
+            skipped.append({"pipeline_id": d["pipeline_id"], "reason": str(e)})
+            continue
+        if d["source_available"] and d["resolved_path"]:
+            repo.update_source_path(d["pipeline_id"], d["resolved_path"])
+            repointed += 1
+    return archived, repointed, skipped
+
+
+def build_reingest_commands(lost_books: Finding) -> list[str]:
+    """One command per distinct recoverable book — newest pipeline id wins."""
+    by_basename: dict[str, str] = {}
+    for d in lost_books.details:
+        if d["source_available"]:
+            by_basename[d["basename"]] = d["pipeline_id"]  # later entries win
+    return [f"agentic-pipeline reingest {pid}" for pid in by_basename.values()]
