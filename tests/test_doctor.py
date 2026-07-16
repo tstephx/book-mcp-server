@@ -284,3 +284,119 @@ class TestCheckLostBooks:
         assert d["pipeline_id"] == lost_pid
         assert d["basename"] == "chapter_1.epub"
         assert d["live_copy"] is False
+
+
+import json
+
+
+class TestCheckNullContentHash:
+    def test_flags_null_hash_and_reports_file_availability(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import check_null_content_hash
+
+        real = tmp_path / "ch.md"
+        real.write_text("chapter body")
+        conn = _connect(db_path)
+        _seed_book(conn)
+        _seed_chapter(conn, chapter_id="fixable", content_hash=None, file_path=str(real))
+        _seed_chapter(conn, chapter_id="unfixable", content_hash=None, file_path="/nope.md", number=2)
+        _seed_chapter(conn, chapter_id="healthy", content_hash="abc", number=3)
+        conn.commit()
+        conn.close()
+
+        finding = check_null_content_hash(db_path)
+
+        assert finding.count == 2
+        assert finding.fixable_count == 1  # only the one whose file exists
+        by_id = {d["chapter_id"]: d for d in finding.details}
+        assert by_id["fixable"]["file_exists"] is True
+        assert by_id["unfixable"]["file_exists"] is False
+
+    def test_clean_db_passes(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_content_hash
+
+        assert check_null_content_hash(db_path).count == 0
+
+
+class TestCheckNullBookType:
+    def _seed(self, db_path, profile):
+        """Book with NULL book_type whose pipeline carries the given profile."""
+        pid = _seed_complete_pipeline(db_path, source_path="/watch/typed.epub")
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=pid, book_type=None)
+        if profile is not None:
+            conn.execute(
+                "UPDATE processing_pipelines SET book_profile = ? WHERE id = ?",
+                (json.dumps(profile), pid),
+            )
+        conn.commit()
+        conn.close()
+        return pid
+
+    def test_valid_enum_value_is_fixable(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        self._seed(db_path, {"book_type": "travel_guide", "confidence": 0.9})
+
+        finding = check_null_book_type(db_path)
+        assert finding.count == 1
+        assert finding.fixable_count == 1
+        assert finding.details[0]["valid"] is True
+        assert finding.details[0]["profile_confidence"] == 0.9
+
+    def test_unknown_is_not_an_answer(self, db_path):
+        """Spec Decision 11: writing 'unknown' as an answer is not an answer."""
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        self._seed(db_path, {"book_type": "unknown", "confidence": 0.0})
+
+        finding = check_null_book_type(db_path)
+        assert finding.count == 1
+        assert finding.fixable_count == 0
+        assert finding.details[0]["valid"] is False
+
+    def test_off_enum_string_is_not_fixable(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        self._seed(db_path, {"book_type": "guidebook", "confidence": 0.8})
+
+        assert check_null_book_type(db_path).fixable_count == 0
+
+    def test_missing_profile_is_reported_not_guessed(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        self._seed(db_path, None)
+
+        finding = check_null_book_type(db_path)
+        assert finding.count == 1
+        assert finding.fixable_count == 0
+        assert finding.details[0]["profile_book_type"] is None
+
+    def test_every_book_type_enum_value_judged_correctly(self, db_path):
+        """Contract rule: enumeration completeness — all enum members handled."""
+        from agentic_pipeline.agents.classifier_types import BookType
+        from agentic_pipeline.health.doctor import _is_valid_book_type
+
+        for member in BookType:
+            expected = member is not BookType.UNKNOWN
+            assert _is_valid_book_type(member.value) is expected, member
+        assert _is_valid_book_type("guidebook") is False
+        assert _is_valid_book_type(None) is False
+
+
+class TestRunChecks:
+    def test_returns_all_four_categories_in_order(self, db_path):
+        from agentic_pipeline.health.doctor import CATEGORIES, run_checks
+
+        findings = run_checks(db_path)
+
+        assert [f.category for f in findings] == list(CATEGORIES)
+
+    def test_has_violations(self, db_path):
+        from agentic_pipeline.health.doctor import has_violations, run_checks
+
+        assert has_violations(run_checks(db_path)) is False
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="o", chapter_id="GONE", book_id="GONE")
+        conn.commit()
+        conn.close()
+        assert has_violations(run_checks(db_path)) is True

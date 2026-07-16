@@ -6,11 +6,13 @@ checks' SQL fragments so detector and repairer cannot drift apart.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from agentic_pipeline.agents.classifier_types import BookType
 from agentic_pipeline.db.connection import get_pipeline_db
 
 logger = logging.getLogger(__name__)
@@ -126,3 +128,78 @@ def check_lost_books(db_path) -> Finding:
         fixable_count=len(details),  # archiving fixes every lost book
         details=details,
     )
+
+
+def check_null_content_hash(db_path) -> Finding:
+    """Chapters whose content_hash is NULL — the duplicate check skips them."""
+    with get_pipeline_db(str(db_path)) as conn:
+        rows = conn.execute(
+            """SELECT id AS chapter_id, file_path FROM chapters
+               WHERE content_hash IS NULL OR content_hash = ''"""
+        ).fetchall()
+    details = []
+    for r in rows:
+        file_exists = bool(r["file_path"]) and Path(r["file_path"]).is_file()
+        details.append({"chapter_id": r["chapter_id"], "file_path": r["file_path"], "file_exists": file_exists})
+    return Finding(
+        category=CATEGORY_NULL_CONTENT_HASH,
+        count=len(details),
+        fixable_count=sum(1 for d in details if d["file_exists"]),
+        details=details,
+    )
+
+
+def _is_valid_book_type(value) -> bool:
+    """A real BookType member, and not 'unknown' — Decision 11."""
+    if not isinstance(value, str):
+        return False
+    return value in {m.value for m in BookType} and value != BookType.UNKNOWN.value
+
+
+def check_null_book_type(db_path) -> Finding:
+    """Books with NULL book_type; fixable when the pipeline profile has a valid type."""
+    with get_pipeline_db(str(db_path)) as conn:
+        rows = conn.execute(
+            """SELECT b.id AS book_id, b.title, p.book_profile
+               FROM books b
+               LEFT JOIN processing_pipelines p ON p.id = b.id
+               WHERE b.book_type IS NULL"""
+        ).fetchall()
+    details = []
+    for r in rows:
+        profile = {}
+        if r["book_profile"]:
+            try:
+                profile = json.loads(r["book_profile"])
+            except (json.JSONDecodeError, TypeError):
+                profile = {}
+        ptype = profile.get("book_type")
+        details.append(
+            {
+                "book_id": r["book_id"],
+                "title": r["title"],
+                "profile_book_type": ptype,
+                "profile_confidence": profile.get("confidence"),
+                "valid": _is_valid_book_type(ptype),
+            }
+        )
+    return Finding(
+        category=CATEGORY_NULL_BOOK_TYPE,
+        count=len(details),
+        fixable_count=sum(1 for d in details if d["valid"]),
+        details=details,
+    )
+
+
+def run_checks(db_path) -> list[Finding]:
+    """All four checks, in CATEGORIES order. Pure reads."""
+    return [
+        check_orphaned_chunks(db_path),
+        check_lost_books(db_path),
+        check_null_content_hash(db_path),
+        check_null_book_type(db_path),
+    ]
+
+
+def has_violations(findings: list[Finding]) -> bool:
+    return any(f.count > 0 for f in findings)
