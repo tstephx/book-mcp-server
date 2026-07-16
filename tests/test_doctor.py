@@ -1,6 +1,7 @@
 """Tests for the integrity doctor."""
 
 import sqlite3
+import time
 
 import pytest
 
@@ -426,3 +427,42 @@ class TestRunChecks:
         conn.commit()
         conn.close()
         assert has_violations(run_checks(db_path)) is True
+
+
+class TestBackup:
+    def test_creates_walsafe_copy_with_doctor_pattern(self, db_path):
+        from agentic_pipeline.health.doctor import create_backup
+
+        backup = create_backup(db_path)
+
+        assert backup.exists()
+        assert backup.name.startswith(db_path.name + ".backup-doctor-")
+        # The copy is a valid database with the same tables
+        conn = sqlite3.connect(backup)
+        assert conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] == 0
+        conn.close()
+
+    def test_keeps_only_newest_two(self, db_path):
+        from agentic_pipeline.health.doctor import create_backup
+
+        made = []
+        for _ in range(3):
+            made.append(create_backup(db_path))
+            time.sleep(1.1)  # timestamp resolution is seconds
+
+        survivors = sorted(db_path.parent.glob(f"{db_path.name}.backup-doctor-*"))
+        assert len(survivors) == 2
+        assert made[0] not in survivors  # oldest pruned
+        assert made[2] in survivors  # newest kept
+
+    def test_never_touches_non_doctor_files(self, db_path):
+        from agentic_pipeline.health.doctor import create_backup
+
+        bystander = db_path.parent / f"{db_path.name}.backup-manual"
+        bystander.write_bytes(b"precious user backup")
+        for _ in range(3):
+            create_backup(db_path)
+            time.sleep(1.1)
+
+        assert bystander.exists()
+        assert bystander.read_bytes() == b"precious user backup"

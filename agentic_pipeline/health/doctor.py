@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agentic_pipeline.agents.classifier_types import BookType
@@ -204,3 +206,33 @@ def run_checks(db_path) -> list[Finding]:
 
 def has_violations(findings: list[Finding]) -> bool:
     return any(f.count > 0 for f in findings)
+
+
+_BACKUP_KEEP = 2
+
+
+def create_backup(db_path) -> Path:
+    """WAL-safe backup beside the DB; prune doctor backups beyond newest 2.
+
+    The filename carries `-doctor-` deliberately: pruning pattern-matches on
+    it, so a user's manual `<db>.backup-*` files are never candidates.
+    """
+    db_path = Path(db_path)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    dest = db_path.parent / f"{db_path.name}.backup-doctor-{stamp}"
+
+    src = sqlite3.connect(str(db_path))
+    dst = sqlite3.connect(str(dest))
+    try:
+        with dst:
+            src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+
+    backups = sorted(db_path.parent.glob(f"{db_path.name}.backup-doctor-*"))
+    for old in backups[:-_BACKUP_KEEP]:
+        old.unlink()
+        logger.info("Pruned old doctor backup: %s", old.name)
+
+    return dest
