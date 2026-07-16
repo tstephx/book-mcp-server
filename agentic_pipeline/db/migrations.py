@@ -234,6 +234,14 @@ MIGRATIONS = [
         FOREIGN KEY (chapter_id) REFERENCES chapters(id)
     )
     """,
+    # Library-wide data version for cache coherence (bumped by bulk mutations
+    # like rechunk --swap; MCP server caches self-invalidate on mismatch)
+    """
+    CREATE TABLE IF NOT EXISTS library_meta (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data_version INTEGER NOT NULL DEFAULT 1
+    )
+    """,
 ]
 
 INDEXES = [
@@ -290,6 +298,9 @@ def run_migrations(db_path: Path) -> None:
 
         # Insert default autonomy config if not exists
         cursor.execute("INSERT OR IGNORE INTO autonomy_config (id) VALUES (1)")
+
+        # Insert default library_meta row if not exists
+        cursor.execute("INSERT OR IGNORE INTO library_meta (id, data_version) VALUES (1, 1)")
 
         # Insert default retention policies
         for audit_type, retain_days in DEFAULT_RETENTION:
