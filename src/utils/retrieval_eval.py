@@ -9,8 +9,13 @@ gates (spec decision 1).
 import io
 import json
 import logging
+import random
+import re
 import sqlite3
+import subprocess
+from collections import defaultdict
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -22,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 _ALLOWED_TABLES = {"chunks", "chunks_staging"}
 _FETCH_K = 50  # chunk-level over-fetch before chapter aggregation
+
+_GOLD_PROMPT = (
+    "Below is a passage from a book. Write ONE specific question that this "
+    "passage uniquely answers — concrete enough that only this passage (not "
+    "general knowledge) answers it. Respond with ONLY a JSON object: "
+    '{"query": "<the question>"}\n\nPASSAGE:\n'
+)
 
 
 def load_gold(paths: list) -> list[dict]:
@@ -144,3 +156,125 @@ def run_eval(db_path, gold_paths: list, table: str, embedder) -> dict:
             "hybrid": evaluate(subset, hyb_lists, k=5),
         }
     return report
+
+
+def _parse_fenced_json(text: str) -> Optional[dict]:
+    """Parse a JSON object from raw or ```json-fenced output."""
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    candidate = fenced.group(1) if fenced else None
+    if candidate is None:
+        brace = re.search(r"\{.*\}", text, re.DOTALL)
+        candidate = brace.group(0) if brace else None
+    if candidate is None:
+        return None
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+
+
+def _claude_generate(passage: str, timeout: int = 120) -> Optional[str]:
+    """One gold question via `claude -p` (subscription billing, decision 7)."""
+    try:
+        proc = subprocess.run(
+            ["claude", "-p", _GOLD_PROMPT + passage],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        logger.warning(f"claude -p failed: {e}")
+        return None
+    if proc.returncode != 0:
+        logger.warning(f"claude -p exit {proc.returncode}: {proc.stderr[:200]}")
+        return None
+    parsed = _parse_fenced_json(proc.stdout)
+    if not parsed or not parsed.get("query"):
+        logger.warning(f"Unparseable gold output: {proc.stdout[:200]}")
+        return None
+    return str(parsed["query"]).strip()
+
+
+def build_gold(
+    db_path,
+    out_path,
+    n: int = 60,
+    seed: int = 42,
+    min_words: int = 300,
+    passage_words: int = 400,
+    generator=None,
+) -> int:
+    """Sample chapters (NOT chunks — decision 6), excerpt a seeded passage,
+    generate one question each, write gold records. Returns records written.
+    """
+    from .file_utils import read_chapter_content
+
+    if generator is None:
+        generator = _claude_generate
+
+    rng = random.Random(seed)
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        chapters = conn.execute(
+            "SELECT c.id, c.book_id, c.file_path FROM chapters c "
+            "JOIN books b ON b.id = c.book_id "
+            "WHERE c.word_count >= ? AND c.file_path IS NOT NULL "
+            "ORDER BY c.id",
+            (min_words,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    # Stratify: round-robin across shuffled books so no book dominates
+    by_book: dict = defaultdict(list)
+    for ch in chapters:
+        by_book[ch["book_id"]].append(ch)
+    books = sorted(by_book)
+    rng.shuffle(books)
+    for b in books:
+        rng.shuffle(by_book[b])
+
+    picks = []
+    round_idx = 0
+    while len(picks) < n:
+        advanced = False
+        for b in books:
+            if round_idx < len(by_book[b]):
+                picks.append(by_book[b][round_idx])
+                advanced = True
+                if len(picks) >= n:
+                    break
+        if not advanced:
+            break  # corpus smaller than n
+        round_idx += 1
+
+    records = []
+    for ch in picks:
+        try:
+            text = read_chapter_content(ch["file_path"])
+        except (FileNotFoundError, OSError) as e:
+            logger.warning(f"Skipping {ch['id']}: {e}")
+            continue
+        words = text.split()
+        if len(words) < min_words:
+            continue
+        start = rng.randrange(0, max(1, len(words) - passage_words))
+        passage = " ".join(words[start : start + passage_words])
+        query = generator(passage)
+        if not query:
+            logger.warning(f"Generator failed for chapter {ch['id']} — skipped")
+            continue
+        records.append(
+            {
+                "query": query,
+                "gold_chapter_id": ch["id"],
+                "gold_book_id": ch["book_id"],
+                "source": "auto",
+            }
+        )
+
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_path).write_text(json.dumps(records, indent=2))
+    logger.info(f"Wrote {len(records)} gold records to {out_path}")
+    return len(records)

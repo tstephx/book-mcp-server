@@ -8,6 +8,8 @@ import numpy as np
 import pytest
 
 from src.utils.retrieval_eval import (
+    _parse_fenced_json,
+    build_gold,
     evaluate,
     load_gold,
     load_matrix,
@@ -169,3 +171,78 @@ class TestRunEval:
 
         with pytest.raises(RuntimeError):
             run_eval(eval_db, [gold_path], table="chunks_staging", embedder=FakeEmbedder())
+
+
+@pytest.fixture
+def gold_db(tmp_path):
+    db = tmp_path / "library.db"
+    conn = sqlite3.connect(db)
+    conn.execute("CREATE TABLE books (id TEXT PRIMARY KEY, title TEXT)")
+    conn.execute(
+        """CREATE TABLE chapters (
+            id TEXT PRIMARY KEY, book_id TEXT NOT NULL, title TEXT,
+            chapter_number INTEGER, file_path TEXT, word_count INTEGER)"""
+    )
+    # 3 books x 3 chapters, each with a real content file
+    for b in range(3):
+        conn.execute("INSERT INTO books VALUES (?, ?)", (f"b{b}", f"Book {b}"))
+        for c in range(3):
+            path = tmp_path / f"b{b}-c{c}.md"
+            path.write_text(" ".join(f"b{b}c{c}word{i}." for i in range(600)))
+            conn.execute(
+                "INSERT INTO chapters VALUES (?,?,?,?,?,?)",
+                (f"b{b}ch{c}", f"b{b}", f"Ch {c}", c, str(path), 600),
+            )
+    conn.commit()
+    conn.close()
+    return db
+
+
+class TestParseFencedJson:
+    def test_plain_json(self):
+        assert _parse_fenced_json('{"query": "q"}') == {"query": "q"}
+
+    def test_fenced_json(self):
+        out = _parse_fenced_json('Here:\n```json\n{"query": "q"}\n```\ndone')
+        assert out == {"query": "q"}
+
+    def test_garbage_returns_none(self):
+        assert _parse_fenced_json("no json here") is None
+
+
+class TestBuildGold:
+    def test_deterministic_sampling_and_records(self, gold_db, tmp_path):
+        calls = []
+
+        def fake_generator(passage):
+            calls.append(passage)
+            return f"question {len(calls)}?"
+
+        out = tmp_path / "gold.json"
+        n1 = build_gold(gold_db, out, n=6, seed=42, min_words=100, passage_words=50, generator=fake_generator)
+        first_passages = list(calls)
+        records = json.loads(out.read_text())
+        assert n1 == 6 == len(records)
+        for r in records:
+            assert set(r) == {"query", "gold_chapter_id", "gold_book_id", "source"}
+            assert r["source"] == "auto"
+
+        # rerun with same seed -> identical passages sampled
+        calls.clear()
+        build_gold(gold_db, out, n=6, seed=42, min_words=100, passage_words=50, generator=fake_generator)
+        assert calls == first_passages
+
+    def test_stratifies_across_books(self, gold_db, tmp_path):
+        out = tmp_path / "gold.json"
+        build_gold(gold_db, out, n=3, seed=1, min_words=100, passage_words=50, generator=lambda p: "q?")
+        records = json.loads(out.read_text())
+        assert len({r["gold_book_id"] for r in records}) == 3
+
+    def test_generator_failure_skips_and_logs(self, gold_db, tmp_path):
+        def flaky(passage):
+            return None  # simulates claude -p failure / unparseable output
+
+        out = tmp_path / "gold.json"
+        n = build_gold(gold_db, out, n=4, seed=7, min_words=100, passage_words=50, generator=flaky)
+        assert n == 0
+        assert json.loads(out.read_text()) == []
