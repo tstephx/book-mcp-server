@@ -35,6 +35,7 @@ Registered tools exposed to Claude Desktop via FastMCP. Implementations in `agen
 |------|-----------|-------------|
 | `health` | `() → dict` | Active/queued/stuck counts, alerts, untracked_books count |
 | `stuck` | `() → list` | Pipelines stuck longer than expected in their current state |
+| `doctor_report` | `(db_path?) → dict` | Read-only integrity report — orphaned chunks, lost books, null content hashes, null book types. `lost_books` returns every detail; other categories cap at 10 samples with a `truncated` flag. Repair is CLI-only (`agentic-pipeline doctor --fix`), never exposed over MCP |
 
 ### Batch Operations
 

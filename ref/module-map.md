@@ -130,6 +130,7 @@ Quick reference: "which file handles X?"
 |------|---------------|
 | `monitor.py` | `HealthMonitor` — `get_health()` returns active/queued/error counts and alerts |
 | `stuck_detector.py` | `StuckDetector` — `detect()` finds pipelines exceeding `p95_seconds` per state |
+| `doctor.py` | Integrity checks + fixes: `run_checks()` returns 4 `Finding`s (orphaned chunks, lost books, null content hash, null book type); `apply_fixes()` backs up, deletes orphans, archives+repoints lost books, backfills hashes/types, returns a `FixReport` |
 
 ---
 
