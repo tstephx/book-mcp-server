@@ -233,7 +233,8 @@ def check_extraction_quality(
         reasons.append(f"{len(suspicious)} suspicious chapter title(s): {examples}")
 
     # --- Check 8: Source completeness ---
-    # Skipped when the source word count is unavailable (PDF, unreadable file).
+    # Skipped when the source word count is unavailable (unreadable file,
+    # unsupported format, or a scanned/image-only PDF under the word floor).
     if raw_source_words:
         coverage = total_words / raw_source_words
         metrics["source_coverage"] = coverage
