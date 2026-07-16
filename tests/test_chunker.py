@@ -1,6 +1,6 @@
 """Tests for paragraph-grouping chunker."""
 
-from src.utils.chunker import chunk_chapter
+from src.utils.chunker import chunk_chapter, sentence_windows
 
 
 class TestChunkChapter:
@@ -103,9 +103,6 @@ class TestChunkChapter:
 
         for chunk in chunks:
             assert chunk["token_count"] <= 5000
-
-
-from src.utils.chunker import sentence_windows
 
 
 def _numbered_sentences(n: int) -> str:
