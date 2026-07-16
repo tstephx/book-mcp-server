@@ -103,3 +103,58 @@ class TestChunkChapter:
 
         for chunk in chunks:
             assert chunk["token_count"] <= 5000
+
+
+from src.utils.chunker import sentence_windows
+
+
+def _numbered_sentences(n: int) -> str:
+    """n sentences, 7 words each, individually identifiable."""
+    return " ".join(f"This is numbered sentence {i:04d} padded body." for i in range(1, n + 1))
+
+
+class TestSentenceWindows:
+    def test_wall_of_text_produces_sized_windows(self):
+        # ~2,520 words, zero double-newlines
+        text = _numbered_sentences(360)
+        windows = sentence_windows(text, target_words=500, overlap_sentences=2, min_chunk_words=100)
+        assert len(windows) >= 4
+        for w in windows:
+            assert 300 <= len(w.split()) <= 700, f"window out of range: {len(w.split())} words"
+
+    def test_consecutive_windows_overlap_by_two_sentences(self):
+        import re as _re
+
+        def _nums(s):
+            return _re.findall(r"numbered sentence (\d{4})", s)
+
+        text = _numbered_sentences(200)
+        windows = sentence_windows(text, target_words=500, overlap_sentences=2, min_chunk_words=100)
+        assert len(windows) >= 2
+        for prev, nxt in zip(windows, windows[1:]):
+            # window i+1 opens with the last 2 sentences of window i
+            assert _nums(nxt)[:2] == _nums(prev)[-2:]
+
+    def test_short_final_window_merges_into_predecessor(self):
+        # 52 sentences x 7 words = 364 words... need >target to split: use target=300
+        text = _numbered_sentences(52)
+        windows = sentence_windows(text, target_words=300, overlap_sentences=2, min_chunk_words=100)
+        # tail after the first window is < 100 new words -> merged, single window
+        assert len(windows) == 1
+        assert "0052" in windows[0]
+
+    def test_single_giant_sentence_yields_one_window(self):
+        text = " ".join(["word"] * 1500)  # no sentence boundaries at all
+        windows = sentence_windows(text, target_words=500, overlap_sentences=2, min_chunk_words=100)
+        assert len(windows) == 1
+
+    def test_empty_text_returns_empty(self):
+        assert sentence_windows("") == []
+        assert sentence_windows("   \n  ") == []
+
+    def test_coverage_no_content_lost(self):
+        text = _numbered_sentences(300)
+        windows = sentence_windows(text, target_words=500, overlap_sentences=2, min_chunk_words=100)
+        joined = " ".join(windows)
+        for i in range(1, 301):
+            assert f"{i:04d}" in joined

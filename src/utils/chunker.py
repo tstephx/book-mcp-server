@@ -24,6 +24,9 @@ def _count_tokens(text: str) -> int:
     return len(_get_encoding().encode(text))
 
 
+_SENTENCE_SPLIT = r"(?<=[.!?])\s+"
+
+
 def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
     """Split text at sentence boundaries to stay under max_tokens.
 
@@ -35,7 +38,7 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
         List of sentence-split chunks, each under max_tokens
     """
     # Split on sentence boundaries
-    sentences = re.split(r"(?<=[.!?])\s+", text)
+    sentences = re.split(_SENTENCE_SPLIT, text)
 
     chunks = []
     current = []
@@ -69,6 +72,52 @@ def _split_at_sentences(text: str, max_tokens: int) -> list[str]:
         chunks.append(" ".join(current))
 
     return chunks
+
+
+def sentence_windows(
+    text: str,
+    target_words: int = 500,
+    overlap_sentences: int = 2,
+    min_chunk_words: int = 100,
+) -> list[str]:
+    """Pack sentences into ~target_words windows with sentence overlap.
+
+    Fallback for wall-of-text input where paragraph splitting finds no
+    boundaries. Each window after the first starts with the last
+    `overlap_sentences` sentences of the previous window, so content at
+    window edges is findable from both sides. A final window contributing
+    fewer than `min_chunk_words` NEW words merges into its predecessor.
+    """
+    sentences = [s for s in re.split(_SENTENCE_SPLIT, text.strip()) if s.strip()]
+    if not sentences:
+        return []
+
+    windows: list[list[str]] = []
+    current: list[str] = []
+    carried = 0  # sentences at the head of `current` copied from the previous window
+    current_words = 0
+
+    for sentence in sentences:
+        s_words = len(sentence.split())
+        # break only if this window already holds at least one NEW sentence
+        if current_words + s_words > target_words and len(current) > carried:
+            windows.append(current)
+            overlap = current[-overlap_sentences:] if overlap_sentences > 0 else []
+            carried = len(overlap)
+            current = list(overlap)
+            current_words = sum(len(s.split()) for s in current)
+        current.append(sentence)
+        current_words += s_words
+
+    if len(current) > carried:
+        new_sentences = current[carried:]
+        new_words = sum(len(s.split()) for s in new_sentences)
+        if windows and new_words < min_chunk_words:
+            windows[-1].extend(new_sentences)
+        else:
+            windows.append(current)
+
+    return [" ".join(w) for w in windows]
 
 
 def chunk_chapter(
