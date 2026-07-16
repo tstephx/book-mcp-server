@@ -386,6 +386,23 @@ def status(pipeline_id: str):
     if pipeline.get("approved_by"):
         console.print(f"  Approved by: {pipeline['approved_by']}")
 
+    if pipeline["state"] == "rejected":
+        import sqlite3
+
+        conn = sqlite3.connect(db_path, timeout=10)
+        conn.row_factory = sqlite3.Row
+        try:
+            audit = conn.execute(
+                "SELECT actor, reason FROM approval_audit "
+                "WHERE pipeline_id = ? AND action = 'rejected' "
+                "ORDER BY id DESC LIMIT 1",
+                (pipeline_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if audit:
+            console.print(f'  Rejected by: {audit["actor"]} — "{audit["reason"]}"')
+
 
 # Phase 4: Production Hardening Commands
 
