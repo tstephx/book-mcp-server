@@ -1,5 +1,6 @@
 """Approval actions - approve, reject, rollback."""
 
+import hashlib
 import logging
 import json
 import os
@@ -73,15 +74,39 @@ def _get_processed_dir() -> Optional[Path]:
     return Path(processed_dir_str).resolve() if processed_dir_str else None
 
 
-def resolve_source_file(source_path: Optional[str]) -> Optional[Path]:
+def _hash_file(path: Path) -> str:
+    """SHA-256 of file contents. Mirrors Orchestrator._compute_hash."""
+    hasher = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def resolve_source_file(source_path: Optional[str], expected_hash: Optional[str] = None) -> Optional[Path]:
     """Locate a book's source file, following it into the archive if it moved.
 
-    Records written before archiving updated source_path still name the original
-    watch-dir path, which auto-archive emptied. Fall back to the same basename
-    under processed_dir.
+    Records written before archiving tracked the move still name the original
+    watch-dir path, which auto-archive emptied. We can look for the same
+    basename under processed_dir — but that is a *guess*, not a lookup:
+    _archive_source_file() renames collisions to stem_1.epub, so two books can
+    share an original filename and the basename will resolve to whichever one
+    got archived first. Handing back the wrong book is worse than finding
+    nothing: reingest wipes the book's chapters and refills them from the file
+    we return.
 
-    Returns None when the file cannot be found — the caller decides whether that
-    is fatal.
+    So the fallback is only taken when expected_hash is supplied and the
+    candidate's contents match it. Without a hash we cannot tell the right book
+    from a namesake, so we fail closed and return None.
+
+    Args:
+        expected_hash: the record's content_hash. Required to use the archive
+            fallback; ignored when the file is still at source_path, which is a
+            recorded location rather than a guess.
+
+    Returns:
+        The file, or None if it cannot be found or cannot be proven to be the
+        right one.
     """
     if not source_path:
         return None
@@ -91,12 +116,38 @@ def resolve_source_file(source_path: Optional[str]) -> Optional[Path]:
         return src
 
     processed_dir = _get_processed_dir()
-    if processed_dir:
-        archived = Path(processed_dir) / src.name
-        if archived.exists():
-            return archived
+    if not processed_dir:
+        return None
 
-    return None
+    archived = Path(processed_dir) / src.name
+    if not archived.exists():
+        return None
+
+    if not expected_hash:
+        logger.warning(
+            "Found %s in the archive but no expected hash was given; refusing to "
+            "assume it is the right book (collisions share basenames)",
+            src.name,
+        )
+        return None
+
+    try:
+        actual = _hash_file(archived)
+    except OSError as e:
+        logger.warning("Could not hash archived candidate %s: %s", archived.name, e)
+        return None
+
+    if actual != expected_hash:
+        logger.warning(
+            "Archived %s is a different book (hash %s != %s) — most likely a "
+            "filename collision renamed the real file to stem_N",
+            src.name,
+            actual[:12],
+            expected_hash[:12],
+        )
+        return None
+
+    return archived
 
 
 def _archive_source_file(

@@ -74,6 +74,13 @@ def test_approve_book(db_path):
     assert pipeline["approved_by"] == "human:taylor"
 
 
+def _sha(data: bytes) -> str:
+    """SHA-256 of raw bytes, matching Orchestrator._compute_hash."""
+    import hashlib
+
+    return hashlib.sha256(data).hexdigest()
+
+
 class TestResolveSourceFile:
     """Find a book whose record predates the archive-tracking fix."""
 
@@ -96,7 +103,47 @@ class TestResolveSourceFile:
         stale = tmp_path / "watch" / "b.epub"  # never existed / moved away
 
         with patch.object(actions, "_get_processed_dir", return_value=processed):
-            assert actions.resolve_source_file(str(stale)) == archived
+            assert actions.resolve_source_file(str(stale), expected_hash=_sha(b"x")) == archived
+
+    def test_refuses_an_archived_file_whose_content_differs(self, tmp_path):
+        """The basename is a guess — collisions rename to stem_1.epub.
+
+        Two books can share an original filename; the archive keeps the first as
+        b.epub and renames the second to b_1.epub. A record for the *second*
+        book still names .../b.epub, so a basename-only fallback hands back the
+        FIRST book's bytes. reingest would then wipe this book's chapters and
+        refill them from a different book — silent cross-book corruption.
+        """
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"a DIFFERENT book that merely shares a filename")
+        stale = tmp_path / "watch" / "b.epub"
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale), expected_hash=_sha(b"the real book")) is None
+
+    def test_fallback_requires_a_hash_to_verify_against(self, tmp_path):
+        """Fail closed: without a hash we cannot tell the right book from a namesake."""
+        from agentic_pipeline.approval import actions
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "b.epub").write_bytes(b"x")
+        stale = tmp_path / "watch" / "b.epub"
+
+        with patch.object(actions, "_get_processed_dir", return_value=processed):
+            assert actions.resolve_source_file(str(stale)) is None
+
+    def test_recorded_path_is_trusted_without_a_hash(self, tmp_path):
+        """A file still at its recorded path is not a guess — no verification needed."""
+        from agentic_pipeline.approval import actions
+
+        book = tmp_path / "b.epub"
+        book.write_bytes(b"x")
+
+        assert actions.resolve_source_file(str(book)) == book
 
     def test_returns_none_when_the_file_is_gone(self, tmp_path):
         from agentic_pipeline.approval import actions
@@ -105,13 +152,13 @@ class TestResolveSourceFile:
         processed.mkdir()
 
         with patch.object(actions, "_get_processed_dir", return_value=processed):
-            assert actions.resolve_source_file(str(tmp_path / "nope.epub")) is None
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub"), expected_hash="abc") is None
 
     def test_handles_no_processed_dir_configured(self, tmp_path):
         from agentic_pipeline.approval import actions
 
         with patch.object(actions, "_get_processed_dir", return_value=None):
-            assert actions.resolve_source_file(str(tmp_path / "nope.epub")) is None
+            assert actions.resolve_source_file(str(tmp_path / "nope.epub"), expected_hash="abc") is None
 
     def test_handles_empty_source_path(self):
         from agentic_pipeline.approval.actions import resolve_source_file

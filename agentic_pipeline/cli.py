@@ -311,11 +311,13 @@ def reingest(book_id: str, force_fallback: bool):
         return
 
     # Records written before archiving tracked the move still name the original
-    # watch-dir path; follow the file into processed_dir.
-    resolved = resolve_source_file(record["source_path"])
+    # watch-dir path; follow the file into processed_dir. The content_hash is
+    # what proves the archived candidate is this book and not a namesake —
+    # collisions are archived as stem_N, so the basename alone is ambiguous.
+    resolved = resolve_source_file(record["source_path"], expected_hash=record["content_hash"])
     if resolved is None:
         console.print(f"[red]Source file not found: {record['source_path']}[/red]")
-        console.print("[dim]Not at that path, and not in PROCESSED_DIR. The original file is needed.[/dim]")
+        console.print("[dim]Not at that path, and no archived file matching this book's hash.[/dim]")
         return
 
     source_path = str(resolved)

@@ -198,6 +198,37 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
     assert pipeline["approved_by"] == "auto:high_confidence"
 
 
+def test_reprocess_existing_losing_a_race_does_not_clobber_the_winner(db_path, config):
+    """CLI/MCP entry points need the same protection as the worker loop.
+
+    process_one() and reprocess_existing() are reachable from `agentic-pipeline
+    process`, the MCP process_book tool, and reingest — all of which can run
+    while the always-on worker is polling. Their `except Exception` handler
+    forced NEEDS_RETRY from a stale read, which is a *valid* transition from most
+    states and so slips past the compare-and-swap.
+    """
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pid = repo.create("/book.epub", "hash-reproc")
+
+    orchestrator = Orchestrator(config)
+
+    def rival_claims_then_we_fail(pipeline_id, book_path, content_hash, force_fallback=False):
+        # A rival wins the claim while we are working.
+        repo.update_state(pipeline_id, PipelineState.HASHING)
+        raise RuntimeError("our attempt blew up after losing the record")
+
+    orchestrator._process_book = rival_claims_then_we_fail
+
+    result = orchestrator.reprocess_existing(pid, "/book.epub", "hash-reproc")
+
+    # The rival's state must survive; we must not drag it to NEEDS_RETRY.
+    assert repo.get(pid)["state"] == PipelineState.HASHING.value, f"clobbered the winner: {result}"
+
+
 def test_worker_survives_an_unexpected_error_in_the_loop(db_path, config):
     """An unexpected exception must not kill the daemon.
 

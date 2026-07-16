@@ -308,9 +308,13 @@ class Orchestrator:
             self.logger.processing_complete(pipeline_id, duration)
             return result
 
+        except ConcurrentModificationError as e:
+            # Another actor owns this record now — do not force it to NEEDS_RETRY.
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            return {"pipeline_id": pipeline_id, "state": "claimed_by_another_actor", "error": str(e)}
         except Exception as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            self._recover_to_retry(pipeline_id, PipelineState.DETECTED)
             return {"pipeline_id": pipeline_id, "state": PipelineState.NEEDS_RETRY.value, "error": str(e)}
 
     def reprocess_existing(
@@ -344,9 +348,17 @@ class Orchestrator:
             duration = time.time() - start_time
             self.logger.processing_complete(pipeline_id, duration)
             return result
+        except ConcurrentModificationError as e:
+            # Another actor owns this record now — do not force it to NEEDS_RETRY.
+            self.logger.error(pipeline_id, type(e).__name__, str(e))
+            return {
+                "pipeline_id": pipeline_id,
+                "state": "claimed_by_another_actor",
+                "error": str(e),
+            }
         except Exception as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
-            self.repo.update_state(pipeline_id, PipelineState.NEEDS_RETRY)
+            self._recover_to_retry(pipeline_id, PipelineState.DETECTED)
             return {
                 "pipeline_id": pipeline_id,
                 "state": PipelineState.NEEDS_RETRY.value,

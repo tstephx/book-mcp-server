@@ -50,6 +50,92 @@ def test_batch_approve(db_path):
     assert entries[0]["filter_used"]["min_confidence"] == 0.9
 
 
+class TestBatchToleratesConcurrentClaims:
+    """One contended book must not abort the batch or lose the audit trail.
+
+    update_state now raises ConcurrentModificationError on a lost claim. The
+    batch loop called it unguarded, so a single book claimed between the filter
+    query and the loop reaching it would abort the whole run — leaving books
+    already flipped and audit.log() (called after the loop) never reached.
+    """
+
+    def _pending(self, repo, path, hash_, conf):
+        from agentic_pipeline.pipeline.states import PipelineState
+
+        pid = repo.create(path, hash_)
+        transition_to(repo, pid, PipelineState.PENDING_APPROVAL)
+        repo.update_book_profile(pid, {"book_type": "technical_tutorial", "confidence": conf})
+        return pid
+
+    def test_a_claimed_book_is_skipped_not_fatal(self, db_path, monkeypatch):
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+        from agentic_pipeline.batch import BatchOperations, BatchFilter
+        from agentic_pipeline.audit import AuditTrail
+        import agentic_pipeline.approval.actions as actions
+
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError
+
+        repo = PipelineRepository(db_path)
+        id1 = self._pending(repo, "/book1.epub", "hash1", 0.95)
+        id2 = self._pending(repo, "/book2.epub", "hash2", 0.92)
+
+        monkeypatch.setattr(
+            actions,
+            "_complete_approved",
+            lambda db, pid, pipeline: {"state": PipelineState.COMPLETE.value, "chapters_embedded": 1},
+        )
+
+        ops = BatchOperations(db_path)
+        real_update = ops.repo.update_state
+
+        def lose_the_claim_on_book1(pipeline_id, new_state, **kw):
+            # A rival claims book1 between filter.apply() and the loop reaching it.
+            if pipeline_id == id1 and new_state == PipelineState.APPROVED:
+                raise ConcurrentModificationError(f"{id1} claimed by another actor")
+            return real_update(pipeline_id, new_state, **kw)
+
+        ops.repo.update_state = lose_the_claim_on_book1
+
+        result = ops.approve(BatchFilter(min_confidence=0.9), actor="human:taylor", execute=True)
+
+        # book2 still got approved; book1 was reported, not fatal.
+        assert repo.get(id2)["state"] in (PipelineState.COMPLETE.value, PipelineState.APPROVED.value)
+        assert result["approved"] >= 1
+        assert any(id1 in str(s) for s in result.get("skipped", [])), result
+
+        # The audit entry must exist despite the contended book.
+        assert len(AuditTrail(db_path).query(action="BATCH_APPROVED")) == 1
+
+    def test_reject_skips_a_claimed_book_and_still_audits(self, db_path):
+        from agentic_pipeline.db.pipelines import PipelineRepository
+        from agentic_pipeline.pipeline.states import PipelineState
+        from agentic_pipeline.batch import BatchOperations, BatchFilter
+        from agentic_pipeline.audit import AuditTrail
+
+        from agentic_pipeline.db.pipelines import ConcurrentModificationError
+
+        repo = PipelineRepository(db_path)
+        id1 = self._pending(repo, "/book1.epub", "hash1", 0.95)
+        id2 = self._pending(repo, "/book2.epub", "hash2", 0.92)
+
+        ops = BatchOperations(db_path)
+        real_update = ops.repo.update_state
+
+        def lose_the_claim_on_book1(pipeline_id, new_state, **kw):
+            if pipeline_id == id1 and new_state == PipelineState.REJECTED:
+                raise ConcurrentModificationError(f"{id1} claimed by another actor")
+            return real_update(pipeline_id, new_state, **kw)
+
+        ops.repo.update_state = lose_the_claim_on_book1
+
+        result = ops.reject(BatchFilter(min_confidence=0.9), reason="bad", actor="human:taylor", execute=True)
+
+        assert repo.get(id2)["state"] == PipelineState.REJECTED.value
+        assert any(id1 in str(s) for s in result.get("skipped", [])), result
+        assert len(AuditTrail(db_path).query(action="BATCH_REJECTED")) == 1
+
+
 def test_batch_approve_dry_run(db_path):
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.pipeline.states import PipelineState
