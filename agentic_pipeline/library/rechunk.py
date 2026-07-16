@@ -292,5 +292,98 @@ class SwapRefused(RuntimeError):
     """Swap preconditions not met (no PASS verdict, unembedded rows, ...)."""
 
 
-def swap(db_path) -> dict:
-    raise SwapRefused("swap not yet implemented")
+def _pre_commit_hook() -> None:
+    """Test seam: raised-from here simulates mid-transaction failure."""
+
+
+def _stage_delta(conn, marker: dict, generator=None) -> int:
+    """Stage chapters whose live chunks postdate the marker (decision 2)."""
+    rows = conn.execute(
+        "SELECT DISTINCT c.id, c.book_id, c.file_path FROM chapters c "
+        "JOIN chunks k ON k.chapter_id = c.id "
+        "WHERE k.created_at > ? "
+        "   OR c.id NOT IN (SELECT DISTINCT chapter_id FROM chunks_staging)",
+        (marker.get("max_created_at", ""),),
+    ).fetchall()
+    for ch in rows:
+        try:
+            stage_chapter(conn, ch, chunk_chapter)
+        except (FileNotFoundError, IOError):
+            _carry_live_chunks(conn, ch["id"])
+    conn.commit()
+    if rows:
+        embed_pending(conn, generator=generator)
+    return len(rows)
+
+
+def swap(db_path, generator=None) -> dict:
+    """Apply staged chunks to production. Refuses without a PASS verdict."""
+    import sqlite3 as _sqlite3
+
+    from agentic_pipeline.health.doctor import create_backup
+
+    verdict = load_verdict(db_path)
+    if verdict is None:
+        raise SwapRefused("no verdict found — run `agentic-pipeline rechunk` first")
+    if not verdict.get("pass"):
+        raise SwapRefused("last eval verdict is FAIL — refusing to swap")
+
+    conn = _sqlite3.connect(str(db_path), timeout=10)
+    conn.row_factory = _sqlite3.Row
+    # autocommit mode: python's implicit-transaction management would fight
+    # the explicit BEGIN IMMEDIATE below ("cannot start a transaction within
+    # a transaction" when a DML statement auto-begins first)
+    conn.isolation_level = None
+    try:
+        staging_exists = conn.execute("SELECT name FROM sqlite_master WHERE name = 'chunks_staging'").fetchone()
+        if not staging_exists:
+            raise SwapRefused("chunks_staging does not exist — run `agentic-pipeline rechunk` first")
+
+        delta = _stage_delta(conn, verdict.get("snapshot", {}), generator=generator)
+
+        unembedded = conn.execute("SELECT COUNT(*) FROM chunks_staging WHERE embedding IS NULL").fetchone()[0]
+        if unembedded:
+            raise SwapRefused(f"{unembedded} staged chunks lack embeddings")
+
+        staged_n = conn.execute("SELECT COUNT(*) FROM chunks_staging").fetchone()[0]
+        if staged_n == 0:
+            raise SwapRefused("staging is empty")
+
+        backup = create_backup(db_path)
+
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM chunks")
+            conn.execute(
+                "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, "
+                " word_count, embedding, embedding_model, content_hash) "
+                "SELECT id, chapter_id, book_id, chunk_index, content, "
+                " word_count, embedding, embedding_model, content_hash "
+                "FROM chunks_staging"
+            )
+            conn.execute("DROP TABLE chunks_staging")
+            conn.execute("UPDATE library_meta SET data_version = data_version + 1")
+            _pre_commit_hook()
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+        live_n = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+        nulls = conn.execute("SELECT COUNT(*) FROM chunks WHERE embedding IS NULL").fetchone()[0]
+        if live_n != staged_n or nulls:
+            raise RuntimeError(
+                f"post-swap verification failed (count {live_n} vs {staged_n}, "
+                f"{nulls} NULL embeddings) — restore backup: {backup}"
+            )
+        version = conn.execute("SELECT data_version FROM library_meta WHERE id = 1").fetchone()[0]
+    finally:
+        conn.close()
+
+    logger.info(f"swap complete: {live_n} chunks live, data_version={version}")
+    return {
+        "chunks": live_n,
+        "backup": str(backup),
+        "data_version": version,
+        "delta_chapters": delta,
+    }

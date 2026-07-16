@@ -272,6 +272,117 @@ class TestVerdictPersistence:
             rc.run_gate_eval(db, [gold], embedder=FakeEmbedder())
 
 
+def _prep_passing_swap(conn, db, tmp_path):
+    """Stage + embed + write a PASS verdict with a current snapshot."""
+    import json as _json
+
+    rc.ensure_staging(conn)
+    rc.stage_all(conn)
+    rc.embed_pending(conn, generator=FakeGenerator())
+    # library_meta must exist for the version bump
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS library_meta "
+        "(id INTEGER PRIMARY KEY CHECK (id = 1), data_version INTEGER NOT NULL DEFAULT 1)"
+    )
+    conn.execute("INSERT OR IGNORE INTO library_meta (id, data_version) VALUES (1, 1)")
+    conn.commit()
+    verdict_path = db.parent / "rechunk" / "last-verdict.json"
+    verdict_path.parent.mkdir(parents=True, exist_ok=True)
+    verdict_path.write_text(
+        _json.dumps(
+            {
+                "pass": True,
+                "baseline": {},
+                "staged": {},
+                "snapshot": rc.snapshot_marker(conn),
+            }
+        )
+    )
+
+
+class TestSwap:
+    def test_swap_refused_without_pass_verdict(self, staged_db):
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        with pytest.raises(rc.SwapRefused):
+            rc.swap(db)
+
+    def test_swap_refused_with_fail_verdict(self, staged_db):
+        import json as _json
+
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        p = db.parent / "rechunk" / "last-verdict.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(_json.dumps({"pass": False, "snapshot": {}}))
+        with pytest.raises(rc.SwapRefused):
+            rc.swap(db)
+
+    def test_swap_refused_with_unembedded_staging(self, staged_db, tmp_path):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        conn.execute("UPDATE chunks_staging SET embedding = NULL WHERE rowid = 1")
+        conn.commit()
+        with pytest.raises(rc.SwapRefused):
+            rc.swap(db)
+
+    def test_swap_replaces_chunks_bumps_version_drops_staging(self, staged_db, tmp_path):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        staged_n = conn.execute("SELECT COUNT(*) FROM chunks_staging").fetchone()[0]
+
+        report = rc.swap(db)
+
+        assert report["chunks"] == staged_n
+        live = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+        assert live == staged_n
+        nulls = conn.execute("SELECT COUNT(*) FROM chunks WHERE embedding IS NULL").fetchone()[0]
+        assert nulls == 0
+        version = conn.execute("SELECT data_version FROM library_meta").fetchone()[0]
+        assert version == 2 == report["data_version"]
+        remaining = conn.execute("SELECT name FROM sqlite_master WHERE name = 'chunks_staging'").fetchone()
+        assert remaining is None
+        assert (db.parent / db.name).exists()
+        backups = list(db.parent.glob(f"{db.name}.backup-doctor-*"))
+        assert backups, "swap must take a backup first"
+
+    def test_swap_stages_delta_for_books_added_after_marker(self, staged_db, tmp_path):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        # simulate the worker approving a new book AFTER the marker
+        ch_file = tmp_path / "ch3.md"
+        ch_file.write_text(" ".join(f"Delta sentence {i} five words." for i in range(200)))
+        conn.execute("INSERT INTO chapters VALUES ('ch3', 'b1', 'Three', 3, ?, 1000)", (str(ch_file),))
+        conn.execute(
+            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count, embedding, created_at) "
+            "VALUES ('new1', 'ch3', 'b1', 0, 'delta live', 2, ?, '2026-12-31')",
+            (_blob([9, 9, 9, 9]),),
+        )
+        conn.commit()
+
+        report = rc.swap(db, generator=FakeGenerator())
+
+        assert report["delta_chapters"] == 1
+        survived = conn.execute("SELECT COUNT(*) FROM chunks WHERE chapter_id = 'ch3'").fetchone()[0]
+        assert survived >= 1, "book approved mid-run must survive the swap"
+
+    def test_mid_transaction_failure_leaves_chunks_and_version_untouched(self, staged_db, tmp_path, monkeypatch):
+        conn, db = staged_db
+        _prep_passing_swap(conn, db, tmp_path)
+        before_chunks = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+
+        def boom():
+            raise RuntimeError("injected failure")
+
+        monkeypatch.setattr(rc, "_pre_commit_hook", boom)
+        with pytest.raises(RuntimeError, match="injected failure"):
+            rc.swap(db)
+
+        assert conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] == before_chunks
+        assert conn.execute("SELECT data_version FROM library_meta").fetchone()[0] == 1
+        assert conn.execute("SELECT name FROM sqlite_master WHERE name = 'chunks_staging'").fetchone() is not None
+
+
 class TestRechunkCli:
     def test_stage_flow_reports_and_never_swaps(self, staged_db, tmp_path, monkeypatch):
         from click.testing import CliRunner
