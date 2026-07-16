@@ -182,7 +182,7 @@ def _claude_generate(passage: str, timeout: int = 120) -> Optional[str]:
             text=True,
             timeout=timeout,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+    except (subprocess.TimeoutExpired, OSError) as e:
         logger.warning(f"claude -p failed: {e}")
         return None
     if proc.returncode != 0:
