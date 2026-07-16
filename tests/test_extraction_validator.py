@@ -706,3 +706,47 @@ class TestAuditQualityCLI:
 
         assert result.exit_code == 0
         assert "All books pass quality checks" in result.output
+
+
+class TestPdfSourceWords:
+    @staticmethod
+    def _make_pdf(path, n_words: int):
+        import fitz
+
+        words = [f"word{i}" for i in range(n_words)]
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_textbox(fitz.Rect(36, 36, 559, 806), " ".join(words), fontsize=8)
+        doc.save(str(path))
+        doc.close()
+        return words
+
+    def test_pdf_word_count(self, tmp_path):
+        from agentic_pipeline.validation.extraction_validator import count_source_words
+
+        pdf = tmp_path / "book.pdf"
+        self._make_pdf(pdf, 150)
+        count = count_source_words(str(pdf))
+        assert isinstance(count, int)
+        assert count == 150
+
+    def test_pdf_under_100_words_returns_none(self, tmp_path):
+        from agentic_pipeline.validation.extraction_validator import count_source_words
+
+        pdf = tmp_path / "scan.pdf"
+        self._make_pdf(pdf, 10)
+        assert count_source_words(str(pdf)) is None
+
+    def test_corrupt_pdf_returns_none(self, tmp_path):
+        from agentic_pipeline.validation.extraction_validator import count_source_words
+
+        pdf = tmp_path / "corrupt.pdf"
+        pdf.write_bytes(b"not a pdf at all")
+        assert count_source_words(str(pdf)) is None
+
+    def test_unsupported_suffix_still_none(self, tmp_path):
+        from agentic_pipeline.validation.extraction_validator import count_source_words
+
+        f = tmp_path / "book.mobi"
+        f.write_bytes(b"x")
+        assert count_source_words(str(f)) is None

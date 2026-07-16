@@ -71,16 +71,26 @@ class _TextExtractor(HTMLParser):
 
 
 def count_source_words(source_path: str) -> Optional[int]:
-    """Count words in an EPUB's HTML documents.
+    """Count words in a source EPUB (HTML documents) or PDF (page text).
 
-    Returns None when the count can't be established (missing file, not a zip,
-    unsupported format such as PDF). Callers treat None as "skip the check"
-    rather than as a failure.
+    Returns None when the count can't be established (missing file,
+    unsupported format, corrupt archive, or a PDF with fewer than 100
+    extractable words — image-only scans make coverage meaningless).
+    Callers treat None as "skip the check" rather than as a failure.
     """
     path = Path(source_path)
-    if not path.is_file() or path.suffix.lower() != ".epub":
+    if not path.is_file():
         return None
 
+    suffix = path.suffix.lower()
+    if suffix == ".epub":
+        return _count_epub_words(path)
+    if suffix == ".pdf":
+        return _count_pdf_words(path)
+    return None
+
+
+def _count_epub_words(path: Path) -> Optional[int]:
     try:
         with zipfile.ZipFile(path) as archive:
             total = 0
@@ -98,6 +108,27 @@ def count_source_words(source_path: str) -> Optional[int]:
         logger.warning(f"Could not read source words from {path.name}: {e}")
         return None
 
+    return total
+
+
+def _count_pdf_words(path: Path) -> Optional[int]:
+    try:
+        import fitz  # PyMuPDF — lazy: validators run in contexts without it loaded
+    except ImportError:
+        logger.warning("PyMuPDF not available; skipping PDF source word count")
+        return None
+
+    try:
+        with fitz.open(str(path)) as doc:
+            total = sum(len(page.get_text().split()) for page in doc)
+    except Exception as e:
+        logger.warning(f"Could not read source words from {path.name}: {e}")
+        return None
+
+    if total < 100:
+        # image-only/scanned PDF: a near-zero denominator makes the
+        # coverage ratio meaningless — treat as "can't establish a count"
+        return None
     return total
 
 
