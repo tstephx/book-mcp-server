@@ -91,7 +91,8 @@ def check_lost_books(db_path) -> Finding:
         rows = conn.execute(
             """SELECT p.id, p.source_path FROM processing_pipelines p
                WHERE p.state = 'complete'
-                 AND NOT EXISTS (SELECT 1 FROM books b WHERE b.id = p.id)"""
+                 AND NOT EXISTS (SELECT 1 FROM books b WHERE b.id = p.id)
+               ORDER BY p.created_at"""
         ).fetchall()
         details = []
         for r in rows:
@@ -337,6 +338,13 @@ def fix_backfill_hashes(db_path, finding: Finding):
     Uses the same read + hash routines embedding_sync uses when it writes
     content_hash, so backfilled values are byte-compatible with existing
     ones. Missing files land in skipped — reported, not silent.
+
+    The UPDATE re-asserts `content_hash IS NULL OR content_hash = ''`: the
+    worker runs continuously and could have legitimately hashed this same
+    chapter between apply_fixes's initial run_checks and this step (e.g. a
+    reingest completing). Doctor's read is stale by then, so re-checking the
+    guard in the UPDATE itself makes a stale case a silent no-op instead of
+    clobbering the concurrent write.
     """
     # Local import: src.utils pulls openai at module import time; keep doctor
     # importable without it except when this fix actually runs.
@@ -355,17 +363,25 @@ def fix_backfill_hashes(db_path, finding: Finding):
             except OSError as e:
                 skipped.append({"chapter_id": d["chapter_id"], "reason": str(e)})
                 continue
-            conn.execute(
-                "UPDATE chapters SET content_hash = ? WHERE id = ?",
+            cursor = conn.execute(
+                """UPDATE chapters SET content_hash = ? WHERE id = ?
+                   AND (content_hash IS NULL OR content_hash = '')""",
                 (compute_content_hash(content), d["chapter_id"]),
             )
-            fixed += 1
+            fixed += cursor.rowcount
         conn.commit()
     return fixed, skipped
 
 
 def fix_backfill_book_types(db_path, finding: Finding):
-    """Copy validated book_type/confidence from pipeline profiles into books."""
+    """Copy validated book_type/confidence from pipeline profiles into books.
+
+    The UPDATE re-asserts `book_type IS NULL` for the same reason
+    fix_backfill_hashes re-asserts its NULL/empty guard: the worker could
+    have classified this book between apply_fixes's initial run_checks and
+    this step, and doctor's read would otherwise clobber that concurrent
+    write with a stale value.
+    """
     fixed = 0
     skipped: list[dict] = []
     with get_pipeline_db(str(db_path)) as conn:
@@ -378,13 +394,13 @@ def fix_backfill_book_types(db_path, finding: Finding):
                     }
                 )
                 continue
-            conn.execute(
+            cursor = conn.execute(
                 """UPDATE books SET book_type = ?, classification_confidence = ?,
                                     classified_by = 'backfill:doctor'
-                   WHERE id = ?""",
+                   WHERE id = ? AND book_type IS NULL""",
                 (d["profile_book_type"], d["profile_confidence"], d["book_id"]),
             )
-            fixed += 1
+            fixed += cursor.rowcount
         conn.commit()
     return fixed, skipped
 

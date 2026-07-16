@@ -189,6 +189,41 @@ def _seed_complete_pipeline(db_path, pipeline_id=None, source_path="/watch/lost.
     return pid
 
 
+def _patch_concurrent_archive_race(monkeypatch):
+    """Make the FIRST archive attempt (new_state == ARCHIVED) lose a real race.
+
+    Just before doctor's own `update_state` call lands, a rival
+    PipelineRepository instance performs the genuine complete -> archived
+    transition out-of-band (using the real, unpatched method). By the time
+    doctor's call runs, the row has moved past the 'complete' state doctor's
+    check_lost_books read, so doctor's `expected_state=COMPLETE` guard is
+    violated for real and ConcurrentModificationError is raised through the
+    actual CAS path in PipelineRepository.update_state — nothing about the
+    raise itself is mocked, only the timing of a second writer is induced.
+    """
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    original_update_state = PipelineRepository.update_state
+    already_raced = {"done": False}
+
+    def racing_update_state(self, pipeline_id, new_state, agent_output=None, error_details=None, expected_state=None):
+        if new_state == PipelineState.ARCHIVED and not already_raced["done"]:
+            already_raced["done"] = True
+            rival = PipelineRepository(self.db_path)
+            original_update_state(rival, pipeline_id, PipelineState.ARCHIVED, expected_state=PipelineState.COMPLETE)
+        return original_update_state(
+            self,
+            pipeline_id,
+            new_state,
+            agent_output=agent_output,
+            error_details=error_details,
+            expected_state=expected_state,
+        )
+
+    monkeypatch.setattr(PipelineRepository, "update_state", racing_update_state)
+
+
 class TestCheckLostBooks:
     def test_flags_complete_pipeline_without_book_row(self, db_path, tmp_path):
         from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, check_lost_books
@@ -514,7 +549,7 @@ class TestManifest:
         assert "a.epub" in text and "b.epub" in text
         assert "Re-ingestable" in text and "Source gone" in text
         assert "sample text from book a" in text
-        assert text.index("a.epub") < text.index("b.epub") or "Source gone" in text
+        assert text.index("a.epub") < text.index("## Source gone") < text.index("b.epub")
 
     def test_explicit_path_override(self, db_path, tmp_path):
         from agentic_pipeline.health.doctor import write_manifest
@@ -818,6 +853,24 @@ class TestApplyFixes:
         assert len(report.skipped["null_content_hash"]) == 1
         assert report.has_failures is False  # unfixable ≠ failed
 
+    def test_concurrent_archive_race_sets_has_failures(self, db_path, monkeypatch):
+        """Positive path for has_failures: a rival archives the lost pipeline
+        out-of-band between apply_fixes's own run_checks and its archive step
+        (e.g. a reingest completing while the always-running worker is up).
+        Doctor's archive attempt must lose the real CAS check, land in
+        skipped, and flip has_failures — not silently succeed or crash."""
+        from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, apply_fixes
+
+        pid = _seed_complete_pipeline(db_path, source_path="/nowhere/race.epub")
+        _patch_concurrent_archive_race(monkeypatch)
+
+        report = apply_fixes(db_path, backup=False)
+
+        assert report.has_failures is True
+        assert report.fixed[CATEGORY_LOST_BOOKS] == 0
+        assert len(report.skipped[CATEGORY_LOST_BOOKS]) == 1
+        assert report.skipped[CATEGORY_LOST_BOOKS][0]["pipeline_id"] == pid
+
     def test_every_category_has_a_fix_handler(self):
         """Contract rule: enumeration completeness over CATEGORIES."""
         from agentic_pipeline.health.doctor import CATEGORIES, FIX_HANDLED_CATEGORIES
@@ -868,6 +921,17 @@ class TestDoctorCli:
 
         assert result.exit_code == 0
         assert self._run(db_path, monkeypatch).exit_code == 0  # now clean
+
+    def test_fix_exits_one_on_concurrent_archive_race(self, db_path, monkeypatch):
+        """CLI-level view of the has_failures positive path: a rival archives
+        the lost pipeline out-of-band mid-fix, so `doctor --fix` must exit 1
+        instead of reporting success."""
+        _seed_complete_pipeline(db_path, source_path="/nowhere/race.epub")
+        _patch_concurrent_archive_race(monkeypatch)
+
+        result = self._run(db_path, monkeypatch, "--fix", "--no-backup")
+
+        assert result.exit_code == 1
 
     def test_fix_prints_reingest_commands_and_manifest_path(self, db_path, tmp_path, monkeypatch):
         src = tmp_path / "lost.epub"
