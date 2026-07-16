@@ -836,15 +836,14 @@ class TestApplyFixes:
 
 
 class TestDoctorCli:
-    def _run(self, db_path, *args, monkeypatch=None):
+    def _run(self, db_path, monkeypatch, *args):
         from agentic_pipeline.cli import main
 
-        if monkeypatch is not None:
-            monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+        monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
         return CliRunner().invoke(main, ["doctor", *args])
 
     def test_report_clean_exits_zero(self, db_path, monkeypatch):
-        result = self._run(db_path, monkeypatch=monkeypatch)
+        result = self._run(db_path, monkeypatch)
         assert result.exit_code == 0
         assert "OK" in result.output or "0" in result.output
 
@@ -854,7 +853,7 @@ class TestDoctorCli:
         conn.commit()
         conn.close()
 
-        result = self._run(db_path, monkeypatch=monkeypatch)
+        result = self._run(db_path, monkeypatch)
 
         assert result.exit_code == 1
         assert "orphaned_chunks" in result.output
@@ -865,19 +864,17 @@ class TestDoctorCli:
         conn.commit()
         conn.close()
 
-        result = self._run(db_path, "--fix", "--no-backup", monkeypatch=monkeypatch)
+        result = self._run(db_path, monkeypatch, "--fix", "--no-backup")
 
         assert result.exit_code == 0
-        assert self._run(db_path, monkeypatch=monkeypatch).exit_code == 0  # now clean
+        assert self._run(db_path, monkeypatch).exit_code == 0  # now clean
 
     def test_fix_prints_reingest_commands_and_manifest_path(self, db_path, tmp_path, monkeypatch):
         src = tmp_path / "lost.epub"
         src.write_bytes(b"x")
         _seed_complete_pipeline(db_path, source_path=str(src))
 
-        result = self._run(
-            db_path, "--fix", "--no-backup", "--manifest", str(tmp_path / "m.md"), monkeypatch=monkeypatch
-        )
+        result = self._run(db_path, monkeypatch, "--fix", "--no-backup", "--manifest", str(tmp_path / "m.md"))
 
         assert result.exit_code == 0
         assert "agentic-pipeline reingest" in result.output
