@@ -12,6 +12,7 @@ from src.utils.retrieval_eval import (
     load_gold,
     load_matrix,
     rank_chapters_semantic,
+    run_eval,
 )
 
 
@@ -104,6 +105,15 @@ class TestEvaluate:
         assert r["hit_at_5"] == 0.0
         assert r["mrr"] == pytest.approx(1 / 6)
 
+    def test_mismatched_lengths_raises(self):
+        golds = [
+            {"query": "q1", "gold_chapter_id": "ch1", "gold_book_id": "b1"},
+            {"query": "q2", "gold_chapter_id": "ch2", "gold_book_id": "b1"},
+        ]
+        ranked = [[{"chapter_id": "ch1", "book_id": "b1"}]]
+        with pytest.raises(ValueError, match=r"2.*1|1.*2"):
+            evaluate(golds, ranked, k=5)
+
 
 class TestLoadGold:
     def test_merges_files_and_tags_source(self, tmp_path):
@@ -118,3 +128,44 @@ class TestLoadGold:
         a = tmp_path / "auto.json"
         a.write_text(json.dumps([]))
         assert load_gold([a, tmp_path / "nope.json"]) == []
+
+
+class FakeEmbedder:
+    def generate(self, text):
+        return np.array([1.0, 0.0, 0.0], dtype=np.float32)
+
+
+class TestRunEval:
+    def test_report_shape_and_empty_table_raises(self, eval_db, tmp_path, monkeypatch):
+        conn = sqlite3.connect(eval_db)
+        conn.execute(
+            """CREATE TABLE chunks_staging (
+                id TEXT PRIMARY KEY, chapter_id TEXT NOT NULL, book_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL, content TEXT NOT NULL,
+                word_count INTEGER NOT NULL, embedding BLOB, embedding_model TEXT,
+                content_hash TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"""
+        )
+        conn.commit()
+        conn.close()
+
+        gold_path = tmp_path / "gold.json"
+        gold_path.write_text(
+            json.dumps(
+                [
+                    {"query": "alpha query", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "auto"},
+                    {"query": "beta query", "gold_chapter_id": None, "gold_book_id": "b1", "source": "manual"},
+                ]
+            )
+        )
+
+        monkeypatch.setattr("src.utils.retrieval_eval.full_text_search", lambda *a, **k: {"results": []})
+
+        report = run_eval(eval_db, [gold_path], table="chunks", embedder=FakeEmbedder())
+        assert set(report) == {"auto", "manual"}
+        for source in report:
+            assert set(report[source]) == {"semantic", "hybrid"}
+            for mode in report[source]:
+                assert set(report[source][mode]) == {"hit_at_5", "mrr", "n"}
+
+        with pytest.raises(RuntimeError):
+            run_eval(eval_db, [gold_path], table="chunks_staging", embedder=FakeEmbedder())

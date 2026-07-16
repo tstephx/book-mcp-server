@@ -102,6 +102,8 @@ def evaluate(golds: list[dict], ranked_lists: list[list[dict]], k: int = 5) -> d
     Manual gold entries may carry gold_chapter_id=None — any chapter of
     the gold book counts (book-level hit).
     """
+    if len(golds) != len(ranked_lists):
+        raise ValueError(f"golds and ranked_lists must be the same length, got {len(golds)} and {len(ranked_lists)}")
     hits = 0
     rr = 0.0
     for gold, ranked in zip(golds, ranked_lists):
