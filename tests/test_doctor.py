@@ -253,3 +253,34 @@ class TestCheckLostBooks:
 
         finding = check_lost_books(db_path)
         assert finding.fixable_count == finding.count == 1
+
+    def test_live_copy_true_when_another_book_shares_basename(self, db_path):
+        """A lost pipeline's basename also belongs to a pipeline WITH a books row."""
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        lost_pid = _seed_complete_pipeline(db_path, source_path="/watch/dup.epub")
+        live_pid = _seed_complete_pipeline(db_path, pipeline_id="live", source_path="/other/dup.epub")
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=live_pid)
+        conn.commit()
+        conn.close()
+
+        d = check_lost_books(db_path).details[0]
+        assert d["pipeline_id"] == lost_pid
+        assert d["live_copy"] is True
+
+    def test_live_copy_false_for_wildcard_lookalike_basename(self, db_path):
+        """LIKE metacharacters in the basename must not cause false-positive matches."""
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        lost_pid = _seed_complete_pipeline(db_path, source_path="/watch/chapter_1.epub")
+        other_pid = _seed_complete_pipeline(db_path, pipeline_id="other", source_path="/other/chapterX1.epub")
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=other_pid)
+        conn.commit()
+        conn.close()
+
+        d = check_lost_books(db_path).details[0]
+        assert d["pipeline_id"] == lost_pid
+        assert d["basename"] == "chapter_1.epub"
+        assert d["live_copy"] is False

@@ -97,13 +97,14 @@ def check_lost_books(db_path) -> Finding:
                 (r["id"],),
             ).fetchone()
             sample = (sample_row["content"] or "")[:200] if sample_row else ""
+            escaped_basename = basename.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             live_copy = bool(
                 basename
                 and conn.execute(
                     """SELECT 1 FROM processing_pipelines p2
                        JOIN books b ON b.id = p2.id
-                       WHERE p2.source_path LIKE ? AND p2.id != ? LIMIT 1""",
-                    (f"%{basename}", r["id"]),
+                       WHERE p2.source_path LIKE ? ESCAPE '\\' AND p2.id != ? LIMIT 1""",
+                    (f"%{escaped_basename}", r["id"]),
                 ).fetchone()
             )
             resolved = _resolve_lost_source(source_path)
