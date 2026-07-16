@@ -329,3 +329,61 @@ def build_reingest_commands(lost_books: Finding) -> list[str]:
         if d["source_available"]:
             by_basename[d["basename"]] = d["pipeline_id"]  # later entries win
     return [f"agentic-pipeline reingest {pid}" for pid in by_basename.values()]
+
+
+def fix_backfill_hashes(db_path, finding: Finding):
+    """Backfill chapters.content_hash from chapter files.
+
+    Uses the same read + hash routines embedding_sync uses when it writes
+    content_hash, so backfilled values are byte-compatible with existing
+    ones. Missing files land in skipped — reported, not silent.
+    """
+    # Local import: src.utils pulls openai at module import time; keep doctor
+    # importable without it except when this fix actually runs.
+    from src.utils.embedding_sync import compute_content_hash
+    from src.utils.file_utils import read_chapter_content
+
+    fixed = 0
+    skipped: list[dict] = []
+    with get_pipeline_db(str(db_path)) as conn:
+        for d in finding.details:
+            if not d["file_exists"]:
+                skipped.append({"chapter_id": d["chapter_id"], "reason": f"file missing: {d['file_path']}"})
+                continue
+            try:
+                content = read_chapter_content(d["file_path"])
+            except OSError as e:
+                skipped.append({"chapter_id": d["chapter_id"], "reason": str(e)})
+                continue
+            conn.execute(
+                "UPDATE chapters SET content_hash = ? WHERE id = ?",
+                (compute_content_hash(content), d["chapter_id"]),
+            )
+            fixed += 1
+        conn.commit()
+    return fixed, skipped
+
+
+def fix_backfill_book_types(db_path, finding: Finding):
+    """Copy validated book_type/confidence from pipeline profiles into books."""
+    fixed = 0
+    skipped: list[dict] = []
+    with get_pipeline_db(str(db_path)) as conn:
+        for d in finding.details:
+            if not d["valid"]:
+                skipped.append(
+                    {
+                        "book_id": d["book_id"],
+                        "reason": f"no valid type in profile: {d['profile_book_type']!r}",
+                    }
+                )
+                continue
+            conn.execute(
+                """UPDATE books SET book_type = ?, classification_confidence = ?,
+                                    classified_by = 'backfill:doctor'
+                   WHERE id = ?""",
+                (d["profile_book_type"], d["profile_confidence"], d["book_id"]),
+            )
+            fixed += 1
+        conn.commit()
+    return fixed, skipped

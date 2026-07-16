@@ -29,6 +29,8 @@ def db_path(tmp_path):
             book_type TEXT,
             source_file TEXT,
             word_count INTEGER DEFAULT 0,
+            classification_confidence REAL,
+            classified_by TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )"""
     )
@@ -667,3 +669,72 @@ class TestDestructiveFixes:
         commands = build_reingest_commands(lost)
 
         assert commands == ["agentic-pipeline reingest new-id"]  # last wins, gone excluded
+
+
+class TestBackfills:
+    def test_hash_backfill_matches_embedding_sync_exactly(self, db_path, tmp_path):
+        """Byte-compat: backfilled hash == what embedding_sync would compute."""
+        from src.utils.embedding_sync import compute_content_hash
+        from src.utils.file_utils import read_chapter_content
+        from agentic_pipeline.health.doctor import check_null_content_hash, fix_backfill_hashes
+
+        real = tmp_path / "ch.md"
+        real.write_text("# Chapter\n\nsome chapter prose")
+        conn = _connect(db_path)
+        _seed_book(conn)
+        _seed_chapter(conn, chapter_id="fx", content_hash=None, file_path=str(real))
+        _seed_chapter(conn, chapter_id="gone", content_hash=None, file_path="/nope.md", number=2)
+        conn.commit()
+        conn.close()
+
+        fixed, skipped = fix_backfill_hashes(db_path, check_null_content_hash(db_path))
+
+        assert fixed == 1
+        assert len(skipped) == 1 and skipped[0]["chapter_id"] == "gone"
+        conn = _connect(db_path)
+        stored = conn.execute("SELECT content_hash FROM chapters WHERE id = 'fx'").fetchone()["content_hash"]
+        conn.close()
+        assert stored == compute_content_hash(read_chapter_content(str(real)))
+        # idempotent: nothing left to fix
+        from agentic_pipeline.health.doctor import check_null_content_hash as chk
+
+        assert chk(db_path).fixable_count == 0
+
+    def test_book_type_backfill_stamps_and_validates(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_book_type, fix_backfill_book_types
+
+        # NOTE (adjustment): _seed_complete_pipeline's content_hash defaults to
+        # f"hash-{pipeline_id or 'x'}"; two calls with the default None both
+        # collide on "hash-x" against processing_pipelines' UNIQUE(content_hash).
+        # Pass distinct pipeline_id values, as other multi-seed tests in this
+        # file already do (e.g. TestCheckLostBooks.test_live_copy_true_...).
+        pid_ok = _seed_complete_pipeline(db_path, pipeline_id="ok", source_path="/w/ok.epub")
+        pid_bad = _seed_complete_pipeline(db_path, pipeline_id="bad", source_path="/w/bad.epub")
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=pid_ok, book_type=None)
+        _seed_book(conn, book_id=pid_bad, book_type=None)
+        conn.execute(
+            "UPDATE processing_pipelines SET book_profile=? WHERE id=?",
+            (json.dumps({"book_type": "travel_guide", "confidence": 0.95}), pid_ok),
+        )
+        conn.execute(
+            "UPDATE processing_pipelines SET book_profile=? WHERE id=?",
+            (json.dumps({"book_type": "unknown", "confidence": 0.0}), pid_bad),
+        )
+        conn.commit()
+        conn.close()
+
+        fixed, skipped = fix_backfill_book_types(db_path, check_null_book_type(db_path))
+
+        assert fixed == 1
+        assert len(skipped) == 1 and skipped[0]["book_id"] == pid_bad
+        conn = _connect(db_path)
+        row = conn.execute(
+            """SELECT book_type, classification_confidence, classified_by
+               FROM books WHERE id = ?""",
+            (pid_ok,),
+        ).fetchone()
+        conn.close()
+        assert row["book_type"] == "travel_guide"
+        assert row["classification_confidence"] == 0.95
+        assert row["classified_by"] == "backfill:doctor"
