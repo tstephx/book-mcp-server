@@ -257,6 +257,20 @@ Chapter/section chunks with embeddings for semantic search. Created by pipeline 
 
 **Note:** Embeddings are generated inline during `approve_book()` → EMBEDDING → COMPLETE. No separate embedding worker.
 
+### `library_meta`
+One-row table for cache coherence. `data_version` is bumped inside bulk-mutation
+transactions (`rechunk --swap`); the MCP server's chunk-embedding cache
+self-invalidates on mismatch.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | INTEGER PK | CHECK (id = 1) |
+| data_version | INTEGER NOT NULL | seeded 1 |
+
+### `chunks_staging` (transient)
+Created by `agentic-pipeline rechunk`, dropped by `--swap`. Same columns as
+`chunks` plus NOT NULL `content_hash`; `UNIQUE(chapter_id, chunk_index)`.
+
 ---
 
 ## Infrastructure Tables

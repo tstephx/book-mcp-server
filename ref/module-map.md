@@ -17,7 +17,7 @@ Quick reference: "which file handles X?"
 | File | Responsibility |
 |------|---------------|
 | `agentic_pipeline/config.py` | `OrchestratorConfig` dataclass — all tunable knobs, reads env vars |
-| `agentic_pipeline/cli.py` | Click CLI entry point — 30 human-facing commands (see `ref/cli-commands.md`) |
+| `agentic_pipeline/cli.py` | Click CLI entry point — 31 human-facing commands (see `ref/cli-commands.md`) |
 | `agentic_pipeline/mcp_server.py` | MCP tool implementations — thin wrappers around domain modules |
 
 ---
@@ -150,6 +150,17 @@ Quick reference: "which file handles X?"
 | `chapter_reader.py` | `read_chapter_content(file_path, books_dir)` — shared utility for reading chapter markdown from disk, handles split chapters |
 | `migration.py` | Helpers for chunking and re-embedding the full book library (one-time migrations) |
 | `status.py` | `LibraryStatus` — unified dashboard combining books, chapters, and pipeline state |
+| `rechunk.py` | Staged re-chunking: hash-keyed staging into `chunks_staging`, embedding, gate eval, atomic swap into `chunks` |
+
+---
+
+## `src/utils/` (book-library side)
+
+| File | Responsibility |
+|------|---------------|
+| `retrieval_eval.py` | Gold-query retrieval eval: build-gold (`claude -p`), chapter-level hit@5/MRR, semantic + hybrid |
+| `data_version.py` | Reads `library_meta.data_version` for cache coherence |
+| `cache.py` | `LibraryCache` — chunk-embeddings tier is version-aware: `get_chunk_embeddings()`/`set_chunk_embeddings()` tag entries with `data_version` and self-invalidate on mismatch (paired with `chunk_loader.py`, which reads the current version via `data_version.py`) |
 
 ---
 
