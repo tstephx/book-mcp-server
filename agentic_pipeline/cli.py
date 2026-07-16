@@ -405,6 +405,15 @@ def health(as_json: bool):
     report = monitor.get_health()
     report["stuck"] = detector.detect()
 
+    from .health.doctor import run_checks
+
+    findings = run_checks(db_path)
+    issues = sum(f.count for f in findings)
+    report["integrity"] = {
+        "issues": issues,
+        "categories": {f.category: f.count for f in findings},
+    }
+
     if as_json:
         console.print(json_module.dumps(report, indent=2))
         return
@@ -424,6 +433,15 @@ def health(as_json: bool):
     console.print(f"  Failed:     {report['failed']} (needs_retry)")
     console.print(f"  Perm.failed:  {report['permanently_failed']} (max retries exhausted)")
     console.print("-" * 35)
+
+    if issues == 0:
+        console.print("  [green]integrity: OK[/green]", soft_wrap=True)
+    else:
+        plural = "issue" if issues == 1 else "issues"
+        console.print(
+            f"  [yellow]integrity: {issues} {plural} — run 'agentic-pipeline doctor'[/yellow]",
+            soft_wrap=True,
+        )
 
     if report["alerts"]:
         console.print("\n[yellow]Alerts:[/yellow]")

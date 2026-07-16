@@ -879,3 +879,40 @@ class TestDoctorCli:
         assert result.exit_code == 0
         assert "agentic-pipeline reingest" in result.output
         assert str(tmp_path / "m.md") in result.output
+
+
+class TestHealthIntegration:
+    def _run_health(self, db_path, monkeypatch, *args):
+        from agentic_pipeline.cli import main
+
+        monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+        return CliRunner().invoke(main, ["health", *args])
+
+    def test_health_reports_integrity_ok(self, db_path, monkeypatch):
+        result = self._run_health(db_path, monkeypatch)
+        assert "integrity: OK" in result.output
+        assert result.exit_code == 0
+
+    def test_health_reports_issue_count_and_stays_exit_zero(self, db_path, monkeypatch):
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="o", chapter_id="GONE", book_id="GONE")
+        conn.commit()
+        conn.close()
+
+        result = self._run_health(db_path, monkeypatch)
+
+        assert "integrity: 1 issue" in result.output
+        assert "doctor" in result.output  # points at the tool
+        assert result.exit_code == 0  # dashboard, not gate
+
+    def test_health_json_carries_integrity_block(self, db_path, monkeypatch):
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="o", chapter_id="GONE", book_id="GONE")
+        conn.commit()
+        conn.close()
+
+        result = self._run_health(db_path, monkeypatch, "--json")
+        payload = json.loads(result.output)
+
+        assert payload["integrity"]["issues"] == 1
+        assert payload["integrity"]["categories"]["orphaned_chunks"] == 1
