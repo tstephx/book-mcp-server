@@ -97,6 +97,11 @@ class ClassifierAgent:
             logger.info(f"Cache hit for {content_hash[:8]}")
             return cached
 
+        # Fail loud on an invalid CLASSIFIER_PROVIDER before the provider
+        # try/except could swallow it — don't rely on incidental re-invocation
+        # inside the except-block logging to surface the error.
+        self._forced_provider_name()
+
         # 2. Try primary provider
         try:
             primary = self._get_primary()
