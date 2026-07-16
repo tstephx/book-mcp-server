@@ -1339,5 +1339,63 @@ def library_issues():
             console.print("Use [bold]update-title[/bold] to fix chapter titles, or manual SQL for book titles.")
 
 
+@main.command()
+@click.option("--fix", "do_fix", is_flag=True, help="Repair what the checks find.")
+@click.option("--no-backup", is_flag=True, help="Skip the automatic pre-fix backup.")
+@click.option(
+    "--manifest", "manifest_path", type=click.Path(), default=None, help="Where to write the lost-books manifest."
+)
+def doctor(do_fix: bool, no_backup: bool, manifest_path):
+    """Detect (and with --fix, repair) library integrity drift.
+
+    Bare `doctor` is the always-safe report and exits 1 when violations
+    exist, so `agentic-pipeline doctor || alert` works in cron. `--fix` is
+    the consent — no prompt (house --execute convention).
+    """
+    import sys
+
+    from .db.config import get_db_path
+    from .health.doctor import apply_fixes, has_violations, run_checks
+
+    db_path = get_db_path()
+    findings = run_checks(db_path)
+
+    console.print("\n[bold]Integrity Doctor[/bold]")
+    console.print("-" * 44)
+    for f in findings:
+        marker = "[red]✗[/red]" if f.count else "[green]✓[/green]"
+        console.print(f"  {marker} {f.category:20} {f.count:>6}  (fixable: {f.fixable_count})")
+
+    if not do_fix:
+        if has_violations(findings):
+            console.print("\n[yellow]Run 'agentic-pipeline doctor --fix' to repair.[/yellow]")
+            sys.exit(1)
+        console.print("\n[green]integrity: OK[/green]")
+        return
+
+    report = apply_fixes(db_path, backup=not no_backup, manifest_path=manifest_path)
+
+    console.print("\n[bold]Fixes applied[/bold]")
+    if report.backup_path:
+        console.print(f"  backup   : {report.backup_path}", soft_wrap=True)
+    if report.manifest_path:
+        console.print(f"  manifest : {report.manifest_path}", soft_wrap=True)
+    for category, n in report.fixed.items():
+        skipped = report.skipped.get(category, [])
+        line = f"  {category:20} fixed {n}"
+        if skipped:
+            line += f", skipped {len(skipped)}"
+        console.print(line)
+        for s in skipped[:5]:
+            console.print(f"      [dim]{s.get('reason', s)}[/dim]")
+    if report.reingest_commands:
+        console.print("\n[bold]Re-ingest these recovered books:[/bold]")
+        for cmd in report.reingest_commands:
+            console.print(f"  {cmd}")
+    if report.has_failures:
+        console.print("\n[red]Some fixes could not be applied — see skipped above.[/red]")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     main()

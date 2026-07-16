@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from agentic_pipeline.db.migrations import run_migrations
 
@@ -832,3 +833,52 @@ class TestApplyFixes:
         assert isinstance(report.skipped, dict)
         assert isinstance(report.reingest_commands, list)
         assert isinstance(report.has_failures, bool)
+
+
+class TestDoctorCli:
+    def _run(self, db_path, *args, monkeypatch=None):
+        from agentic_pipeline.cli import main
+
+        if monkeypatch is not None:
+            monkeypatch.setenv("AGENTIC_PIPELINE_DB", str(db_path))
+        return CliRunner().invoke(main, ["doctor", *args])
+
+    def test_report_clean_exits_zero(self, db_path, monkeypatch):
+        result = self._run(db_path, monkeypatch=monkeypatch)
+        assert result.exit_code == 0
+        assert "OK" in result.output or "0" in result.output
+
+    def test_report_violations_exit_one(self, db_path, monkeypatch):
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="o", chapter_id="GONE", book_id="GONE")
+        conn.commit()
+        conn.close()
+
+        result = self._run(db_path, monkeypatch=monkeypatch)
+
+        assert result.exit_code == 1
+        assert "orphaned_chunks" in result.output
+
+    def test_fix_repairs_and_exits_zero(self, db_path, monkeypatch):
+        conn = _connect(db_path)
+        _seed_chunk(conn, chunk_id="o", chapter_id="GONE", book_id="GONE")
+        conn.commit()
+        conn.close()
+
+        result = self._run(db_path, "--fix", "--no-backup", monkeypatch=monkeypatch)
+
+        assert result.exit_code == 0
+        assert self._run(db_path, monkeypatch=monkeypatch).exit_code == 0  # now clean
+
+    def test_fix_prints_reingest_commands_and_manifest_path(self, db_path, tmp_path, monkeypatch):
+        src = tmp_path / "lost.epub"
+        src.write_bytes(b"x")
+        _seed_complete_pipeline(db_path, source_path=str(src))
+
+        result = self._run(
+            db_path, "--fix", "--no-backup", "--manifest", str(tmp_path / "m.md"), monkeypatch=monkeypatch
+        )
+
+        assert result.exit_code == 0
+        assert "agentic-pipeline reingest" in result.output
+        assert str(tmp_path / "m.md") in result.output
