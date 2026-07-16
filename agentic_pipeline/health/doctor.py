@@ -170,7 +170,8 @@ def check_null_book_type(db_path) -> Finding:
         profile = {}
         if r["book_profile"]:
             try:
-                profile = json.loads(r["book_profile"])
+                parsed = json.loads(r["book_profile"])
+                profile = parsed if isinstance(parsed, dict) else {}
             except (json.JSONDecodeError, TypeError):
                 profile = {}
         ptype = profile.get("book_type")

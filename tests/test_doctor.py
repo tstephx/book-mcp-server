@@ -371,6 +371,32 @@ class TestCheckNullBookType:
         assert finding.fixable_count == 0
         assert finding.details[0]["profile_book_type"] is None
 
+    def test_non_dict_profile_json_does_not_crash(self, db_path):
+        """book_profile can be valid JSON with the wrong shape (string/list/number) —
+        the check must report it, not raise AttributeError on .get()."""
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        pid = _seed_complete_pipeline(db_path, source_path="/watch/typed.epub")
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=pid, book_type=None)
+        conn.execute(
+            "UPDATE processing_pipelines SET book_profile = ? WHERE id = ?",
+            ('"just a string"', pid),
+        )
+        conn.commit()
+        conn.close()
+
+        finding = check_null_book_type(db_path)
+        assert finding.count == 1
+        assert finding.fixable_count == 0
+        assert finding.details[0]["profile_book_type"] is None
+        assert finding.details[0]["valid"] is False
+
+    def test_clean_db_passes(self, db_path):
+        from agentic_pipeline.health.doctor import check_null_book_type
+
+        assert check_null_book_type(db_path).count == 0
+
     def test_every_book_type_enum_value_judged_correctly(self, db_path):
         """Contract rule: enumeration completeness — all enum members handled."""
         from agentic_pipeline.agents.classifier_types import BookType
