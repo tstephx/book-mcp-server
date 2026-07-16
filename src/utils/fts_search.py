@@ -22,26 +22,33 @@ def fts_table_exists() -> bool:
         return False
 
 
-def escape_fts_query(query: str) -> str:
-    """Escape special FTS5 characters in query
+_FTS_OPERATORS = {"AND", "OR", "NOT"}
 
-    FTS5 special chars: " * - ^ : ( )
-    We preserve quoted phrases and basic operators.
+
+def escape_fts_query(query: str) -> str:
+    """Escape user text for FTS5 MATCH.
+
+    Every term is wrapped in double quotes so any content — apostrophes
+    (Jakob's), periods (zone.js), hyphens, colons — is matched literally
+    instead of being parsed as FTS5 syntax. AND/OR/NOT operators and a
+    trailing * (prefix match) are preserved.
     """
     # If query contains quotes, assume user knows what they're doing
     if '"' in query:
         return query
 
-    # Escape special characters that could cause syntax errors
-    # But preserve * for prefix matching
-    special_chars = ["-", "^", ":", "(", ")"]
-    for char in special_chars:
-        query = query.replace(char, " ")
+    tokens = []
+    for token in query.split():
+        if token in _FTS_OPERATORS:
+            tokens.append(token)
+            continue
+        prefix = token.endswith("*")
+        term = token[:-1] if prefix else token
+        if not term:
+            continue
+        tokens.append(f'"{term}"' + ("*" if prefix else ""))
 
-    # Clean up multiple spaces
-    query = " ".join(query.split())
-
-    return query
+    return " ".join(tokens)
 
 
 def full_text_search(query: str, limit: int = 10, book_id: Optional[str] = None, highlight: bool = True) -> dict:
