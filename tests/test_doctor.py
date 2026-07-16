@@ -916,3 +916,46 @@ class TestHealthIntegration:
 
         assert payload["integrity"]["issues"] == 1
         assert payload["integrity"]["categories"]["orphaned_chunks"] == 1
+
+
+class TestDoctorReportMcp:
+    def test_caps_samples_and_flags_truncation(self, db_path):
+        from agentic_pipeline.mcp_server import doctor_report
+
+        conn = _connect(db_path)
+        for i in range(15):
+            _seed_chunk(conn, chunk_id=f"o{i}", chapter_id="GONE", book_id="GONE", chunk_index=i)
+        conn.commit()
+        conn.close()
+
+        payload = doctor_report(db_path=str(db_path))
+
+        oc = payload["orphaned_chunks"]
+        assert oc["count"] == 15
+        assert len(oc["samples"]) == 10
+        assert oc["truncated"] is True
+
+    def test_lost_books_returns_all_details(self, db_path):
+        from agentic_pipeline.mcp_server import doctor_report
+
+        for i in range(12):
+            _seed_complete_pipeline(db_path, pipeline_id=str(i), source_path=f"/nowhere/book{i}.epub")
+
+        lb = doctor_report(db_path=str(db_path))["lost_books"]
+
+        assert lb["count"] == 12
+        assert len(lb["samples"]) == 12  # the actionable list, uncapped
+        assert lb["truncated"] is False
+
+    def test_clean_db_shape(self, db_path):
+        from agentic_pipeline.health.doctor import CATEGORIES
+        from agentic_pipeline.mcp_server import doctor_report
+
+        payload = doctor_report(db_path=str(db_path))
+
+        assert set(payload.keys()) == set(CATEGORIES)
+        for category in CATEGORIES:
+            block = payload[category]
+            assert block["count"] == 0
+            assert block["samples"] == []
+            assert block["truncated"] is False

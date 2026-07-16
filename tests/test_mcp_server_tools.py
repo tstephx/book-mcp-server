@@ -112,6 +112,14 @@ def test_backfill_validate_reingest_registered_in_wrapper():
     assert "reingest" in tool_names, f"reingest not registered. Tools: {tool_names}"
 
 
+def test_doctor_report_registered_in_wrapper():
+    """doctor_report must be exposed by the agentic_mcp_server wrapper."""
+    import agentic_mcp_server
+
+    tool_names = list(agentic_mcp_server.mcp._tool_manager._tools.keys())
+    assert "doctor_report" in tool_names, f"doctor_report not registered. Tools: {tool_names}"
+
+
 # ---------------------------------------------------------------------------
 # W2: type annotations — Optional parameters must be Optional
 # ---------------------------------------------------------------------------

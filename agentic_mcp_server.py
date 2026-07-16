@@ -42,6 +42,7 @@ from agentic_pipeline.mcp_server import (
     backfill_library,
     validate_library as validate_library_fn,
     reingest_book_tool,
+    doctor_report as doctor_report_fn,
 )
 
 # Create MCP server
@@ -178,6 +179,12 @@ def validate_library() -> dict:
 def reingest(book_id: str) -> dict:
     """Reprocess a book through the full pipeline. Requires the original source file."""
     return reingest_book_tool(book_id=book_id)
+
+
+@mcp.tool()
+def doctor_report() -> dict:
+    """Library integrity report: orphaned chunks, lost books, NULL hashes/types."""
+    return doctor_report_fn()
 
 
 if __name__ == "__main__":
