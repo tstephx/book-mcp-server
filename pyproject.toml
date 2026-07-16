@@ -24,6 +24,11 @@ dependencies = [
     "numpy>=1.24",
     "tiktoken>=0.5",
     "cohere>=5.0",
+    # PDF source-coverage validation (extraction_validator._count_pdf_words).
+    # Lazy-imported and degrades to None when absent, but declared so the
+    # check actually runs on fresh installs and in CI. >=1.24 for the
+    # `with fitz.open(...)` context manager.
+    "pymupdf>=1.24",
     # "book-ingestion",  # Install separately: pip install -e /path/to/book-ingestion-python
 ]
 
