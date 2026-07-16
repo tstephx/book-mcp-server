@@ -2,6 +2,7 @@
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from pathlib import Path
 
@@ -385,6 +386,31 @@ def status(pipeline_id: str):
 
     if pipeline.get("approved_by"):
         console.print(f"  Approved by: {pipeline['approved_by']}")
+
+    # Surface the operator's reason for a rejection or rollback (persisted in
+    # approval_audit). Rollbacks land the pipeline in ARCHIVED state; a book
+    # archived for any other reason simply has no matching audit row.
+    if pipeline["state"] in ("rejected", "archived"):
+        import sqlite3
+
+        conn = sqlite3.connect(db_path, timeout=10)
+        conn.row_factory = sqlite3.Row
+        try:
+            audit = conn.execute(
+                "SELECT action, actor, reason FROM approval_audit "
+                "WHERE pipeline_id = ? AND action IN ('rejected', 'rollback') "
+                "ORDER BY id DESC LIMIT 1",
+                (pipeline_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if audit:
+            # reason/actor are free-form operator text — escape so a stray
+            # "[..]" isn't parsed as Rich markup (unmatched tags raise)
+            verb = "Rejected" if audit["action"] == "rejected" else "Rolled back"
+            actor = escape(audit["actor"] or "")
+            reason = escape(audit["reason"] or "")
+            console.print(f'  {verb} by: {actor} — "{reason}"')
 
 
 # Phase 4: Production Hardening Commands

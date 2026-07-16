@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
+from agentic_pipeline.agents.classifier import ClassifierAgent
+
 
 @pytest.fixture
 def db_path():
@@ -113,3 +115,51 @@ def test_classifier_returns_unknown_when_both_fail(db_path):
     assert result.book_type == BookType.UNKNOWN
     assert result.confidence == 0.0
     assert "failed" in result.reasoning.lower()
+
+
+class _BoomProvider:
+    name = "boom"
+
+    def classify(self, text, metadata=None):
+        raise RuntimeError("boom")
+
+
+def test_default_chain_is_claude_code_then_openai(db_path, monkeypatch):
+    monkeypatch.delenv("CLASSIFIER_PROVIDER", raising=False)
+    monkeypatch.setattr("agentic_pipeline.agents.providers.openai_provider.OpenAI", lambda api_key=None: object())
+    agent = ClassifierAgent(db_path)
+    assert agent._get_primary().name == "claude-code"
+    assert agent._get_fallback().name == "openai"
+
+
+def test_env_override_forces_single_provider(db_path, monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_PROVIDER", "openai")
+    monkeypatch.setattr("agentic_pipeline.agents.providers.openai_provider.OpenAI", lambda api_key=None: object())
+    agent = ClassifierAgent(db_path)
+    assert agent._get_primary().name == "openai"
+    assert agent._get_fallback() is None
+
+
+def test_env_override_no_fallback_attempted(db_path, monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_PROVIDER", "claude-code")
+    agent = ClassifierAgent(db_path)
+    agent.primary = _BoomProvider()
+    agent._primary_initialized = True
+    profile = agent.classify("text", content_hash="deadbeef" * 8)
+    # single-provider mode: primary failed, NO fallback -> unknown profile
+    assert profile.book_type.value == "unknown"
+    assert agent._get_fallback() is None
+
+
+def test_invalid_env_value_raises(db_path, monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_PROVIDER", "ollama")
+    agent = ClassifierAgent(db_path)
+    with pytest.raises(ValueError, match="CLASSIFIER_PROVIDER"):
+        agent.classify("text", content_hash="cafebabe" * 8)
+
+
+def test_constructor_injection_beats_env(db_path, monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_PROVIDER", "openai")
+    injected = _BoomProvider()
+    agent = ClassifierAgent(db_path, primary=injected)
+    assert agent._get_primary() is injected

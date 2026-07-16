@@ -1,14 +1,13 @@
 # agentic_pipeline/agents/providers/openai_provider.py
 """OpenAI LLM provider."""
 
-import json
 import os
 from typing import Optional
 
 from openai import OpenAI
 
 from agentic_pipeline.agents.classifier_types import BookProfile
-from agentic_pipeline.agents.providers.base import LLMProvider
+from agentic_pipeline.agents.providers.base import LLMProvider, parse_profile_json
 from agentic_pipeline.agents.prompts import load_prompt
 
 
@@ -62,16 +61,5 @@ class OpenAIProvider(LLMProvider):
         return self._parse_response(content)
 
     def _parse_response(self, content: str) -> BookProfile:
-        """Parse JSON response into BookProfile."""
-        # Try to extract JSON if wrapped in markdown code blocks
-        if "```" in content:
-            start = content.find("{")
-            end = content.rfind("}") + 1
-            if start != -1 and end > start:
-                content = content[start:end]
-
-        try:
-            data = json.loads(content)
-            return BookProfile.from_dict(data)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse LLM response as JSON: {e}")
+        """Parse JSON response into BookProfile (shared implementation)."""
+        return parse_profile_json(content)
