@@ -20,7 +20,7 @@ related: ["[[Claude-Config/mcp-servers/book-library]]", "[[Claude-Config/mcp-ser
 | [`ref/mcp-tools.md`](ref/mcp-tools.md) | All MCP tools for both servers with signatures and descriptions |
 | [`ref/db-schema.md`](ref/db-schema.md) | All pipeline DB tables and columns |
 | [`ref/module-map.md`](ref/module-map.md) | "Which file handles X?" — responsibility of every module in `agentic_pipeline/` |
-| [`ref/cli-commands.md`](ref/cli-commands.md) | All 29 CLI commands grouped by category with args and descriptions |
+| [`ref/cli-commands.md`](ref/cli-commands.md) | All 31 CLI commands grouped by category with args and descriptions |
 
 ## What This Is
 Two MCP servers + a CLI pipeline in one repo:
@@ -34,7 +34,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-------------|-------------|
 | **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
 | **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
-| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 30 commands for pipeline management, approval, autonomy, library maintenance. See `ref/cli-commands.md`. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 31 commands for pipeline management, approval, autonomy, library maintenance (incl. `rechunk`). See `ref/cli-commands.md`. |
 | **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
 
 ## Environment Variables
@@ -44,7 +44,8 @@ Two MCP servers + a CLI pipeline in one repo:
 | Pipeline (agentic-pipeline) | `AGENTIC_PIPELINE_DB` | `WATCH_DIR`, `PROCESSED_DIR` | Worker + state machine |
 | MCP server (Claude Desktop) | `BOOK_DB_PATH` | `BOOKS_DIR` | Read/search tools |
 | Both | — | — | Shared DB: `~/Library/Application Support/book-library/library.db` |
-| Embeddings | `OPENAI_API_KEY` | — | Required for semantic search + pipeline embedding |
+| Embeddings | `OPENAI_API_KEY` | — | Required for semantic search + pipeline embedding (`text-embedding-3-large`) |
+| Classifier | `CLASSIFIER_PROVIDER` | — | `claude-code` (default primary, `claude -p`) or `openai`; set to force single-provider mode |
 
 ## Quick Start
 
@@ -84,6 +85,12 @@ make test-integration  # requires real DB + OPENAI_API_KEY
 Books flow through: `DETECTED` → `HASHING` → `CLASSIFYING` → `SELECTING_STRATEGY` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `APPROVED` → `EMBEDDING` → `COMPLETE`
 
 High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and auto-approve. Approval runs embedding inline — no separate worker needed.
+
+### Classifier Providers
+`ClassifierAgent` (`agentic_pipeline/agents/classifier.py`) tries a primary then a fallback provider. Default chain: **`claude-code`** (`claude -p`, subscription billing, no API key) → **`openai`**. `CLASSIFIER_PROVIDER=claude-code|openai` forces one provider with no fallback (invalid value fails loud). Providers implement `LLMProvider` (`agents/providers/`) and share `parse_profile_json` from `providers/base.py`. The launchd worker needs `claude` on its PATH — `scripts/run-worker.sh` exports `~/.local/bin`.
+
+### Chunking & Re-chunking
+`src/utils/chunker.py` `chunk_chapter()` packs paragraphs to ~500 words; segments over `2*target` (1,000 words) fall through to overlapped **sentence windows** (fixes wall-of-text chapters that used to pass through as one fat chunk). Search reads `chunks.embedding` (chunk-level). Bulk re-chunk via `agentic-pipeline rechunk` (stages into `chunks_staging`, hash-keyed embedding reuse, retrieval-eval gate) then `rechunk --swap` (atomic, backs up, bumps `library_meta.data_version` so MCP-server caches self-invalidate). Gold eval sets in `eval/gold-queries*.json`.
 
 ### Autonomy Modes
 - **supervised** — All books require human approval (default)
@@ -173,7 +180,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 - **Manual refresh** — Ask Claude `"refresh embeddings"` (calls `refresh_embeddings` MCP tool), or run `python -m pytest tests/test_openai_embeddings.py` to verify.
 - **Summary embeddings** — separate from chapter embeddings; call `generate_summary_embeddings` MCP tool.
 
-**Where they live:** `chapters.embedding` column (BLOB, numpy float32 array). Indexed via cosine similarity at query time — no separate vector store.
+**Where they live:** `chunks.embedding` column (BLOB, numpy float32 array) is the primary search surface (chunk-level); `chapters.embedding` is a separate chapter-level surface. Indexed via cosine similarity at query time — no separate vector store. In-memory chunk-matrix caches (book-library MCP server) self-invalidate on a `library_meta.data_version` bump, so a bulk `rechunk --swap` takes effect without a restart.
 
 **Troubleshooting:**
 - Semantic search returns nothing → check `OPENAI_API_KEY` is set; run `refresh_embeddings`
@@ -184,6 +191,9 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 2. **Inline embedding** — `approve_book()` runs full APPROVED → EMBEDDING → COMPLETE flow
 3. **ProcessingAdapter** — wraps `book-ingestion` as library (lazy-imported)
 4. **Hybrid Search** — RRF combines FTS5 keyword + semantic vector; optional MMR for diversity
+5. **Provider abstraction** — classifier default is `claude-code` (subscription billing) with OpenAI fallback; `CLASSIFIER_PROVIDER` forces single-provider mode
+6. **Hierarchical chunker** — paragraph packing with sentence-window fallback for wall-of-text; re-chunk is staged + retrieval-eval-gated (`rechunk`/`--swap`), `library_meta.data_version` drives cache coherence
+7. **Extraction validation** — `count_source_words` (EPUB via zip, PDF via PyMuPDF) feeds Check 8 source-coverage; scanned PDFs (<100 words) skip the check
 
 ## Book Library Tools (Claude Desktop)
 
@@ -224,4 +234,4 @@ Add to `.mcp.json` in any project that needs the book library:
 
 ---
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-07-16*
