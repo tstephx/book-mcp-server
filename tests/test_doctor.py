@@ -464,3 +464,66 @@ class TestBackup:
 
         assert bystander.exists()
         assert bystander.read_bytes() == b"precious user backup"
+
+
+class TestManifest:
+    def _lost_finding(self):
+        from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, Finding
+
+        return Finding(
+            category=CATEGORY_LOST_BOOKS,
+            count=2,
+            fixable_count=2,
+            details=[
+                {
+                    "pipeline_id": "p-1",
+                    "source_path": "/w/a.epub",
+                    "basename": "a.epub",
+                    "chunk_count": 10,
+                    "source_available": True,
+                    "resolved_path": "/proc/a.epub",
+                    "live_copy": False,
+                    "sample": "sample text from book a",
+                },
+                {
+                    "pipeline_id": "p-2",
+                    "source_path": "/w/b.epub",
+                    "basename": "b.epub",
+                    "chunk_count": 5,
+                    "source_available": False,
+                    "resolved_path": None,
+                    "live_copy": False,
+                    "sample": "sample text from book b",
+                },
+            ],
+        )
+
+    def test_writes_default_location_and_splits_sections(self, db_path):
+        from agentic_pipeline.health.doctor import write_manifest
+
+        path = write_manifest(db_path, self._lost_finding())
+
+        assert path.parent == db_path.parent / "doctor"
+        assert path.name.startswith("manifest-")
+        text = path.read_text()
+        # re-ingestable and source-gone are separated; samples present
+        assert "a.epub" in text and "b.epub" in text
+        assert "Re-ingestable" in text and "Source gone" in text
+        assert "sample text from book a" in text
+        assert text.index("a.epub") < text.index("b.epub") or "Source gone" in text
+
+    def test_explicit_path_override(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import write_manifest
+
+        target = tmp_path / "custom-manifest.md"
+        path = write_manifest(db_path, self._lost_finding(), manifest_path=target)
+
+        assert path == target
+        assert target.exists()
+
+    def test_no_lost_books_writes_nothing(self, db_path):
+        from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, Finding, write_manifest
+
+        empty = Finding(category=CATEGORY_LOST_BOOKS, count=0, fixable_count=0)
+        assert write_manifest(db_path, empty) is None
+        assert not (db_path.parent / "doctor").exists()

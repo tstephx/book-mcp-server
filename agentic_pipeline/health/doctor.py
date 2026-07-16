@@ -236,3 +236,47 @@ def create_backup(db_path) -> Path:
         logger.info("Pruned old doctor backup: %s", old.name)
 
     return dest
+
+
+def write_manifest(db_path, lost_books: Finding, manifest_path=None) -> Path | None:
+    """Record every lost book so silent loss becomes a visible TODO.
+
+    Returns None when there is nothing to record.
+    """
+    if lost_books.count == 0:
+        return None
+
+    db_path = Path(db_path)
+    if manifest_path is None:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        manifest_path = db_path.parent / "doctor" / f"manifest-{stamp}.md"
+    manifest_path = Path(manifest_path)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    recoverable = [d for d in lost_books.details if d["source_available"]]
+    gone = [d for d in lost_books.details if not d["source_available"]]
+
+    lines = [
+        "# Lost books manifest",
+        "",
+        f"Generated: {datetime.now(timezone.utc).isoformat()}",
+        f"Total lost books: {lost_books.count} (re-ingestable: {len(recoverable)}, source gone: {len(gone)})",
+        "",
+        "## Re-ingestable (source file found)",
+        "",
+    ]
+    for d in recoverable:
+        lines += [
+            f"- **{d['basename']}** — {d['chunk_count']} orphaned chunks, pipeline `{d['pipeline_id']}`",
+            f"  - file: `{d['resolved_path']}`",
+            f"  - sample: {d['sample'][:200]!r}",
+        ]
+    lines += ["", "## Source gone (re-acquire, then drop into the watch dir)", ""]
+    for d in gone:
+        lines += [
+            f"- **{d['basename']}** — {d['chunk_count']} orphaned chunks, pipeline `{d['pipeline_id']}`",
+            f"  - last known path: `{d['source_path']}`",
+            f"  - sample: {d['sample'][:200]!r}",
+        ]
+    manifest_path.write_text("\n".join(lines) + "\n")
+    return manifest_path
