@@ -43,4 +43,9 @@ class ClaudeCodeProvider(LLMProvider):
         if proc.returncode != 0:
             raise RuntimeError(f"claude -p exit {proc.returncode}: {proc.stderr.strip()[:200]}")
 
-        return parse_profile_json(proc.stdout.strip())
+        try:
+            return parse_profile_json(proc.stdout.strip())
+        except ValueError as e:
+            # uniform contract: every failure mode surfaces as RuntimeError so
+            # the agent's fallback triggers on the same exception type
+            raise RuntimeError(f"claude -p returned unparseable output: {e}") from e

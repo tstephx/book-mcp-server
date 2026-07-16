@@ -60,9 +60,9 @@ class TestClaudeCodeProvider:
             ClaudeCodeProvider().classify("t")
 
     @patch("agentic_pipeline.agents.providers.claude_code_provider.subprocess.run")
-    def test_garbage_output_raises_value_error_family(self, mock_run):
+    def test_garbage_output_raises_runtime_error(self, mock_run):
         mock_run.return_value = _proc(stdout="no json here")
-        with pytest.raises((RuntimeError, ValueError)):
+        with pytest.raises(RuntimeError, match="unparseable"):
             ClaudeCodeProvider().classify("t")
 
     @patch("agentic_pipeline.agents.providers.claude_code_provider.subprocess.run")
