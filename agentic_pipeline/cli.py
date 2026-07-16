@@ -2,6 +2,7 @@
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from pathlib import Path
 
@@ -401,7 +402,11 @@ def status(pipeline_id: str):
         finally:
             conn.close()
         if audit:
-            console.print(f'  Rejected by: {audit["actor"]} — "{audit["reason"]}"')
+            # reason/actor are free-form operator text — escape so a stray
+            # "[..]" isn't parsed as Rich markup (unmatched tags raise)
+            actor = escape(audit["actor"] or "")
+            reason = escape(audit["reason"] or "")
+            console.print(f'  Rejected by: {actor} — "{reason}"')
 
 
 # Phase 4: Production Hardening Commands
