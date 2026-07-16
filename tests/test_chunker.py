@@ -155,3 +155,54 @@ class TestSentenceWindows:
         joined = " ".join(windows)
         for i in range(1, 301):
             assert f"{i:04d}" in joined
+
+
+def _paragraph(words: int, tag: str) -> str:
+    """One paragraph of exactly `words` words ending with a period."""
+    body = " ".join(f"{tag}w{i}" for i in range(words - 1))
+    return f"{body} end."
+
+
+class TestChunkChapterFallback:
+    def test_wall_of_text_chapter_no_longer_passes_through(self):
+        # single giant paragraph, ~2,520 words, no double newlines
+        text = _numbered_sentences(360)
+        out = chunk_chapter(text)
+        assert len(out) >= 4
+        for c in out:
+            assert c["word_count"] <= 2 * 500, "fallback failed to size a segment"
+
+    def test_well_formatted_chapter_regression_pin(self):
+        # 15 paragraphs x 100 words: old algorithm packs 5-para/500-word
+        # chunks with one-paragraph overlap, tail 300 words. Must be unchanged.
+        text = "\n\n".join(_paragraph(100, f"p{i}") for i in range(15))
+        out = chunk_chapter(text)
+        assert [c["word_count"] for c in out] == [500, 500, 500, 300]
+        assert all("\n\n" in c["content"] for c in out)
+
+    def test_boundary_exactly_double_target_does_not_fall_through(self):
+        # one paragraph of exactly 1000 words -> single chunk, no windows
+        text = " ".join(f"Sentence {i} has five words." for i in range(200))  # 200*5=1000
+        out = chunk_chapter(text)
+        assert len(out) == 1
+        assert out[0]["word_count"] == 1000
+
+    def test_boundary_one_sentence_over_falls_through(self):
+        text = " ".join(f"Sentence {i} has five words." for i in range(201))  # 1005
+        out = chunk_chapter(text)
+        assert len(out) >= 2
+
+    def test_chunk_indices_sequential_after_fallback(self):
+        text = _numbered_sentences(360)
+        out = chunk_chapter(text)
+        assert [c["chunk_index"] for c in out] == list(range(len(out)))
+
+    def test_max_tokens_guard_still_enforced(self):
+        # pathological: no sentence boundaries, force token overflow path
+        text = " ".join(["token"] * 20000)
+        out = chunk_chapter(text, max_tokens=2000)
+        assert all(c["token_count"] <= 2000 for c in out)
+
+    def test_empty_text_still_returns_empty(self):
+        assert chunk_chapter("") == []
+        assert chunk_chapter("  \n\n  ") == []

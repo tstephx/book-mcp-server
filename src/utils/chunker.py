@@ -2,7 +2,10 @@
 
 Splits chapter text into ~500-word chunks along paragraph boundaries,
 with one-paragraph overlap between adjacent chunks for context continuity.
-Enforces a hard token limit using tiktoken to prevent API truncation.
+Two-level strategy: paragraph packing runs first; any segment that comes
+out over 2x target_words (e.g. a wall-of-text chapter with no paragraph
+boundaries) falls through to overlapped sentence windows instead. Enforces
+a hard token limit using tiktoken to prevent API truncation.
 """
 
 import re
@@ -125,14 +128,22 @@ def chunk_chapter(
     target_words: int = 500,
     min_chunk_words: int = 100,
     max_tokens: int = 8000,
+    overlap_sentences: int = 2,
 ) -> list[dict]:
     """Split chapter text into chunks along paragraph boundaries.
+
+    Paragraph packing runs first. Any resulting segment over
+    2 * target_words (e.g. a wall-of-text chapter with no paragraph
+    boundaries to pack against) falls through to overlapped sentence
+    windows via `sentence_windows()`. A hard token ceiling is enforced
+    last using tiktoken to prevent API truncation.
 
     Args:
         text: Full chapter text.
         target_words: Target words per chunk (~500).
         min_chunk_words: Minimum words for a standalone chunk.
         max_tokens: Hard token limit (default: 8000, buffer below 8191 API limit).
+        overlap_sentences: Sentences of overlap between fallback sentence windows.
 
     Returns:
         List of dicts with keys: chunk_index, content, word_count, token_count.
@@ -145,35 +156,14 @@ def chunk_chapter(
 
     if total_words <= int(target_words * 1.2):
         token_count = _count_tokens(text)
-        if token_count > max_tokens:
-            # Single-chunk chapter exceeds token limit, split it
-            sub_chunks = _split_at_sentences(text, max_tokens)
-            return [
-                {
-                    "chunk_index": i,
-                    "content": chunk,
-                    "word_count": len(chunk.split()),
-                    "token_count": _count_tokens(chunk),
-                }
-                for i, chunk in enumerate(sub_chunks)
-            ]
-        return [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
+        chunks = [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
+        return _finalize(chunks, target_words, min_chunk_words, max_tokens, overlap_sentences)
 
     paragraphs = _split_paragraphs(text)
     if not paragraphs:
         token_count = _count_tokens(text)
-        if token_count > max_tokens:
-            sub_chunks = _split_at_sentences(text, max_tokens)
-            return [
-                {
-                    "chunk_index": i,
-                    "content": chunk,
-                    "word_count": len(chunk.split()),
-                    "token_count": _count_tokens(chunk),
-                }
-                for i, chunk in enumerate(sub_chunks)
-            ]
-        return [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
+        chunks = [{"chunk_index": 0, "content": text, "word_count": total_words, "token_count": token_count}]
+        return _finalize(chunks, target_words, min_chunk_words, max_tokens, overlap_sentences)
 
     chunks = []
     current_paragraphs: list[str] = []
@@ -204,13 +194,38 @@ def chunk_chapter(
         else:
             chunks.append(_make_chunk(len(chunks), current_paragraphs))
 
-    # Post-process: split any chunks that exceed max_tokens
-    final_chunks = []
+    return _finalize(chunks, target_words, min_chunk_words, max_tokens, overlap_sentences)
+
+
+def _finalize(
+    chunks: list[dict],
+    target_words: int,
+    min_chunk_words: int,
+    max_tokens: int,
+    overlap_sentences: int,
+) -> list[dict]:
+    """Shared tail: oversize fallback, then token guard, then re-index."""
+    # Fallback: segments the paragraph pass couldn't size (wall-of-text input)
+    sized: list[dict] = []
     for chunk in chunks:
+        if chunk["word_count"] > 2 * target_words:
+            for content in sentence_windows(
+                chunk["content"],
+                target_words=target_words,
+                overlap_sentences=overlap_sentences,
+                min_chunk_words=min_chunk_words,
+            ):
+                sized.append(_make_chunk(len(sized), None, content))
+        else:
+            chunk["chunk_index"] = len(sized)
+            sized.append(chunk)
+
+    # Hard token ceiling (pre-existing behavior, unchanged)
+    final_chunks: list[dict] = []
+    for chunk in sized:
         if chunk["token_count"] > max_tokens:
-            # Split oversized chunk at sentence boundaries
             sub_chunks = _split_at_sentences(chunk["content"], max_tokens)
-            for i, sub_content in enumerate(sub_chunks):
+            for sub_content in sub_chunks:
                 final_chunks.append(
                     {
                         "chunk_index": len(final_chunks),
@@ -220,7 +235,6 @@ def chunk_chapter(
                     }
                 )
         else:
-            # Re-index to maintain sequential indices
             chunk["chunk_index"] = len(final_chunks)
             final_chunks.append(chunk)
 
