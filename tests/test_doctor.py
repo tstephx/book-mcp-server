@@ -159,3 +159,97 @@ class TestCheckOrphanedChunks:
         assert isinstance(finding.count, int)
         assert isinstance(finding.fixable_count, int)
         assert isinstance(finding.details, list)
+
+
+def _seed_complete_pipeline(db_path, pipeline_id=None, source_path="/watch/lost.epub"):
+    """Create a pipeline and walk it to COMPLETE through valid transitions."""
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pid = repo.create(source_path, f"hash-{pipeline_id or 'x'}")
+    for state in (
+        PipelineState.HASHING,
+        PipelineState.CLASSIFYING,
+        PipelineState.SELECTING_STRATEGY,
+        PipelineState.PROCESSING,
+        PipelineState.VALIDATING,
+        PipelineState.PENDING_APPROVAL,
+        PipelineState.APPROVED,
+        PipelineState.EMBEDDING,
+        PipelineState.COMPLETE,
+    ):
+        repo.update_state(pid, state)
+    return pid
+
+
+class TestCheckLostBooks:
+    def test_flags_complete_pipeline_without_book_row(self, db_path, tmp_path):
+        from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, check_lost_books
+
+        src = tmp_path / "lost.epub"
+        src.write_bytes(b"epub bytes")
+        pid = _seed_complete_pipeline(db_path, source_path=str(src))
+        conn = _connect(db_path)
+        _seed_chunk(
+            conn, chunk_id="lost-k", chapter_id="GONE", book_id=pid, content="a sample of the lost book's text " * 20
+        )
+        conn.commit()
+        conn.close()
+
+        finding = check_lost_books(db_path)
+
+        assert finding.category == CATEGORY_LOST_BOOKS
+        assert finding.count == 1
+        d = finding.details[0]
+        assert d["pipeline_id"] == pid
+        assert d["basename"] == "lost.epub"
+        assert d["chunk_count"] == 1
+        assert d["source_available"] is True
+        assert d["resolved_path"] == str(src)
+        assert d["live_copy"] is False
+        assert 0 < len(d["sample"]) <= 200
+
+    def test_source_gone_book_is_flagged_unavailable(self, db_path):
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        _seed_complete_pipeline(db_path, source_path="/nowhere/gone.epub")
+
+        d = check_lost_books(db_path).details[0]
+        assert d["source_available"] is False
+        assert d["resolved_path"] is None
+        assert d["sample"] == ""  # no chunks seeded
+
+    def test_resolves_source_via_processed_dir(self, db_path, tmp_path, monkeypatch):
+        """A moved file is found at PROCESSED_DIR/<basename>."""
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        processed = tmp_path / "processed"
+        processed.mkdir()
+        (processed / "moved.epub").write_bytes(b"x")
+        monkeypatch.setenv("PROCESSED_DIR", str(processed))
+        _seed_complete_pipeline(db_path, source_path="/watch/moved.epub")
+
+        d = check_lost_books(db_path).details[0]
+        assert d["source_available"] is True
+        assert d["resolved_path"] == str(processed / "moved.epub")
+
+    def test_complete_pipeline_with_book_row_is_healthy(self, db_path):
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        pid = _seed_complete_pipeline(db_path)
+        conn = _connect(db_path)
+        _seed_book(conn, book_id=pid)
+        conn.commit()
+        conn.close()
+
+        assert check_lost_books(db_path).count == 0
+
+    def test_fixable_count_equals_count(self, db_path):
+        """Archiving fixes every lost book, source or no source."""
+        from agentic_pipeline.health.doctor import check_lost_books
+
+        _seed_complete_pipeline(db_path, source_path="/nowhere/gone.epub")
+
+        finding = check_lost_books(db_path)
+        assert finding.fixable_count == finding.count == 1
