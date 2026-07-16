@@ -161,7 +161,11 @@ class ShortGenerator:
     """Returns one vector fewer than requested — must raise, never loop."""
 
     def generate_batch(self, texts):
-        return np.stack([np.full(4, 1.0, dtype=np.float32) for _ in texts[:-1]]) if len(texts) > 1 else np.empty((0, 4), dtype=np.float32)
+        return (
+            np.stack([np.full(4, 1.0, dtype=np.float32) for _ in texts[:-1]])
+            if len(texts) > 1
+            else np.empty((0, 4), dtype=np.float32)
+        )
 
 
 class TestEmbedPendingGuard:
@@ -171,3 +175,104 @@ class TestEmbedPendingGuard:
         rc.stage_all(conn)
         with pytest.raises(RuntimeError, match="vectors for"):
             rc.embed_pending(conn, generator=ShortGenerator())
+
+
+class TestGate:
+    BASE = {
+        "auto": {
+            "semantic": {"hit_at_5": 0.60, "mrr": 0.40, "n": 60},
+            "hybrid": {"hit_at_5": 0.70, "mrr": 0.50, "n": 60},
+        },
+        "manual": {
+            "semantic": {"hit_at_5": 0.20, "mrr": 0.15, "n": 10},
+            "hybrid": {"hit_at_5": 0.30, "mrr": 0.20, "n": 10},
+        },
+    }
+
+    def _staged(self, auto_hit, auto_mrr, manual_hit):
+        return {
+            "auto": {
+                "semantic": {"hit_at_5": auto_hit, "mrr": auto_mrr, "n": 60},
+                "hybrid": {"hit_at_5": 0.0, "mrr": 0.0, "n": 60},
+            },
+            "manual": {
+                "semantic": {"hit_at_5": manual_hit, "mrr": 0.5, "n": 10},
+                "hybrid": {"hit_at_5": 0.0, "mrr": 0.0, "n": 10},
+            },
+        }
+
+    def test_pass_requires_all_three_arms(self):
+        assert rc.gate_pass(self.BASE, self._staged(0.60, 0.40, 0.30)) is True
+
+    def test_auto_hit_regression_fails(self):
+        assert rc.gate_pass(self.BASE, self._staged(0.59, 0.40, 0.30)) is False
+
+    def test_auto_mrr_regression_fails(self):
+        assert rc.gate_pass(self.BASE, self._staged(0.60, 0.39, 0.30)) is False
+
+    def test_manual_equal_is_not_strict_improvement(self):
+        assert rc.gate_pass(self.BASE, self._staged(0.60, 0.40, 0.20)) is False
+
+    def test_hybrid_numbers_never_gate(self):
+        # staged hybrid is 0.0 everywhere; gate still passes on semantic arms
+        assert rc.gate_pass(self.BASE, self._staged(0.65, 0.45, 0.40)) is True
+
+
+class TestVerdictPersistence:
+    def test_run_gate_eval_persists_verdict(self, staged_db, tmp_path, monkeypatch):
+        conn, db = staged_db
+        rc.ensure_staging(conn)
+        rc.stage_all(conn)
+        rc.embed_pending(conn, generator=FakeGenerator())
+
+        gold = tmp_path / "gold.json"
+        gold.write_text('[{"query": "q", "gold_chapter_id": "ch1", "gold_book_id": "b1", "source": "auto"}]')
+
+        class FakeEmbedder:
+            def generate(self, text):
+                return np.full(4, 5.0, dtype=np.float32)
+
+        # avoid the FTS arm in unit tests (no chapters_fts table in fixture)
+        monkeypatch.setattr(
+            "src.utils.retrieval_eval.full_text_search",
+            lambda q, limit=10: {"results": []},
+        )
+        verdict = rc.run_gate_eval(db, [gold], embedder=FakeEmbedder())
+        assert "baseline" in verdict and "staged" in verdict
+        assert isinstance(verdict["pass"], bool)
+        assert verdict["snapshot"]["chunk_count"] == 1
+
+        loaded = rc.load_verdict(db)
+        assert loaded == verdict
+
+    def test_load_verdict_none_when_absent(self, tmp_path):
+        assert rc.load_verdict(tmp_path / "library.db") is None
+
+
+class TestRechunkCli:
+    def test_stage_flow_reports_and_never_swaps(self, staged_db, tmp_path, monkeypatch):
+        from click.testing import CliRunner
+        from agentic_pipeline.cli import main
+
+        conn, db = staged_db
+        gold = tmp_path / "gold.json"
+        gold.write_text("[]")
+        monkeypatch.setattr("agentic_pipeline.library.rechunk.GOLD_PATHS", [gold])
+        monkeypatch.setattr(
+            "agentic_pipeline.library.rechunk.embed_pending",
+            lambda conn, generator=None, batch_size=256: 0,
+        )
+        monkeypatch.setattr(
+            "agentic_pipeline.library.rechunk.run_gate_eval",
+            lambda db_path, gold_paths=None, embedder=None: {
+                "pass": False,
+                "baseline": {},
+                "staged": {},
+                "snapshot": {},
+            },
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["rechunk", "--yes"])
+        assert result.exit_code in (0, 1)  # FAIL verdict exits 1; either way no crash
+        before = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+        assert before == 1, "CLI stage flow must not touch chunks"

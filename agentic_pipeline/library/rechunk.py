@@ -7,8 +7,10 @@ state is representable). Production `chunks` is only written by `swap()`
 """
 
 import io
+import json
 import logging
 import uuid
+from pathlib import Path
 
 import numpy as np
 
@@ -205,3 +207,85 @@ def snapshot_marker(conn) -> dict:
     """Live-chunks marker for the swap-time staleness check (decision 2)."""
     row = conn.execute("SELECT COUNT(*), COALESCE(MAX(created_at), '') FROM chunks").fetchone()
     return {"chunk_count": row[0], "max_created_at": row[1]}
+
+
+# Gold files live in the repo (spec: only runtime state lives beside the DB)
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+GOLD_PATHS = [
+    _REPO_ROOT / "eval" / "gold-queries.json",
+    _REPO_ROOT / "eval" / "gold-queries-manual.json",
+]
+
+
+def _verdict_path(db_path) -> Path:
+    return Path(db_path).parent / "rechunk" / "last-verdict.json"
+
+
+def gate_pass(baseline: dict, staged: dict) -> bool:
+    """Spec acceptance gate, semantic mode only (decision 1), verbatim:
+
+    auto hit@5 >= baseline AND auto MRR >= baseline AND manual hit@5 > baseline.
+    """
+    b_auto = baseline["auto"]["semantic"]
+    s_auto = staged["auto"]["semantic"]
+    b_manual = baseline["manual"]["semantic"]
+    s_manual = staged["manual"]["semantic"]
+    return (
+        s_auto["hit_at_5"] >= b_auto["hit_at_5"]
+        and s_auto["mrr"] >= b_auto["mrr"]
+        and s_manual["hit_at_5"] > b_manual["hit_at_5"]
+    )
+
+
+def run_gate_eval(db_path, gold_paths=None, embedder=None) -> dict:
+    """Score live vs staged, decide the gate, persist the verdict."""
+    import sqlite3 as _sqlite3
+
+    from src.utils.retrieval_eval import run_eval
+
+    if gold_paths is None:
+        gold_paths = GOLD_PATHS
+    if embedder is None:
+        from src.utils.openai_embeddings import OpenAIEmbeddingGenerator
+
+        embedder = OpenAIEmbeddingGenerator()
+
+    baseline = run_eval(db_path, gold_paths, table="chunks", embedder=embedder)
+    staged = run_eval(db_path, gold_paths, table="chunks_staging", embedder=embedder)
+
+    conn = _sqlite3.connect(str(db_path))
+    try:
+        snapshot = snapshot_marker(conn)
+    finally:
+        conn.close()
+
+    verdict = {
+        "baseline": baseline,
+        "staged": staged,
+        "pass": gate_pass(baseline, staged),
+        "snapshot": snapshot,
+        "gold_counts": {
+            "auto": baseline["auto"]["semantic"]["n"],
+            "manual": baseline["manual"]["semantic"]["n"],
+        },
+    }
+    path = _verdict_path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(verdict, indent=2))
+    logger.info(f"Verdict ({'PASS' if verdict['pass'] else 'FAIL'}) -> {path}")
+    return verdict
+
+
+def load_verdict(db_path):
+    path = _verdict_path(db_path)
+    if not path.exists():
+        return None
+    return json.loads(path.read_text())
+
+
+class SwapRefused(RuntimeError):
+    """Swap preconditions not met (no PASS verdict, unembedded rows, ...)."""
+
+
+def swap(db_path) -> dict:
+    raise SwapRefused("swap not yet implemented")
