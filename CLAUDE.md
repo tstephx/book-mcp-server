@@ -34,7 +34,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-------------|-------------|
 | **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
 | **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
-| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 29 commands for pipeline management, approval, autonomy, library maintenance. See `ref/cli-commands.md`. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 30 commands for pipeline management, approval, autonomy, library maintenance. See `ref/cli-commands.md`. |
 | **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
 
 ## Environment Variables

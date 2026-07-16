@@ -484,3 +484,33 @@ def reingest_book_tool(
     result["new_pipeline_id"] = new_pid
     result["old_pipeline_id"] = book_id
     return result
+
+
+_DOCTOR_SAMPLE_CAP = 10
+
+
+def doctor_report(db_path: Optional[str] = None) -> dict:
+    """Read-only integrity report, payload-capped for chat contexts.
+
+    lost_books returns every detail (it is the actionable list); other
+    categories return at most _DOCTOR_SAMPLE_CAP samples plus a truncated
+    flag. Repair is deliberately NOT exposed over MCP — use the CLI.
+    """
+    from agentic_pipeline.health.doctor import CATEGORY_LOST_BOOKS, run_checks
+
+    path = Path(db_path) if db_path else get_db_path()
+    payload = {}
+    for finding in run_checks(path):
+        if finding.category == CATEGORY_LOST_BOOKS:
+            samples = finding.details
+            truncated = False
+        else:
+            samples = finding.details[:_DOCTOR_SAMPLE_CAP]
+            truncated = len(finding.details) > _DOCTOR_SAMPLE_CAP
+        payload[finding.category] = {
+            "count": finding.count,
+            "fixable_count": finding.fixable_count,
+            "samples": samples,
+            "truncated": truncated,
+        }
+    return payload
