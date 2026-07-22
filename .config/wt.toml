@@ -9,8 +9,19 @@
 # defensive backstop, not an invitation.
 # Interpreter pinned to this repo's measured baseline — never ambient python3,
 # which drifts with every brew upgrade. uv fails loudly if 3.12 is missing.
+#
+# `uv sync --frozen` installs exactly what uv.lock pins, so every worktree gets
+# bit-identical dependencies instead of a fresh latest-compatible resolve. This
+# repo is a shared MCP provider (periodical-parser, book-ingestion-python,
+# archana-portfolio and archana-interview launch servers out of it), so a drifting
+# resolve here breaks consumers silently. --frozen makes a stale lock fail loudly
+# rather than get silently re-resolved.
+#
+# book_ingestion is NOT installed by this (it's a local editable sibling, see
+# pyproject). The 28 tests guarded by pytest.importorskip("book_ingestion") skip
+# in a worktree, same as in CI.
 [[pre-start]]
-deps = "uv venv --python 3.12 .venv && uv pip install -p .venv -qe ."
+deps = "uv sync --frozen --python 3.12 --extra dev"
 
 [pre-merge]
 test = ".venv/bin/python -m pytest -q"
