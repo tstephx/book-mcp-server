@@ -162,7 +162,7 @@ Before claiming a feature is complete:
 python -m pytest tests/ -v
 
 # 2. Test the server starts
-timeout 3 venv/bin/python -m src.server || true
+timeout 3 .venv/bin/python -m src.server || true
 
 # 3. Verify in Claude Desktop (restart required)
 ```
