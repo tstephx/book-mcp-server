@@ -29,6 +29,14 @@ dependencies = [
     # check actually runs on fresh installs and in CI. >=1.24 for the
     # `with fitz.open(...)` context manager.
     "pymupdf>=1.24",
+    # agentic_pipeline/converters/enhanced_epub_parser.py imports bs4 at module
+    # scope and converters/__init__.py imports that module eagerly, so any
+    # `import agentic_pipeline.converters` needs it. It was pip-installed by hand
+    # into the live .venv and never declared — invisible until uv.lock made
+    # environments strictly reproducible, at which point a fresh worktree venv
+    # raises ModuleNotFoundError. The suite masks it because the tests that reach
+    # converters/ are guarded by pytest.importorskip("book_ingestion").
+    "beautifulsoup4>=4.12",
     # "book-ingestion",  # Install separately: pip install -e /path/to/book-ingestion-python
 ]
 
