@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "book-library": {
-      "command": "/path/to/book-mcp-server/venv/bin/python",
+      "command": "/path/to/book-mcp-server/.venv/bin/python",
       "args": [
         "/path/to/book-mcp-server/server.py"
       ]

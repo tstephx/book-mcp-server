@@ -9,8 +9,25 @@
 # defensive backstop, not an invitation.
 # Interpreter pinned to this repo's measured baseline — never ambient python3,
 # which drifts with every brew upgrade. uv fails loudly if 3.12 is missing.
+#
+# `uv sync --locked` installs exactly what uv.lock pins, so every worktree gets
+# bit-identical dependencies instead of a fresh latest-compatible resolve, and
+# --locked additionally asserts the lock is still consistent with pyproject —
+# failing loudly if it drifted. (--frozen would install a drifted lock silently.)
+#
+# SCOPE, stated precisely because an earlier version of this comment overclaimed:
+# this governs THIS REPO'S WORKTREES ONLY. periodical-parser and
+# book-ingestion-python launch servers from the MAIN checkout's .venv by absolute
+# path in their .mcp.json, and a pre-start hook never touches that venv. CI
+# installs via `pip install -e ".[dev]"` and does not read uv.lock either. So the
+# lock makes feature-branch worktrees reproducible; it does not protect consumers.
+# Keeping the main .venv in step with uv.lock is a separate, unautomated job.
+#
+# book_ingestion is NOT installed by this (it's a local editable sibling, see
+# pyproject). The 28 tests guarded by pytest.importorskip("book_ingestion") skip
+# in a worktree, same as in CI.
 [[pre-start]]
-deps = "uv venv --python 3.12 .venv && uv pip install -p .venv -qe ."
+deps = "uv sync --locked --python 3.12 --extra dev"
 
 [pre-merge]
 test = ".venv/bin/python -m pytest -q"
