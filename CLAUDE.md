@@ -232,6 +232,14 @@ Add to `.mcp.json` in any project that needs the book library:
 
 **Critical:** Command must use the **venv python** (has mcp, fastmcp, openai deps). Env vars are `BOOK_DB_PATH` and `BOOKS_DIR` (NOT `BOOK_LIBRARY_DB`/`LIBRARY_PATH`). Do NOT use `uv`.
 
+### `agentic-pipeline` is a shared MCP provider — this is deliberate, not accidental coupling
+
+`agentic_mcp_server.py` in this repo is launched directly out of **this project's own `.venv`** by other projects' `.mcp.json` files, via a hardcoded absolute path (e.g. `/Users/taylorstephens/Dev/_Projects/book-mcp-server/.venv/bin/python .../agentic_mcp_server.py`). Current consumers: **periodical-parser**, **book-ingestion-python**. (Two other consumers named in the `[tool.uv]` pyproject.toml comment — archana-portfolio, archana-interview — are archived and no longer active.)
+
+This is why `pyproject.toml`'s `[tool.uv]` section pins exact versions via `constraint-dependencies` instead of letting `uv lock` resolve freely — an unconstrained relock drifted 67 packages in one pass, which would silently break every consumer launching out of this venv. **The pinning discipline is the safety net for the coupling, not a separate concern.** Do not "fix" this by packaging `agentic-pipeline` as an installable dependency for each consumer to `pip install -e` into their own venv — that trades one working, actively-maintained pattern for a second point of drift (now N venvs to keep in sync instead of one pinned one), with no corresponding benefit.
+
+**Upgrade procedure** (from the pyproject.toml comment, restated here since that's not where a future session would look first): bump the pin in `constraint-dependencies`, re-run `uv lock --python 3.12`, re-run this repo's test suite, then **smoke-test each consumer** (periodical-parser, book-ingestion-python) by actually invoking their `agentic-pipeline` MCP tools before considering the upgrade done.
+
 ---
 
 *Last updated: 2026-07-16*
