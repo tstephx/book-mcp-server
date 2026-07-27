@@ -42,4 +42,4 @@ entities.json
 .firecrawl/
 
 # Local Claude Code settings (personal overrides, not shared)
-.claude/settings.local.json
+**/.claude/settings.local.json
