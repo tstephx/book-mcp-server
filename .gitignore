@@ -40,3 +40,6 @@ entities.json
 
 # Firecrawl scrape cache
 .firecrawl/
+
+# Local Claude Code settings (personal overrides, not shared)
+.claude/settings.local.json
