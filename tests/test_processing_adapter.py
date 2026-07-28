@@ -1,7 +1,10 @@
 """Integration tests for ProcessingAdapter."""
 
+import json
 import pytest
+import sqlite3
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -138,6 +141,67 @@ class TestProcessingAdapterProcessBook:
         assert result.success is False
         assert result.error == "Chapter detection failed"
         assert result.quality_score == 0
+
+    def test_persists_complete_book_profile_after_successful_storage(self, tmp_path):
+        db_path = tmp_path / "test.db"
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE books (
+                id TEXT PRIMARY KEY
+            )"""
+        )
+        conn.execute("INSERT INTO books (id) VALUES ('test-123')")
+        conn.commit()
+        conn.close()
+
+        adapter = ProcessingAdapter(db_path=db_path)
+        mock_app = _make_mock_app(_make_success_result())
+        profile = {
+            "book_type": "travel_guide",
+            "confidence": 0.98,
+            "suggested_tags": ["sicily", "travel"],
+            "reasoning": "Destination-oriented reference",
+        }
+
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
+            result = adapter.process_book(
+                book_path="/fake/book.epub",
+                book_profile=profile,
+            )
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM books WHERE id = 'test-123'").fetchone()
+        conn.close()
+
+        assert result.success is True
+        assert row["book_type"] == "travel_guide"
+        assert row["classification_confidence"] == 0.98
+        assert json.loads(row["suggested_tags"]) == ["sicily", "travel"]
+        assert row["classification_reasoning"] == "Destination-oriented reference"
+        assert datetime.fromisoformat(row["classified_at"]).tzinfo is not None
+        assert row["classified_by"] == "agentic_pipeline"
+
+    def test_does_not_persist_profile_when_storage_is_disabled(self, tmp_path):
+        db_path = tmp_path / "not-created.db"
+        adapter = ProcessingAdapter(db_path=db_path)
+        mock_app = _make_mock_app(_make_success_result())
+
+        with patch(
+            "agentic_pipeline.adapters.processing_adapter.BookIngestionApp.create",
+            return_value=mock_app,
+        ):
+            result = adapter.process_book(
+                book_path="/fake/book.epub",
+                save_to_storage=False,
+                book_profile={"book_type": "travel_guide", "confidence": 0.98},
+            )
+
+        assert result.success is True
+        assert not db_path.exists()
 
 
 class TestProcessingAdapterFields:

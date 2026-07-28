@@ -186,11 +186,21 @@ def test_retry_uses_force_fallback(config, sample_book):
     # First call: normal processing (force_fallback=False)
     assert mock_run_processing.call_count == 2
     first_call = mock_run_processing.call_args_list[0]
-    assert first_call == call(sample_book, book_id=result["pipeline_id"], force_fallback=False)
+    assert first_call == call(
+        sample_book,
+        book_id=result["pipeline_id"],
+        force_fallback=False,
+        book_profile=mock_profile.to_dict(),
+    )
 
     # Second call: retry with force_fallback=True
     second_call = mock_run_processing.call_args_list[1]
-    assert second_call == call(sample_book, book_id=result["pipeline_id"], force_fallback=True)
+    assert second_call == call(
+        sample_book,
+        book_id=result["pipeline_id"],
+        force_fallback=True,
+        book_profile=mock_profile.to_dict(),
+    )
 
 
 def test_retry_processing_error_rejects_directly(config, sample_book):

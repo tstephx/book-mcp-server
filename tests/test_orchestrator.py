@@ -148,6 +148,46 @@ def test_orchestrator_handles_processing_timeout(db_path, config):
     assert result["state"] == PipelineState.NEEDS_RETRY.value
 
 
+def test_run_processing_forwards_book_profile_to_adapter(config):
+    from agentic_pipeline.adapters.processing_adapter import ProcessingResult
+    from agentic_pipeline.orchestrator import Orchestrator
+    from unittest.mock import MagicMock
+
+    orchestrator = Orchestrator(config)
+    orchestrator.processing_adapter = MagicMock()
+    orchestrator.processing_adapter.process_book.return_value = ProcessingResult(
+        success=True,
+        book_id="book-1",
+        quality_score=90,
+        detection_confidence=0.95,
+        detection_method="epub_anchor",
+        needs_review=False,
+        warnings=[],
+        chapter_count=10,
+        word_count=50000,
+    )
+    profile = {
+        "book_type": "travel_guide",
+        "confidence": 0.98,
+        "suggested_tags": ["travel"],
+        "reasoning": "Destination guide",
+    }
+
+    orchestrator._run_processing(
+        "/book.epub",
+        book_id="book-1",
+        force_fallback=False,
+        book_profile=profile,
+    )
+
+    orchestrator.processing_adapter.process_book.assert_called_once_with(
+        book_path="/book.epub",
+        book_id="book-1",
+        force_fallback=False,
+        book_profile=profile,
+    )
+
+
 def test_orchestrator_supervised_holds_high_confidence_for_review(db_path, config):
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.db.pipelines import PipelineRepository

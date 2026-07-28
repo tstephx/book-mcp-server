@@ -5,8 +5,10 @@ This adapter provides a clean interface for the orchestrator to use
 book-ingestion as a library instead of subprocess calls.
 """
 
+import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -19,6 +21,15 @@ from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.library.chapter_reader import read_chapter_content
 
 logger = logging.getLogger(__name__)
+
+BOOK_PROFILE_COLUMNS = (
+    ("book_type", "TEXT"),
+    ("classification_confidence", "REAL"),
+    ("suggested_tags", "TEXT"),
+    ("classification_reasoning", "TEXT"),
+    ("classified_at", "TEXT"),
+    ("classified_by", "TEXT"),
+)
 
 
 @dataclass
@@ -96,6 +107,7 @@ class ProcessingAdapter:
         book_id: Optional[str] = None,
         save_to_storage: bool = True,
         force_fallback: bool = False,
+        book_profile: Optional[dict] = None,
     ) -> ProcessingResult:
         """
         Process a book file and return structured results.
@@ -106,6 +118,7 @@ class ProcessingAdapter:
             author: Optional author override
             book_id: Optional book ID (generated if not provided)
             force_fallback: If True, force LLM fallback processing
+            book_profile: Optional classifier output to copy onto the stored book row
 
         Returns:
             ProcessingResult with processing details
@@ -148,6 +161,9 @@ class ProcessingAdapter:
                     error=result.error,
                 )
 
+            if save_to_storage and book_profile is not None:
+                self._persist_book_profile(result.book_id, book_profile)
+
             # Extract data from pipeline result
             pipeline_result = result.pipeline_result
             return ProcessingResult(
@@ -177,6 +193,41 @@ class ProcessingAdapter:
                 word_count=0,
                 error=str(e),
             )
+
+    def _persist_book_profile(self, book_id: str, book_profile: dict) -> None:
+        """Copy pipeline classification data onto the newly stored library row."""
+        with get_pipeline_db(str(self.db_path)) as conn:
+            existing_columns = {
+                row["name"] for row in conn.execute("PRAGMA table_info(books)").fetchall()
+            }
+            for column_name, column_type in BOOK_PROFILE_COLUMNS:
+                if column_name not in existing_columns:
+                    conn.execute(
+                        f"ALTER TABLE books ADD COLUMN {column_name} {column_type}"
+                    )
+
+            cursor = conn.execute(
+                """UPDATE books SET
+                    book_type = ?,
+                    classification_confidence = ?,
+                    suggested_tags = ?,
+                    classification_reasoning = ?,
+                    classified_at = ?,
+                    classified_by = ?
+                WHERE id = ?""",
+                (
+                    book_profile.get("book_type", "unknown"),
+                    book_profile.get("confidence", 0.0),
+                    json.dumps(book_profile.get("suggested_tags", [])),
+                    book_profile.get("reasoning", ""),
+                    datetime.now(timezone.utc).isoformat(),
+                    "agentic_pipeline",
+                    book_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise RuntimeError(f"Stored book row not found for classification: {book_id}")
+            conn.commit()
 
     def generate_embeddings(
         self,

@@ -213,13 +213,20 @@ class Orchestrator:
             },
         )
 
-    def _run_processing(self, book_path: str, book_id: Optional[str] = None, force_fallback: bool = False) -> dict:
+    def _run_processing(
+        self,
+        book_path: str,
+        book_id: Optional[str] = None,
+        force_fallback: bool = False,
+        book_profile: Optional[dict] = None,
+    ) -> dict:
         """Run book-ingestion processing via direct library call.
 
         Args:
             book_path: Path to the book file.
             book_id: Optional pipeline ID to use as book ID.
             force_fallback: If True, force LLM fallback processing.
+            book_profile: Optional classifier output to persist with the book.
 
         Returns:
             Dict with processing results including quality_score, confidence, etc.
@@ -230,6 +237,7 @@ class Orchestrator:
             book_path=book_path,
             book_id=book_id,
             force_fallback=force_fallback,
+            book_profile=book_profile,
         )
         try:
             result = future.result(timeout=self.config.processing_timeout)
@@ -417,7 +425,12 @@ class Orchestrator:
         # PROCESSING
         self._transition(pipeline_id, PipelineState.PROCESSING)
         try:
-            processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=force_fallback)
+            processing_result = self._run_processing(
+                book_path,
+                book_id=pipeline_id,
+                force_fallback=force_fallback,
+                book_profile=profile,
+            )
         except (ProcessingError, PipelineTimeoutError) as e:
             self.logger.error(pipeline_id, type(e).__name__, str(e))
             self._transition(pipeline_id, PipelineState.NEEDS_RETRY)
@@ -460,7 +473,12 @@ class Orchestrator:
                 self._transition(pipeline_id, PipelineState.PROCESSING)
 
                 try:
-                    processing_result = self._run_processing(book_path, book_id=pipeline_id, force_fallback=True)
+                    processing_result = self._run_processing(
+                        book_path,
+                        book_id=pipeline_id,
+                        force_fallback=True,
+                        book_profile=profile,
+                    )
                 except (ProcessingError, PipelineTimeoutError) as e:
                     # Retry processing failed — permanently reject (PROCESSING -> REJECTED is valid)
                     self.logger.error(pipeline_id, type(e).__name__, str(e))
