@@ -64,7 +64,7 @@ def _make_processing_result():
 
 
 def test_first_validation_failure_retries(config, sample_book):
-    """First validation fails, retry with force_fallback passes -> book completes."""
+    """First validation fails, retry passes -> book awaits supervised approval."""
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.validation import ValidationResult
 
@@ -104,7 +104,7 @@ def test_first_validation_failure_retries(config, sample_book):
                 ):
                     result = orchestrator.process_one(sample_book)
 
-    assert result["state"] == "complete"
+    assert result["state"] == "pending_approval"
     # Validator should have been called twice
     assert mock_validate.call_count == 2
 
@@ -181,7 +181,7 @@ def test_retry_uses_force_fallback(config, sample_book):
                 ):
                     result = orchestrator.process_one(sample_book)
 
-    assert result["state"] == "complete"
+    assert result["state"] == "pending_approval"
 
     # First call: normal processing (force_fallback=False)
     assert mock_run_processing.call_count == 2

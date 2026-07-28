@@ -27,9 +27,14 @@ def test_calculate_calibration_insufficient_data(db_path):
 
 
 def test_calculate_calibration_with_data(db_path):
-    from agentic_pipeline.autonomy import MetricsCollector, CalibrationEngine
+    from agentic_pipeline.autonomy import (
+        CalibrationEngine,
+        MetricsCollector,
+        SpotCheckManager,
+    )
 
     collector = MetricsCollector(db_path)
+    spot_checks = SpotCheckManager(db_path)
 
     # Record 60 decisions for technical_tutorial
     for i in range(60):
@@ -41,8 +46,14 @@ def test_calculate_calibration_with_data(db_path):
             book_id=f"book{i}",
             book_type="technical_tutorial",
             confidence=confidence,
-            decision=decision,
+            decision="approved",
             actor="auto:test",
+        )
+        spot_checks.submit_result(
+            book_id=f"book{i}",
+            classification_correct=decision == "approved",
+            quality_acceptable=decision == "approved",
+            reviewer="human:test",
         )
 
     engine = CalibrationEngine(db_path, min_samples=50)
@@ -54,14 +65,25 @@ def test_calculate_calibration_with_data(db_path):
 
 
 def test_calculate_threshold(db_path):
-    from agentic_pipeline.autonomy import MetricsCollector, CalibrationEngine
+    from agentic_pipeline.autonomy import (
+        CalibrationEngine,
+        MetricsCollector,
+        SpotCheckManager,
+    )
 
     collector = MetricsCollector(db_path)
+    spot_checks = SpotCheckManager(db_path)
 
     # Record 100 high-confidence correct decisions
     for i in range(100):
         collector.record_decision(
             book_id=f"book{i}", book_type="technical_tutorial", confidence=0.92, decision="approved", actor="auto:test"
+        )
+        spot_checks.submit_result(
+            book_id=f"book{i}",
+            classification_correct=True,
+            quality_acceptable=True,
+            reviewer="human:test",
         )
 
     engine = CalibrationEngine(db_path, min_samples=50, target_accuracy=0.95)

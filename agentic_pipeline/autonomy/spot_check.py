@@ -26,7 +26,6 @@ class SpotCheckManager:
                 FROM autonomy_feedback f
                 LEFT JOIN spot_checks s ON f.book_id = s.book_id
                 WHERE f.original_decision = 'auto_approved'
-                AND f.human_decision = 'approved'
                 AND f.created_at > ?
                 AND s.id IS NULL
                 ORDER BY f.created_at DESC
@@ -49,7 +48,6 @@ class SpotCheckManager:
                 FROM autonomy_feedback f
                 LEFT JOIN spot_checks s ON f.book_id = s.book_id
                 WHERE f.original_decision = 'auto_approved'
-                AND f.human_decision = 'approved'
                 AND f.created_at > ?
                 AND s.id IS NULL
             """,
@@ -83,7 +81,7 @@ class SpotCheckManager:
             # Get original info
             cursor.execute(
                 """
-                SELECT original_book_type, original_confidence, created_at
+                SELECT id, original_book_type, original_confidence, created_at
                 FROM autonomy_feedback
                 WHERE book_id = ?
                 ORDER BY created_at DESC
@@ -112,6 +110,14 @@ class SpotCheckManager:
                     notes,
                 ),
             )
+            if original:
+                human_decision = "approved" if classification_correct and quality_acceptable else "rejected"
+                cursor.execute(
+                    """UPDATE autonomy_feedback
+                       SET human_decision = ?, feedback_notes = ?
+                       WHERE id = ?""",
+                    (human_decision, notes, original["id"]),
+                )
 
             conn.commit()
 

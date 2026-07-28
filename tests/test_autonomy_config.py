@@ -154,6 +154,27 @@ def test_confident_mode_requires_calibrated_type_threshold(db_path):
     assert calibrated.threshold == pytest.approx(0.91)
 
 
+def test_confident_mode_honors_zero_manual_override(db_path):
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.db.connection import get_pipeline_db
+
+    config = AutonomyConfig(db_path)
+    config.set_mode("confident")
+    _set_type_threshold(db_path, "technical_tutorial", 0.91)
+    with get_pipeline_db(str(db_path)) as conn:
+        conn.execute(
+            """UPDATE autonomy_thresholds
+               SET manual_override = 0.0
+               WHERE book_type = 'technical_tutorial'"""
+        )
+        conn.commit()
+
+    decision = config.evaluate_auto_approval("technical_tutorial", 0.10)
+
+    assert decision.should_auto_approve is True
+    assert decision.threshold == pytest.approx(0.0)
+
+
 @pytest.mark.parametrize("confidence", [-0.01, 1.01, float("nan"), float("inf")])
 def test_invalid_confidence_fails_closed(db_path, confidence):
     from agentic_pipeline.autonomy import AutonomyConfig

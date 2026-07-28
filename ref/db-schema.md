@@ -169,7 +169,9 @@ Per-book-type calibrated thresholds (set by `CalibrationEngine`).
 | `override_reason` | TEXT |
 
 ### `autonomy_feedback`
-Human override records used for calibration.
+Decision feedback used for metrics and calibration. Automatic decisions begin
+with `human_decision = 'pending_review'`; only reviewed `approved` or `rejected`
+rows contribute to measured accuracy and threshold calibration.
 
 | Column | Type |
 |--------|------|

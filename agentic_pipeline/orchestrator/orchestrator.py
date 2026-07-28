@@ -168,14 +168,44 @@ class Orchestrator:
         self.repo.update_book_profile(pipeline_id, profile_dict)
         return profile_dict
 
+    def _evaluate_auto_approval(
+        self,
+        book_type: str,
+        confidence: float,
+        *,
+        validation_passed: bool,
+        needs_review: bool,
+    ):
+        """Evaluate autonomy controls, failing closed if policy state is unavailable."""
+        from agentic_pipeline.autonomy import AutoApprovalDecision, AutonomyConfig
+
+        try:
+            return AutonomyConfig(self.config.db_path).evaluate_auto_approval(
+                book_type,
+                confidence,
+                validation_passed=validation_passed,
+                needs_review=needs_review,
+            )
+        except Exception:
+            logger.exception("Auto-approval policy failed; holding book for human review")
+            return AutoApprovalDecision(
+                should_auto_approve=False,
+                mode="supervised",
+                reason="policy_error",
+                book_type=book_type,
+                confidence=confidence,
+            )
+
     def _store_processing_result(self, pipeline_id: str, result: dict) -> None:
         """Persist processing result metrics to the pipeline record."""
         self.repo.update_processing_result(
             pipeline_id,
             {
+                "book_id": result.get("book_id"),
                 "quality_score": result.get("quality_score"),
                 "detection_confidence": result.get("detection_confidence"),
                 "detection_method": result.get("detection_method"),
+                "needs_review": result.get("needs_review", True),
                 "chapter_count": result.get("chapter_count"),
                 "word_count": result.get("word_count"),
                 "warnings": result.get("warnings", []),
@@ -400,6 +430,15 @@ class Orchestrator:
         self._transition(pipeline_id, PipelineState.VALIDATING)
         validator = ExtractionValidator()
         validation = validator.validate(book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path)
+        self.repo.update_validation_result(
+            pipeline_id,
+            {
+                "passed": validation.passed,
+                "reasons": validation.reasons,
+                "warnings": validation.warnings,
+                "metrics": validation.metrics,
+            },
+        )
 
         if not validation.passed:
             # Check if we can retry with force_fallback
@@ -443,6 +482,15 @@ class Orchestrator:
                 validation = validator.validate(
                     book_id=pipeline_id, db_path=str(self.config.db_path), source_path=book_path
                 )
+                self.repo.update_validation_result(
+                    pipeline_id,
+                    {
+                        "passed": validation.passed,
+                        "reasons": validation.reasons,
+                        "warnings": validation.warnings,
+                        "metrics": validation.metrics,
+                    },
+                )
 
             if not validation.passed:
                 reason = "; ".join(validation.reasons)
@@ -464,18 +512,21 @@ class Orchestrator:
                     "metrics": validation.metrics,
                 }
 
-        # APPROVAL ROUTING - use processing result confidence
+        # APPROVAL ROUTING - the database-backed autonomy policy is authoritative.
         confidence = processing_result.get("detection_confidence", 0)
         needs_review = processing_result.get("needs_review", False)
 
         # Route through PENDING_APPROVAL for both paths
         self._transition(pipeline_id, PipelineState.PENDING_APPROVAL)
 
-        if confidence >= self.config.confidence_threshold and not needs_review:
-            # Auto-approve
-            self._transition(pipeline_id, PipelineState.APPROVED)
-            self.repo.mark_approved(pipeline_id, approved_by="auto:high_confidence", confidence=confidence)
-        else:
+        approval_decision = self._evaluate_auto_approval(
+            profile.get("book_type", "unknown"),
+            confidence,
+            validation_passed=validation.passed,
+            needs_review=needs_review,
+        )
+
+        if not approval_decision.should_auto_approve:
             # Needs human review — notify via macOS notification
             book_name = Path(book_path).stem
             self._notify_pending_approval(book_name, confidence)
@@ -485,12 +536,31 @@ class Orchestrator:
                 "book_type": profile.get("book_type"),
                 "confidence": confidence,
                 "needs_review": True,
+                "approval_reason": approval_decision.reason,
+                "autonomy_mode": approval_decision.mode,
+                "approval_threshold": approval_decision.threshold,
             }
 
-        # EMBEDDING → COMPLETE (delegate to shared helper)
-        result = self._complete_approved(pipeline_id)
+        # Use the same audited approval action as CLI and MCP callers.
+        from agentic_pipeline.approval.actions import approve_book
+
+        result = approve_book(
+            self.config.db_path,
+            pipeline_id,
+            actor=f"auto:{approval_decision.mode}",
+            background=False,
+            confidence=confidence,
+            decision_metadata={
+                "mode": approval_decision.mode,
+                "reason": approval_decision.reason,
+                "threshold": approval_decision.threshold,
+            },
+        )
         result["book_type"] = profile.get("book_type")
         result["confidence"] = confidence
+        result["approval_reason"] = approval_decision.reason
+        result["autonomy_mode"] = approval_decision.mode
+        result["approval_threshold"] = approval_decision.threshold
         return result
 
     @staticmethod

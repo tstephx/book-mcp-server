@@ -35,6 +35,7 @@ class CalibrationEngine:
                     AVG(original_confidence) as avg_confidence
                 FROM autonomy_feedback
                 WHERE original_book_type = ?
+                AND human_decision IN ('approved', 'rejected')
                 AND created_at > ?
             """,
                 (book_type, cutoff),
@@ -73,6 +74,7 @@ class CalibrationEngine:
                         SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
                     FROM autonomy_feedback
                     WHERE original_book_type = ?
+                    AND human_decision IN ('approved', 'rejected')
                     AND original_confidence >= ?
                     AND created_at > ?
                 """,
@@ -102,6 +104,7 @@ class CalibrationEngine:
             cursor.execute("""
                 SELECT DISTINCT original_book_type FROM autonomy_feedback
                 WHERE original_book_type IS NOT NULL
+                AND human_decision IN ('approved', 'rejected')
             """)
             book_types = [row[0] for row in cursor.fetchall()]
 

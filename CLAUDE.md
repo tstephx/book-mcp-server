@@ -84,7 +84,7 @@ make test-integration  # requires real DB + OPENAI_API_KEY
 ### Pipeline States
 Books flow through: `DETECTED` → `HASHING` → `CLASSIFYING` → `SELECTING_STRATEGY` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `APPROVED` → `EMBEDDING` → `COMPLETE`
 
-High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and auto-approve. Approval runs embedding inline — no separate worker needed.
+Every validated book reaches `PENDING_APPROVAL`. `AutonomyConfig.evaluate_auto_approval()` may then approve it through the shared audited approval action. Supervised mode, the escape hatch, failed validation, `needs_review`, unknown types, invalid confidence, missing thresholds, policy errors, and the daily cap all fail closed and keep the book pending. Approval runs embedding inline — no separate worker needed.
 
 ### Classifier Providers
 `ClassifierAgent` (`agentic_pipeline/agents/classifier.py`) tries a primary then a fallback provider. Default chain: **`claude-code`** (`claude -p`, subscription billing, no API key) → **`openai`**. `CLASSIFIER_PROVIDER=claude-code|openai` forces one provider with no fallback (invalid value fails loud). Providers implement `LLMProvider` (`agents/providers/`) and share `parse_profile_json` from `providers/base.py`. The launchd worker needs `claude` on its PATH — `scripts/run-worker.sh` exports `~/.local/bin`.
@@ -94,8 +94,11 @@ High-confidence books (≥0.7, no review needed) skip `PENDING_APPROVAL` and aut
 
 ### Autonomy Modes
 - **supervised** — All books require human approval (default)
-- **partial** — Auto-approve high-confidence known types
-- **confident** — Per-type calibrated thresholds
+- **partial** — Auto-approve eligible known types at `autonomy_config.auto_approve_threshold` (default 0.95)
+- **confident** — Auto-approve eligible known types at reviewed per-type thresholds
+
+Auto approvals enter feedback as `pending_review`; only human-approved/rejected
+feedback and completed spot checks contribute to accuracy and calibration.
 
 ### File Watcher
 ```bash
@@ -122,7 +125,10 @@ One command reverts to fully supervised mode.
 
 | Knob | File | Symbol | Env override | Default |
 |------|------|--------|-------------|---------|
-| Auto-approve threshold | `agentic_pipeline/config.py` | `confidence_threshold` | `CONFIDENCE_THRESHOLD` | 0.7 |
+| Classifier fallback threshold | `agentic_pipeline/config.py` | `confidence_threshold` | `CONFIDENCE_THRESHOLD` | 0.7 |
+| Partial auto-approve threshold | `autonomy_config` table | `auto_approve_threshold` | — | 0.95 |
+| Confident auto-approve thresholds | `autonomy_thresholds` table | `auto_approve_threshold` / `manual_override` | — | Per book type |
+| Daily automatic approval cap | `autonomy_config` table | `max_auto_approvals_per_day` | — | 50 |
 | Processing timeout | `agentic_pipeline/config.py` | `processing_timeout` | `PROCESSING_TIMEOUT_SECONDS` | 600s |
 | Embedding timeout | `agentic_pipeline/config.py` | `embedding_timeout` | `EMBEDDING_TIMEOUT_SECONDS` | 300s |
 | Worker poll interval | `agentic_pipeline/config.py` | `worker_poll_interval` | `WORKER_POLL_INTERVAL_SECONDS` | 5s |

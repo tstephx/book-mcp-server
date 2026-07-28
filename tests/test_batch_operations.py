@@ -50,6 +50,50 @@ def test_batch_approve(db_path):
     assert entries[0]["filter_used"]["min_confidence"] == 0.9
 
 
+def test_batch_approve_records_each_decision_in_audit_and_metrics(db_path, monkeypatch):
+    from agentic_pipeline.approval import actions
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import MetricsCollector
+    from agentic_pipeline.batch import BatchFilter, BatchOperations
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    for index, confidence in enumerate((0.95, 0.92), start=1):
+        pipeline_id = repo.create(f"/book{index}.epub", f"hash{index}")
+        transition_to(repo, pipeline_id, PipelineState.PENDING_APPROVAL)
+        repo.update_book_profile(
+            pipeline_id,
+            {
+                "book_type": "technical_tutorial",
+                "confidence": confidence,
+            },
+        )
+
+    monkeypatch.setattr(
+        actions,
+        "_complete_approved",
+        lambda db, pid, pipeline: {
+            "state": PipelineState.COMPLETE.value,
+            "chapters_embedded": 1,
+        },
+    )
+
+    result = BatchOperations(db_path).approve(
+        BatchFilter(min_confidence=0.9),
+        actor="human:taylor",
+        execute=True,
+    )
+
+    individual_entries = AuditTrail(db_path).query(action="approved")
+    metrics = MetricsCollector(db_path).get_metrics(days=1)
+
+    assert result["approved"] == 2
+    assert len(individual_entries) == 2
+    assert {entry["pipeline_id"] for entry in individual_entries} == {book["id"] for book in result["books"]}
+    assert metrics["human_approved"] == 2
+
+
 class TestBatchToleratesConcurrentClaims:
     """One contended book must not abort the batch or lose the audit trail.
 
@@ -87,15 +131,15 @@ class TestBatchToleratesConcurrentClaims:
         )
 
         ops = BatchOperations(db_path)
-        real_update = ops.repo.update_state
+        real_update = PipelineRepository.update_state
 
-        def lose_the_claim_on_book1(pipeline_id, new_state, **kw):
+        def lose_the_claim_on_book1(repo_instance, pipeline_id, new_state, **kw):
             # A rival claims book1 between filter.apply() and the loop reaching it.
             if pipeline_id == id1 and new_state == PipelineState.APPROVED:
                 raise ConcurrentModificationError(f"{id1} claimed by another actor")
-            return real_update(pipeline_id, new_state, **kw)
+            return real_update(repo_instance, pipeline_id, new_state, **kw)
 
-        ops.repo.update_state = lose_the_claim_on_book1
+        monkeypatch.setattr(PipelineRepository, "update_state", lose_the_claim_on_book1)
 
         result = ops.approve(BatchFilter(min_confidence=0.9), actor="human:taylor", execute=True)
 

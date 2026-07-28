@@ -104,15 +104,19 @@ class AutonomyConfig:
 
             if not row:
                 return None
-            return row["manual_override"] if row["manual_override"] else row["auto_approve_threshold"]
+            return row["manual_override"] if row["manual_override"] is not None else row["auto_approve_threshold"]
 
     def _get_settings(self) -> dict:
         with get_pipeline_db(self.db_path) as conn:
             row = conn.execute("SELECT * FROM autonomy_config WHERE id = 1").fetchone()
-        return dict(row) if row else {
-            "current_mode": "supervised",
-            "escape_hatch_active": True,
-        }
+        return (
+            dict(row)
+            if row
+            else {
+                "current_mode": "supervised",
+                "escape_hatch_active": True,
+            }
+        )
 
     def _auto_approvals_today(self) -> int:
         with get_pipeline_db(self.db_path) as conn:
@@ -173,11 +177,7 @@ class AutonomyConfig:
         else:
             return deny("invalid_mode")
 
-        if (
-            not isinstance(threshold, (int, float))
-            or not math.isfinite(threshold)
-            or not 0.0 <= threshold <= 1.0
-        ):
+        if not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
             return deny("threshold_unavailable")
         if confidence < threshold:
             return deny("below_threshold", threshold)

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from agentic_pipeline.autonomy.config import AutonomyConfig
+from agentic_pipeline.autonomy.metrics import MetricsCollector
 from agentic_pipeline.db.connection import get_pipeline_db
 from agentic_pipeline.db.pipelines import PipelineRepository
 from agentic_pipeline.pipeline.states import PipelineState
@@ -41,9 +42,11 @@ def _record_audit(
     after_state: Optional[dict] = None,
     adjustments: Optional[dict] = None,
     confidence: Optional[float] = None,
+    connection=None,
 ) -> None:
     """Record an action in the audit trail."""
-    with get_pipeline_db(str(db_path)) as conn:
+
+    def insert(conn) -> None:
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -65,6 +68,13 @@ def _record_audit(
                 AutonomyConfig(db_path).get_mode(),
             ),
         )
+
+    if connection is not None:
+        insert(connection)
+        return
+
+    with get_pipeline_db(str(db_path)) as conn:
+        insert(conn)
         conn.commit()
 
 
@@ -272,6 +282,8 @@ def approve_book(
     actor: str,
     adjustments: Optional[dict] = None,
     background: bool = True,
+    confidence: Optional[float] = None,
+    decision_metadata: Optional[dict] = None,
 ) -> dict:
     """Approve a book, driving PENDING_APPROVAL → APPROVED → EMBEDDING → COMPLETE.
 
@@ -298,27 +310,115 @@ def approve_book(
 
     # Get confidence from profile
     profile = json.loads(pipeline.get("book_profile") or "{}")
-    confidence = profile.get("confidence")
+    approval_confidence = confidence if confidence is not None else profile.get("confidence")
+
+    if actor.startswith("auto:"):
+        processing_result = pipeline.get("processing_result")
+        if isinstance(processing_result, str):
+            try:
+                processing_result = json.loads(processing_result)
+            except (json.JSONDecodeError, TypeError):
+                processing_result = {}
+        if not isinstance(processing_result, dict):
+            processing_result = {}
+
+        validation_result = pipeline.get("validation_result")
+        if isinstance(validation_result, str):
+            try:
+                validation_result = json.loads(validation_result)
+            except (json.JSONDecodeError, TypeError):
+                validation_result = {}
+        if not isinstance(validation_result, dict):
+            validation_result = {}
+
+        try:
+            fresh_decision = AutonomyConfig(db_path).evaluate_auto_approval(
+                profile.get("book_type", "unknown"),
+                approval_confidence,
+                validation_passed=validation_result.get("passed") is True,
+                needs_review=processing_result.get("needs_review", True),
+            )
+        except Exception as exc:
+            logger.error(
+                "Auto-approval policy recheck failed for %s: %s",
+                pipeline_id,
+                exc,
+            )
+            return {
+                "success": False,
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.PENDING_APPROVAL.value,
+                "error": "auto_approval_denied",
+                "approval_reason": "policy_error",
+            }
+        if not fresh_decision.should_auto_approve:
+            return {
+                "success": False,
+                "pipeline_id": pipeline_id,
+                "state": PipelineState.PENDING_APPROVAL.value,
+                "error": "auto_approval_denied",
+                "approval_reason": fresh_decision.reason,
+            }
+        actor = f"auto:{fresh_decision.mode}"
+        decision_metadata = {
+            "mode": fresh_decision.mode,
+            "reason": fresh_decision.reason,
+            "threshold": fresh_decision.threshold,
+        }
+
+    audit_adjustments = dict(adjustments or {})
+    if decision_metadata:
+        audit_adjustments["autonomy_decision"] = decision_metadata
 
     before_state = {"state": pipeline["state"]}
     after_state = {"state": PipelineState.APPROVED.value}
 
     # Transition to APPROVED immediately
     repo.update_state(pipeline_id, PipelineState.APPROVED)
-    repo.mark_approved(pipeline_id, approved_by=actor, confidence=confidence)
+    repo.mark_approved(pipeline_id, approved_by=actor, confidence=approval_confidence)
 
-    # Record audit before spawning thread (so it's always written)
-    _record_audit(
-        db_path,
-        pipeline_id,
-        _extract_book_id(pipeline),
-        action="approved",
-        actor=actor,
-        before_state=before_state,
-        after_state=after_state,
-        adjustments=adjustments,
-        confidence=confidence,
-    )
+    # Governance records must exist before embedding can publish the book.
+    try:
+        with get_pipeline_db(str(db_path)) as governance_conn:
+            _record_audit(
+                db_path,
+                pipeline_id,
+                _extract_book_id(pipeline),
+                action="approved",
+                actor=actor,
+                before_state=before_state,
+                after_state=after_state,
+                adjustments=audit_adjustments or None,
+                confidence=approval_confidence,
+                connection=governance_conn,
+            )
+            MetricsCollector(db_path).record_decision(
+                book_id=_extract_book_id(pipeline) or pipeline_id,
+                pipeline_id=pipeline_id,
+                book_type=profile.get("book_type", "unknown"),
+                confidence=approval_confidence if approval_confidence is not None else 0.0,
+                decision="approved",
+                actor=actor,
+                adjustments=audit_adjustments or None,
+                connection=governance_conn,
+            )
+            governance_conn.commit()
+    except Exception as exc:
+        logger.error("Approval governance recording failed for %s: %s", pipeline_id, exc)
+        repo.update_state(
+            pipeline_id,
+            PipelineState.NEEDS_RETRY,
+            error_details={
+                "failed_in": "approval_governance",
+                "approval_governance_error": str(exc),
+            },
+        )
+        return {
+            "success": False,
+            "pipeline_id": pipeline_id,
+            "state": PipelineState.NEEDS_RETRY.value,
+            "error": "approval_governance_failed",
+        }
 
     if not background:
         # Caller exits on return — embed here or the work never happens.

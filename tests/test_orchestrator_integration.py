@@ -1,6 +1,7 @@
 # tests/test_orchestrator_integration.py
 """Integration tests for the orchestrator."""
 
+import json
 import pytest
 import tempfile
 from pathlib import Path
@@ -52,8 +53,11 @@ def test_full_pipeline_mocked(config, sample_book):
     """Test full pipeline with mocked processing."""
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import AutonomyConfig
     from agentic_pipeline.db.pipelines import PipelineRepository
 
+    AutonomyConfig(config.db_path).set_mode("partial")
     orchestrator = Orchestrator(config)
 
     # Mock classifier to return high confidence
@@ -67,7 +71,7 @@ def test_full_pipeline_mocked(config, sample_book):
     mock_processing_result = {
         "book_id": "test-book-id",
         "quality_score": 85,
-        "detection_confidence": 0.9,
+        "detection_confidence": 0.99,
         "detection_method": "mock",
         "needs_review": False,
         "warnings": [],
@@ -98,13 +102,23 @@ def test_full_pipeline_mocked(config, sample_book):
 
     assert result["state"] == "complete"
     assert result["book_type"] == "technical_tutorial"
-    assert result["confidence"] == 0.9
+    assert result["confidence"] == 0.99
 
     # Verify database state
     repo = PipelineRepository(config.db_path)
     pipeline = repo.get(result["pipeline_id"])
     assert pipeline["state"] == "complete"
-    assert pipeline["approved_by"] == "auto:high_confidence"
+    assert pipeline["approved_by"] == "auto:partial"
+    assert pipeline["approval_confidence"] == pytest.approx(0.99)
+    assert json.loads(pipeline["validation_result"])["passed"] is True
+
+    audit_entry = AuditTrail(config.db_path).query(action="approved")[0]
+    assert audit_entry["confidence_at_decision"] == pytest.approx(0.99)
+    assert audit_entry["adjustments"]["autonomy_decision"] == {
+        "mode": "partial",
+        "reason": "approved",
+        "threshold": 0.95,
+    }
 
 
 def test_low_confidence_needs_approval(config, sample_book):

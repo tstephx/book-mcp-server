@@ -74,6 +74,255 @@ def test_approve_book(db_path):
     assert pipeline["approved_by"] == "human:taylor"
 
 
+def test_approve_book_records_audit_and_autonomy_metrics(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import MetricsCollector
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    repo = PipelineRepository(db_path)
+    pid = _create_pending_pipeline(db_path)
+    repo.update_book_profile(
+        pid,
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.91,
+        },
+    )
+
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        approve_book(db_path, pid, actor="human:taylor")
+
+    audit_entries = AuditTrail(db_path).query(action="approved")
+    metrics = MetricsCollector(db_path).get_metrics(days=1)
+
+    assert len(audit_entries) == 1
+    assert audit_entries[0]["pipeline_id"] == pid
+    assert audit_entries[0]["confidence_at_decision"] == pytest.approx(0.91)
+    assert metrics["total_processed"] == 1
+    assert metrics["human_approved"] == 1
+
+
+def test_auto_approval_preserves_processing_confidence_and_policy_metadata(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import AutonomyConfig, MetricsCollector
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    repo = PipelineRepository(db_path)
+    AutonomyConfig(db_path).set_mode("partial")
+    pid = _create_pending_pipeline(
+        db_path,
+        processing_result={
+            "book_id": "book-1",
+            "needs_review": False,
+        },
+    )
+    repo.update_validation_result(pid, {"passed": True})
+    repo.update_book_profile(
+        pid,
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.80,
+        },
+    )
+    policy = {
+        "mode": "partial",
+        "reason": "approved",
+        "threshold": 0.95,
+    }
+
+    with patch("agentic_pipeline.approval.actions._run_embedding_background"):
+        approve_book(
+            db_path,
+            pid,
+            actor="auto:partial",
+            confidence=0.99,
+            decision_metadata=policy,
+        )
+
+    pipeline = repo.get(pid)
+    audit_entry = AuditTrail(db_path).query(action="approved")[0]
+    metrics = MetricsCollector(db_path).get_metrics(days=1)
+
+    assert pipeline["approval_confidence"] == pytest.approx(0.99)
+    assert audit_entry["confidence_at_decision"] == pytest.approx(0.99)
+    assert audit_entry["adjustments"]["autonomy_decision"] == policy
+    assert metrics["auto_approved"] == 1
+    assert metrics["avg_confidence_auto"] == pytest.approx(0.99)
+
+
+def test_auto_approval_requires_stored_validation_result(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    AutonomyConfig(db_path).set_mode("partial")
+    pid = _create_pending_pipeline(
+        db_path,
+        processing_result={
+            "book_id": "book-1",
+            "needs_review": False,
+        },
+    )
+    repo.update_book_profile(
+        pid,
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.99,
+        },
+    )
+
+    result = approve_book(
+        db_path,
+        pid,
+        actor="auto:partial",
+        confidence=0.99,
+    )
+
+    assert result["success"] is False
+    assert result["state"] == PipelineState.PENDING_APPROVAL.value
+    assert result["approval_reason"] == "validation_failed"
+    assert repo.get(pid)["state"] == PipelineState.PENDING_APPROVAL.value
+
+
+def test_auto_approval_rechecks_stored_needs_review(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    AutonomyConfig(db_path).set_mode("partial")
+    pid = _create_pending_pipeline(
+        db_path,
+        processing_result={
+            "book_id": "book-1",
+            "needs_review": True,
+        },
+    )
+    repo.update_validation_result(pid, {"passed": True})
+    repo.update_book_profile(
+        pid,
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.99,
+        },
+    )
+
+    result = approve_book(
+        db_path,
+        pid,
+        actor="auto:partial",
+        confidence=0.99,
+    )
+
+    assert result["success"] is False
+    assert result["state"] == PipelineState.PENDING_APPROVAL.value
+    assert result["approval_reason"] == "needs_review"
+    assert repo.get(pid)["state"] == PipelineState.PENDING_APPROVAL.value
+
+
+def test_auto_approval_policy_error_fails_closed_at_commit(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pid = _create_pending_pipeline(db_path)
+
+    with patch.object(
+        AutonomyConfig,
+        "evaluate_auto_approval",
+        side_effect=RuntimeError("database unavailable"),
+    ):
+        result = approve_book(
+            db_path,
+            pid,
+            actor="auto:partial",
+            confidence=0.99,
+        )
+
+    assert result["success"] is False
+    assert result["state"] == PipelineState.PENDING_APPROVAL.value
+    assert result["approval_reason"] == "policy_error"
+    assert repo.get(pid)["state"] == PipelineState.PENDING_APPROVAL.value
+
+
+def test_auto_approval_rechecks_escape_hatch_before_state_change(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import AutonomyConfig, MetricsCollector
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pid = _create_pending_pipeline(db_path)
+    repo.update_book_profile(
+        pid,
+        {
+            "book_type": "technical_tutorial",
+            "confidence": 0.99,
+        },
+    )
+    autonomy = AutonomyConfig(db_path)
+    autonomy.set_mode("partial")
+    autonomy.activate_escape_hatch("stop before commit")
+
+    with patch("agentic_pipeline.approval.actions._run_embedding_background") as embed:
+        result = approve_book(
+            db_path,
+            pid,
+            actor="auto:partial",
+            confidence=0.99,
+            decision_metadata={
+                "mode": "partial",
+                "reason": "approved",
+                "threshold": 0.95,
+            },
+        )
+
+    assert result == {
+        "success": False,
+        "pipeline_id": pid,
+        "state": PipelineState.PENDING_APPROVAL.value,
+        "error": "auto_approval_denied",
+        "approval_reason": "escape_hatch_active",
+    }
+    assert repo.get(pid)["state"] == PipelineState.PENDING_APPROVAL.value
+    assert AuditTrail(db_path).query(action="approved") == []
+    assert MetricsCollector(db_path).get_metrics(days=1)["total_processed"] == 0
+    embed.assert_not_called()
+
+
+def test_approval_governance_failure_blocks_embedding_and_queues_retry(db_path):
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.audit import AuditTrail
+    from agentic_pipeline.autonomy import MetricsCollector
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    pid = _create_pending_pipeline(db_path)
+
+    with patch.object(
+        MetricsCollector,
+        "record_decision",
+        side_effect=RuntimeError("metrics unavailable"),
+    ):
+        with patch("agentic_pipeline.approval.actions._run_embedding_background") as embed:
+            result = approve_book(db_path, pid, actor="human:taylor")
+
+    assert result["success"] is False
+    assert result["state"] == PipelineState.NEEDS_RETRY.value
+    assert result["error"] == "approval_governance_failed"
+    assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.NEEDS_RETRY.value
+    assert AuditTrail(db_path).query(action="approved") == []
+    embed.assert_not_called()
+
+
 def _sha(data: bytes) -> str:
     """SHA-256 of raw bytes, matching Orchestrator._compute_hash."""
     import hashlib

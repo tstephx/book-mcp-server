@@ -3,7 +3,7 @@ status: active
 tags: [project/book-mcp-server, format/readme]
 type: project
 created: '2026-02-24'
-modified: '2026-02-24'
+modified: '2026-07-28'
 ---
 
 # book-mcp-server
@@ -30,7 +30,7 @@ An AI-powered pipeline that processes new EPUBs/PDFs into the library automatica
 3. **Selects** the optimal processing strategy for that book type
 4. **Processes** the book through the ingestion pipeline
 5. **Validates** extraction quality
-6. **Queues** for approval (or auto-approves high-confidence books)
+6. **Queues** every validated book for approval, then applies the configured autonomy policy
 7. **Embeds** approved books for semantic search
 
 ---
@@ -92,7 +92,9 @@ DETECTED → HASHING → CLASSIFYING → SELECTING_STRATEGY → PROCESSING
        → VALIDATING → PENDING_APPROVAL → APPROVED → EMBEDDING → COMPLETE
 ```
 
-High-confidence books (≥0.7, no issues) skip `PENDING_APPROVAL` and auto-approve.
+Every validated book reaches `PENDING_APPROVAL`. The database-backed autonomy
+policy may then approve it through the same audited action used for human
+approval.
 
 ---
 
@@ -101,8 +103,12 @@ High-confidence books (≥0.7, no issues) skip `PENDING_APPROVAL` and auto-appro
 | Mode | Behavior |
 |------|----------|
 | **supervised** | All books require human approval (default) |
-| **partial** | Auto-approve high-confidence known types |
-| **confident** | Per-type calibrated thresholds |
+| **partial** | Auto-approve eligible known types at the global threshold (default `0.95`) |
+| **confident** | Auto-approve eligible known types at reviewed, per-type thresholds |
+
+Automatic approval fails closed. The escape hatch, failed validation,
+`needs_review`, unknown types, invalid confidence, a missing threshold, or the
+daily cap leave the book in `PENDING_APPROVAL`.
 
 ```bash
 # Instantly revert to fully supervised mode

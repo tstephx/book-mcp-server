@@ -3,7 +3,7 @@ status: active
 tags: [project/book-mcp-server, format/reference]
 type: project
 created: '2026-03-04'
-modified: '2026-03-04'
+modified: '2026-07-28'
 ---
 
 # Pipeline Architecture Reference
@@ -17,7 +17,8 @@ DETECTED → HASHING → CLASSIFYING → SELECTING_STRATEGY → PROCESSING
          → VALIDATING → PENDING_APPROVAL → APPROVED → EMBEDDING → COMPLETE
 ```
 
-**Shortcut:** High-confidence books (≥0.7, `auto_review=False`) skip `PENDING_APPROVAL` and auto-approve.
+Every validated book reaches `PENDING_APPROVAL`. The autonomy policy may then
+approve it through the same audited action used for human and batch approval.
 
 **Terminal states:** `COMPLETE`, `REJECTED`, `ARCHIVED`, `DUPLICATE`, `FAILED`
 
@@ -84,12 +85,14 @@ Poll cycle (every `WORKER_POLL_INTERVAL_SECONDS`, default 5s):
 ```
 1. Validate pipeline is in PENDING_APPROVAL
 2. Transition → APPROVED
-3. Write approval_audit record
-4. Spawn daemon thread: _run_embedding_background(db_path, pipeline_id, pipeline)
-5. Return immediately: {"success": True, "state": "approved", "embedding": "queued"}
+3. Write the per-book `approval_audit` and autonomy feedback records
+4. Start embedding inline or spawn `_run_embedding_background`, according to `background`
+5. Return the embedding outcome or queued status
 ```
 
-Background thread calls `_complete_approved()` → EMBEDDING → COMPLETE (non-blocking).
+If either governance record cannot be written, embedding does not start and the
+book moves to `NEEDS_RETRY`. The background path calls `_complete_approved()` →
+EMBEDDING → COMPLETE without blocking the caller.
 
 ### `reject_book(db_path, pipeline_id, reason, actor, retry)` → `dict`
 
@@ -106,15 +109,29 @@ Reverts COMPLETE/APPROVED book: removes chapters from library, transitions to AR
 | Mode | Behavior |
 |------|----------|
 | `supervised` | All books require human approval (default) |
-| `partial` | Auto-approve high-confidence known book types |
-| `confident` | Per-type calibrated thresholds from `autonomy_thresholds` |
+| `partial` | Eligible known types use `autonomy_config.auto_approve_threshold` (default `0.95`) |
+| `confident` | Eligible known types use reviewed per-type thresholds from `autonomy_thresholds` |
 
 **Escape hatch:** `agentic-pipeline escape-hatch "reason"` → immediately reverts to `supervised`.
 
 ### Thresholds
-- `CONFIDENCE_THRESHOLD` env var (default `0.7`) — minimum confidence for auto-approve
+- `autonomy_config.auto_approve_threshold` (default `0.95`) controls partial mode
 - Per-type thresholds stored in `autonomy_thresholds` table, updated by `CalibrationEngine`
+- `CONFIDENCE_THRESHOLD` (default `0.7`) controls classifier LLM fallback, not approval
 - Readiness gates: partial requires 100 processed + <15% override rate; confident requires 500 + <5%
+
+### Guardrails and feedback
+
+Automatic approval is denied when the escape hatch is active, the mode is
+supervised or invalid, validation failed, review is requested, the book type or
+confidence is invalid, the applicable threshold is unavailable, or the daily
+automatic-approval cap has been reached. Policy errors also fail closed.
+
+Each auto approval records the original processing confidence, active mode,
+threshold, and decision reason in the per-book audit record. Its feedback begins
+as `pending_review`; only reviewed approved/rejected outcomes are used for
+accuracy and threshold calibration. Spot-check results convert pending feedback
+into a reviewed outcome.
 
 ---
 
@@ -138,7 +155,7 @@ All values overridable via env vars:
 
 | Knob | Env var | Default |
 |------|---------|---------|
-| Auto-approve threshold | `CONFIDENCE_THRESHOLD` | `0.7` |
+| Classifier fallback threshold | `CONFIDENCE_THRESHOLD` | `0.7` |
 | Processing timeout | `PROCESSING_TIMEOUT_SECONDS` | `600s` |
 | Embedding timeout | `EMBEDDING_TIMEOUT_SECONDS` | `300s` |
 | Worker poll interval | `WORKER_POLL_INTERVAL_SECONDS` | `5s` |
@@ -146,3 +163,6 @@ All values overridable via env vars:
 | Pipeline DB | `AGENTIC_PIPELINE_DB` | — |
 | Watch directory | `WATCH_DIR` | — |
 | Processed directory | `PROCESSED_DIR` | — |
+
+Approval thresholds and guardrails are database settings in `autonomy_config`
+and `autonomy_thresholds`; they are not environment variables.

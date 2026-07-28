@@ -66,6 +66,7 @@ def test_full_autonomy_flow(db_path):
 def test_spot_check_integration(db_path):
     """Test spot-check workflow."""
     from agentic_pipeline.autonomy import MetricsCollector, SpotCheckManager
+    from agentic_pipeline.db.connection import get_pipeline_db
 
     collector = MetricsCollector(db_path)
     spot_check = SpotCheckManager(db_path, sample_rate=0.20)
@@ -88,6 +89,10 @@ def test_spot_check_integration(db_path):
     spot_check.submit_result(
         book_id="book0", classification_correct=True, quality_acceptable=True, reviewer="human:taylor"
     )
+
+    with get_pipeline_db(str(db_path)) as conn:
+        feedback = conn.execute("SELECT human_decision FROM autonomy_feedback WHERE book_id = 'book0'").fetchone()
+    assert feedback["human_decision"] == "approved"
 
     # Check accuracy
     accuracy = spot_check.get_accuracy_rate()

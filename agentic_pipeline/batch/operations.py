@@ -34,7 +34,7 @@ class BatchOperations:
                 "books": [{"id": m["id"], "source_path": m["source_path"]} for m in matches],
             }
 
-        from agentic_pipeline.approval.actions import _complete_approved
+        from agentic_pipeline.approval.actions import approve_book
 
         embedded = 0
         embedding_failures = []
@@ -43,23 +43,35 @@ class BatchOperations:
 
         for pipeline in matches:
             try:
-                self.repo.update_state(pipeline["id"], PipelineState.APPROVED)
+                approval_result = approve_book(
+                    self.db_path,
+                    pipeline["id"],
+                    actor=f"batch:{actor}",
+                    background=False,
+                )
             except ConcurrentModificationError as e:
                 # Claimed between filter.apply() and now. One contended book must
                 # not abort the batch, nor cost us the audit entry below.
                 skipped.append({"id": pipeline["id"], "reason": str(e)})
                 continue
 
+            if not approval_result.get("success"):
+                skipped.append(
+                    {
+                        "id": pipeline["id"],
+                        "reason": approval_result.get("error", "approval failed"),
+                    }
+                )
+                continue
+
             approved.append(pipeline)
-            self.repo.mark_approved(pipeline["id"], approved_by=f"batch:{actor}", confidence=None)
-            embed_result = _complete_approved(self.db_path, pipeline["id"], pipeline)
-            if embed_result["state"] == PipelineState.COMPLETE.value:
+            if approval_result["state"] == PipelineState.COMPLETE.value:
                 embedded += 1
             else:
                 embedding_failures.append(
                     {
                         "id": pipeline["id"],
-                        "error": embed_result.get("embedding_error", "unknown"),
+                        "error": approval_result.get("embedding_error", "unknown"),
                     }
                 )
 

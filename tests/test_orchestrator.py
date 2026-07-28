@@ -148,7 +148,7 @@ def test_orchestrator_handles_processing_timeout(db_path, config):
     assert result["state"] == PipelineState.NEEDS_RETRY.value
 
 
-def test_orchestrator_auto_approves_high_confidence(db_path, config):
+def test_orchestrator_supervised_holds_high_confidence_for_review(db_path, config):
     from agentic_pipeline.orchestrator import Orchestrator
     from agentic_pipeline.db.pipelines import PipelineRepository
     from agentic_pipeline.agents.classifier_types import BookProfile, BookType
@@ -192,10 +192,83 @@ def test_orchestrator_auto_approves_high_confidence(db_path, config):
                     ):
                         result = orchestrator.process_one("/book.epub")
 
-    # Check that it was auto-approved
+    assert result["state"] == "pending_approval"
+    assert result["approval_reason"] == "supervised_mode"
+
     repo = PipelineRepository(db_path)
     pipeline = repo.get(result["pipeline_id"])
-    assert pipeline["approved_by"] == "auto:high_confidence"
+    assert pipeline["approved_by"] is None
+
+
+def test_orchestrator_escape_hatch_blocks_partial_auto_approval(db_path, config):
+    from agentic_pipeline.agents.classifier_types import BookProfile, BookType
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.validation import ValidationResult
+    from unittest.mock import MagicMock
+
+    autonomy = AutonomyConfig(db_path)
+    autonomy.set_mode("partial")
+    autonomy.activate_escape_hatch("operator stop")
+
+    orchestrator = Orchestrator(config)
+    orchestrator.classifier = MagicMock()
+    orchestrator.classifier.classify.return_value = BookProfile(
+        book_type=BookType.TECHNICAL_TUTORIAL,
+        confidence=0.99,
+        suggested_tags=["python"],
+        reasoning="Test",
+    )
+    processing_result = {
+        "book_id": "test-book-id",
+        "quality_score": 95,
+        "detection_confidence": 0.99,
+        "detection_method": "mock",
+        "needs_review": False,
+        "warnings": [],
+        "chapter_count": 10,
+        "word_count": 50000,
+        "llm_fallback_used": False,
+    }
+    validation = ValidationResult(
+        passed=True,
+        reasons=[],
+        warnings=[],
+        metrics={"chapter_count": 10},
+    )
+
+    with patch.object(orchestrator, "_run_processing", return_value=processing_result):
+        with patch.object(orchestrator, "_compute_hash", return_value="escape-hash"):
+            with patch.object(orchestrator, "_extract_sample", return_value="text"):
+                with patch(
+                    "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                    return_value=validation,
+                ):
+                    result = orchestrator.process_one("/book.epub")
+
+    assert result["state"] == "pending_approval"
+    assert result["approval_reason"] == "escape_hatch_active"
+
+
+def test_autonomy_policy_error_fails_closed(config):
+    from agentic_pipeline.orchestrator import Orchestrator
+
+    orchestrator = Orchestrator(config)
+
+    with patch(
+        "agentic_pipeline.autonomy.AutonomyConfig.evaluate_auto_approval",
+        side_effect=RuntimeError("database unavailable"),
+    ):
+        decision = orchestrator._evaluate_auto_approval(
+            "technical_tutorial",
+            0.99,
+            validation_passed=True,
+            needs_review=False,
+        )
+
+    assert decision.should_auto_approve is False
+    assert decision.mode == "supervised"
+    assert decision.reason == "policy_error"
 
 
 def test_reprocess_existing_losing_a_race_does_not_clobber_the_winner(db_path, config):

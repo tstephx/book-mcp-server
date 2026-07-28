@@ -22,13 +22,16 @@ class MetricsCollector:
         actor: str,
         pipeline_id: str = None,
         adjustments: dict = None,
+        connection=None,
     ) -> None:
         """Record a decision for metrics tracking."""
-        with get_pipeline_db(self.db_path) as conn:
+
+        def insert(conn) -> None:
             cursor = conn.cursor()
 
             # Determine original decision type
             original_decision = "auto_approved" if actor.startswith("auto:") else "human_review"
+            human_decision = "pending_review" if original_decision == "auto_approved" else decision
 
             cursor.execute(
                 """
@@ -43,12 +46,18 @@ class MetricsCollector:
                     original_decision,
                     confidence,
                     book_type,
-                    decision,
+                    human_decision,
                     json.dumps(adjustments) if adjustments else None,
                     datetime.now(timezone.utc).isoformat(),
                 ),
             )
 
+        if connection is not None:
+            insert(connection)
+            return
+
+        with get_pipeline_db(self.db_path) as conn:
+            insert(conn)
             conn.commit()
 
     def get_metrics(self, days: int = 30) -> dict:
@@ -62,7 +71,7 @@ class MetricsCollector:
                 """
                 SELECT
                     COUNT(*) as total,
-                    SUM(CASE WHEN original_decision = 'auto_approved' AND human_decision = 'approved' THEN 1 ELSE 0 END) as auto_approved,
+                    SUM(CASE WHEN original_decision = 'auto_approved' THEN 1 ELSE 0 END) as auto_approved,
                     SUM(CASE WHEN original_decision = 'human_review' AND human_decision = 'approved' THEN 1 ELSE 0 END) as human_approved,
                     SUM(CASE WHEN human_decision = 'rejected' THEN 1 ELSE 0 END) as human_rejected,
                     SUM(CASE WHEN human_adjustments IS NOT NULL THEN 1 ELSE 0 END) as human_adjusted,
@@ -100,6 +109,7 @@ class MetricsCollector:
                     SUM(CASE WHEN human_decision = 'approved' THEN 1 ELSE 0 END) as correct
                 FROM autonomy_feedback
                 WHERE original_book_type = ?
+                AND human_decision IN ('approved', 'rejected')
                 AND created_at > ?
             """,
                 (book_type, cutoff),
