@@ -8,7 +8,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/taylorstephens/_Projects/book-mcp-server/scripts/run-worker.sh</string>
+        <string>/Users/taylorstephens/Dev/_Projects/book-mcp-server/scripts/run-worker.sh</string>
     </array>
 
     <key>RunAtLoad</key>

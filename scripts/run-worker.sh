@@ -14,4 +14,7 @@ export PATH="$HOME/.local/bin:$PATH"
 export WATCH_DIR="$HOME/Documents/_ebooks/agentic-book-pipeline"
 export PROCESSED_DIR="$HOME/Documents/_ebooks/agentic-book-pipeline/processed"
 
-exec /Users/taylorstephens/_Projects/book-mcp-server/.venv/bin/agentic-pipeline worker
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+exec "$REPO_DIR/.venv/bin/agentic-pipeline" worker
