@@ -249,6 +249,25 @@ def test_update_state(db_path):
     assert pipeline["state"] == PipelineState.HASHING.value
 
 
+def test_transition_to_complete_sets_completed_at(db_path):
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.pipeline.states import PipelineState
+
+    repo = PipelineRepository(db_path)
+    pipeline_id = repo.create("/path/to/book.epub", "complete-hash")
+
+    transition_to(repo, pipeline_id, PipelineState.COMPLETE)
+
+    pipeline = repo.get(pipeline_id)
+    assert pipeline["completed_at"] is not None
+    assert pipeline["completed_at"] == pipeline["updated_at"]
+
+    completed_at = pipeline["completed_at"]
+    repo.update_state(pipeline_id, PipelineState.ARCHIVED)
+
+    assert repo.get(pipeline_id)["completed_at"] == completed_at
+
+
 def test_find_by_hash(db_path):
     from agentic_pipeline.db.pipelines import PipelineRepository
 

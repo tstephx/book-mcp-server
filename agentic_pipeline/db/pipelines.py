@@ -137,10 +137,15 @@ class PipelineRepository:
             cursor.execute(
                 """
                 UPDATE processing_pipelines
-                SET state = ?, updated_at = ?
+                SET state = ?,
+                    updated_at = ?,
+                    completed_at = CASE
+                        WHEN ? = 'complete' THEN ?
+                        ELSE completed_at
+                    END
                 WHERE id = ? AND state = ?
                 """,
-                (new_state.value, now, pipeline_id, old_state),
+                (new_state.value, now, new_state.value, now, pipeline_id, old_state),
             )
 
             if cursor.rowcount == 0:
