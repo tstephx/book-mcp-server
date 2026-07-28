@@ -350,6 +350,8 @@ def approve_book(
                 "state": PipelineState.PENDING_APPROVAL.value,
                 "error": "auto_approval_denied",
                 "approval_reason": "policy_error",
+                "autonomy_mode": "supervised",
+                "approval_threshold": None,
             }
         if not fresh_decision.should_auto_approve:
             return {
@@ -358,6 +360,8 @@ def approve_book(
                 "state": PipelineState.PENDING_APPROVAL.value,
                 "error": "auto_approval_denied",
                 "approval_reason": fresh_decision.reason,
+                "autonomy_mode": fresh_decision.mode,
+                "approval_threshold": fresh_decision.threshold,
             }
         actor = f"auto:{fresh_decision.mode}"
         decision_metadata = {

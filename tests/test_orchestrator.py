@@ -250,6 +250,64 @@ def test_orchestrator_escape_hatch_blocks_partial_auto_approval(db_path, config)
     assert result["approval_reason"] == "escape_hatch_active"
 
 
+def test_orchestrator_preserves_commit_time_auto_approval_denial(db_path, config):
+    from agentic_pipeline.agents.classifier_types import BookProfile, BookType
+    from agentic_pipeline.autonomy import AutonomyConfig
+    from agentic_pipeline.orchestrator import Orchestrator
+    from agentic_pipeline.validation import ValidationResult
+    from unittest.mock import MagicMock
+
+    AutonomyConfig(db_path).set_mode("partial")
+    orchestrator = Orchestrator(config)
+    orchestrator.classifier = MagicMock()
+    orchestrator.classifier.classify.return_value = BookProfile(
+        book_type=BookType.TECHNICAL_TUTORIAL,
+        confidence=0.99,
+        suggested_tags=["python"],
+        reasoning="Test",
+    )
+    processing_result = {
+        "book_id": "test-book-id",
+        "quality_score": 95,
+        "detection_confidence": 0.99,
+        "detection_method": "mock",
+        "needs_review": False,
+        "warnings": [],
+        "chapter_count": 10,
+        "word_count": 50000,
+        "llm_fallback_used": False,
+    }
+    validation = ValidationResult(
+        passed=True,
+        reasons=[],
+        warnings=[],
+        metrics={"chapter_count": 10},
+    )
+    commit_denial = {
+        "success": False,
+        "state": "pending_approval",
+        "error": "auto_approval_denied",
+        "approval_reason": "escape_hatch_active",
+    }
+
+    with patch.object(orchestrator, "_run_processing", return_value=processing_result):
+        with patch.object(orchestrator, "_compute_hash", return_value="late-escape-hash"):
+            with patch.object(orchestrator, "_extract_sample", return_value="text"):
+                with patch(
+                    "agentic_pipeline.validation.extraction_validator.ExtractionValidator.validate",
+                    return_value=validation,
+                ):
+                    with patch(
+                        "agentic_pipeline.approval.actions.approve_book",
+                        return_value=commit_denial,
+                    ):
+                        result = orchestrator.process_one("/book.epub")
+
+    assert result["state"] == "pending_approval"
+    assert result["approval_reason"] == "escape_hatch_active"
+    assert result["error"] == "auto_approval_denied"
+
+
 def test_autonomy_policy_error_fails_closed(config):
     from agentic_pipeline.orchestrator import Orchestrator
 

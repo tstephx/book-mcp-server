@@ -291,6 +291,8 @@ def test_auto_approval_rechecks_escape_hatch_before_state_change(db_path):
         "state": PipelineState.PENDING_APPROVAL.value,
         "error": "auto_approval_denied",
         "approval_reason": "escape_hatch_active",
+        "autonomy_mode": "supervised",
+        "approval_threshold": None,
     }
     assert repo.get(pid)["state"] == PipelineState.PENDING_APPROVAL.value
     assert AuditTrail(db_path).query(action="approved") == []

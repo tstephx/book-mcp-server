@@ -558,9 +558,9 @@ class Orchestrator:
         )
         result["book_type"] = profile.get("book_type")
         result["confidence"] = confidence
-        result["approval_reason"] = approval_decision.reason
-        result["autonomy_mode"] = approval_decision.mode
-        result["approval_threshold"] = approval_decision.threshold
+        result.setdefault("approval_reason", approval_decision.reason)
+        result.setdefault("autonomy_mode", approval_decision.mode)
+        result.setdefault("approval_threshold", approval_decision.threshold)
         return result
 
     @staticmethod
