@@ -1,10 +1,24 @@
 """Autonomy configuration manager."""
 
+import math
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from agentic_pipeline.db.connection import get_pipeline_db
+
+
+@dataclass(frozen=True)
+class AutoApprovalDecision:
+    """Explain a fail-closed automatic approval decision."""
+
+    should_auto_approve: bool
+    mode: str
+    reason: str
+    book_type: str
+    confidence: float
+    threshold: Optional[float] = None
 
 
 class AutonomyConfig:
@@ -92,15 +106,91 @@ class AutonomyConfig:
                 return None
             return row["manual_override"] if row["manual_override"] else row["auto_approve_threshold"]
 
-    def should_auto_approve(self, book_type: str, confidence: float) -> bool:
-        """Determine if a book should be auto-approved."""
-        mode = self.get_mode()
+    def _get_settings(self) -> dict:
+        with get_pipeline_db(self.db_path) as conn:
+            row = conn.execute("SELECT * FROM autonomy_config WHERE id = 1").fetchone()
+        return dict(row) if row else {
+            "current_mode": "supervised",
+            "escape_hatch_active": True,
+        }
 
+    def _auto_approvals_today(self) -> int:
+        with get_pipeline_db(self.db_path) as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) AS total
+                   FROM approval_audit
+                   WHERE action = 'approved'
+                   AND actor LIKE 'auto:%'
+                   AND date(performed_at) = date('now')"""
+            ).fetchone()
+        return int(row["total"]) if row else 0
+
+    def evaluate_auto_approval(
+        self,
+        book_type: str,
+        confidence: float,
+        *,
+        validation_passed: bool = True,
+        needs_review: bool = False,
+    ) -> AutoApprovalDecision:
+        """Evaluate automatic approval using the stored autonomy controls."""
+        settings = self._get_settings()
+        stored_mode = settings.get("current_mode") or "supervised"
+        escape_hatch_active = bool(settings.get("escape_hatch_active"))
+        mode = "supervised" if escape_hatch_active else stored_mode
+
+        def deny(reason: str, threshold: Optional[float] = None) -> AutoApprovalDecision:
+            return AutoApprovalDecision(
+                should_auto_approve=False,
+                mode=mode,
+                reason=reason,
+                book_type=book_type,
+                confidence=confidence,
+                threshold=threshold,
+            )
+
+        if escape_hatch_active:
+            return deny("escape_hatch_active")
         if mode == "supervised":
-            return False
+            return deny("supervised_mode")
+        if not isinstance(confidence, (int, float)) or not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+            return deny("invalid_confidence")
+        if not book_type or book_type == "unknown":
+            return deny("unknown_book_type")
+        if not validation_passed:
+            return deny("validation_failed")
+        if needs_review:
+            return deny("needs_review")
 
-        threshold = self.get_threshold(book_type)
-        if threshold is None:
-            return False
+        daily_limit = settings.get("max_auto_approvals_per_day")
+        if daily_limit is not None and self._auto_approvals_today() >= int(daily_limit):
+            return deny("daily_limit_reached")
 
-        return confidence >= threshold
+        if mode == "partial":
+            threshold = settings.get("auto_approve_threshold")
+        elif mode == "confident":
+            threshold = self.get_threshold(book_type)
+        else:
+            return deny("invalid_mode")
+
+        if (
+            not isinstance(threshold, (int, float))
+            or not math.isfinite(threshold)
+            or not 0.0 <= threshold <= 1.0
+        ):
+            return deny("threshold_unavailable")
+        if confidence < threshold:
+            return deny("below_threshold", threshold)
+
+        return AutoApprovalDecision(
+            should_auto_approve=True,
+            mode=mode,
+            reason="approved",
+            book_type=book_type,
+            confidence=confidence,
+            threshold=threshold,
+        )
+
+    def should_auto_approve(self, book_type: str, confidence: float) -> bool:
+        """Compatibility wrapper for callers that only need a boolean."""
+        return self.evaluate_auto_approval(book_type, confidence).should_auto_approve
