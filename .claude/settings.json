@@ -24,6 +24,7 @@
     ]
   },
   "enabledPlugins": {
-    "commands-database-operations@buildwithclaude": true
+    "commands-database-operations@buildwithclaude": true,
+    "agents-quality-security@buildwithclaude": true
   }
 }
