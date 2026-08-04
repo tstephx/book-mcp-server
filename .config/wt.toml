@@ -31,3 +31,6 @@ deps = "uv sync --locked --python 3.12 --extra dev"
 
 [pre-merge]
 test = ".venv/bin/python -m pytest -q"
+
+[pre-commit]
+lint = ".venv/bin/ruff check ."
