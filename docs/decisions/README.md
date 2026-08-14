@@ -20,3 +20,4 @@ if a decision is reversed, a new ADR is added superseding the old one.
 | [005](005-rrf-hybrid-search.md) | RRF hybrid search combining FTS5 + semantic vectors | Accepted |
 | [006](006-fastmcp-stdio-servers.md) | Two separate FastMCP stdio servers (library + pipeline) | Accepted |
 | [007](007-slug-id-resolution.md) | Slug ID resolution — accept partial titles in place of UUIDs | Accepted |
+| [008](008-db-schema-skills-eval.md) | db-schema skills evaluation across DB-backed repos | Accepted |
