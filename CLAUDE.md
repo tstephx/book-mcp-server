@@ -193,7 +193,7 @@ python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 - New book not searchable → confirm pipeline reached `COMPLETE` state; embeddings generated at approval time
 
 ## Architecture Decisions
-1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row)
+1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row). Both this connection and the MCP-tool-side `src/database.py`'s `get_db_connection()` set `PRAGMA foreign_keys = ON` (PR #10, 2026-08-14) — `ON DELETE CASCADE` now fires consistently on either path. See `ref/db-schema.md` / the `db-schema` skill before touching delete/cascade behavior.
 2. **Inline embedding** — `approve_book()` runs full APPROVED → EMBEDDING → COMPLETE flow
 3. **ProcessingAdapter** — wraps `book-ingestion` as library (lazy-imported)
 4. **Hybrid Search** — RRF combines FTS5 keyword + semantic vector; optional MMR for diversity
@@ -248,4 +248,4 @@ This is why `pyproject.toml`'s `[tool.uv]` section pins exact versions via `cons
 
 ---
 
-*Last updated: 2026-07-16*
+*Last updated: 2026-08-14*

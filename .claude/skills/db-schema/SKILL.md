@@ -38,21 +38,22 @@ To verify a specific column actually exists:
 
 ## Known traps
 
-- **`ON DELETE CASCADE` is not enforced on every connection.** The DDL declares
-  `ON DELETE CASCADE` from `chapters`/`chunks`/`chapter_summaries`/
-  `reading_progress`/`bookmarks` back to `books`/`chapters`. But
-  `src/database.py`'s `get_db_connection()` (line 23, used by every MCP tool in
-  `src/tools/`) never runs `PRAGMA foreign_keys = ON`. Only
-  `agentic_pipeline/db/connection.py`'s `get_pipeline_db()` (line 15) sets it,
-  at line 36 — and both connect to the *same* `library.db` file by default.
-  Reading the DDL alone says deleting a book always cleans up its chapters;
-  in practice cascade only fires through the pipeline connection path. The
-  pipeline code doesn't even trust its own cascade — `orchestrator.py:288-289`
-  and `cli.py:1230-1231` hand-delete `chapters_fts`/`chapter_summaries`/
-  `chunks`/`chapters` rows before deleting the `books` row rather than relying
-  on it. A future MCP tool built with `src.database.get_db_connection()` that
-  does `DELETE FROM books` will silently orphan chapters, chunks, summaries,
-  reading progress, and bookmarks — no error, no warning.
+- **`ON DELETE CASCADE` is now enforced on both connections (fixed
+  book-mcp-server#9, PR #10, 2026-08-14).** The DDL declares `ON DELETE
+  CASCADE` from `chapters`/`chunks`/`chapter_summaries`/`reading_progress`/
+  `bookmarks` back to `books`/`chapters`. Both `src/database.py`'s
+  `get_db_connection()` (line 23, used by every MCP tool in `src/tools/`, sets
+  the pragma at line 42) and `agentic_pipeline/db/connection.py`'s
+  `get_pipeline_db()` (line 15, sets it at line 36) now run `PRAGMA
+  foreign_keys = ON` — before the fix, only the pipeline side did, so cascade
+  silently didn't fire through the MCP-tool path even though both connect to
+  the same `library.db` file. A new MCP delete tool built the normal way
+  (`src.database.get_db_connection()` + `DELETE FROM books`) will now cascade
+  correctly instead of orphaning rows. Note the pipeline code still doesn't
+  trust its own cascade defensively — `orchestrator.py:288-289` and
+  `cli.py:1230-1231` hand-delete `chapters_fts`/`chapter_summaries`/`chunks`/
+  `chapters` rows before deleting the `books` row rather than relying on it;
+  that's now redundant-but-harmless, not a bug.
 
 - **Schema is split across a different repo and two files in this one.**
   `books` and `chapters`' base columns are created in
