@@ -177,6 +177,17 @@ python -m pytest tests/test_phase5*.py -v            # Specific phase
 python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 ```
 
+**Pre-push gate.** Hosted CI (`.github/workflows/ci.yml`) is dormant:
+GitHub Actions is billing-blocked account-wide (taylor-dev-core issue
+#81) and the owner decided not to restore it. The workflow file stays in
+place and resumes automatically if billing is ever fixed. Local
+replacement: a tracked `scripts/pre-push-verify.sh` git hook, installed
+per clone (`.git/hooks` is untracked) via
+`ln -sf ../../scripts/pre-push-verify.sh .git/hooks/pre-push` from the
+repository root, runs `uv sync --locked` then `make lint && make test`
+before any `git push` and blocks it on failure. Emergency bypass:
+`git push --no-verify`.
+
 ## Embeddings
 
 **Model:** OpenAI `text-embedding-3-large` (3072 dims). Requires `OPENAI_API_KEY`.
