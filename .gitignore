@@ -44,3 +44,4 @@ entities.json
 # Local Claude Code settings (personal overrides, not shared)
 **/.claude/settings.local.json
 .claude/.session-receipt.local.json
+.claude-handoff.local.md

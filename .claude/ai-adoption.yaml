@@ -1,0 +1,4 @@
+profile: mcp-server
+commands:
+  verify: scripts/pre-push-verify.sh
+  audit: null
