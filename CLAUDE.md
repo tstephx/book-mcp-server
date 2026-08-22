@@ -82,38 +82,22 @@ make test-integration  # requires real DB + OPENAI_API_KEY
 ## Key Concepts
 
 ### Pipeline States
-Books flow through: `DETECTED` → `HASHING` → `CLASSIFYING` → `SELECTING_STRATEGY` → `PROCESSING` → `VALIDATING` → `PENDING_APPROVAL` → `APPROVED` → `EMBEDDING` → `COMPLETE`
-
-Every validated book reaches `PENDING_APPROVAL`. `AutonomyConfig.evaluate_auto_approval()` may then approve it through the shared audited approval action. Supervised mode, the escape hatch, failed validation, `needs_review`, unknown types, invalid confidence, missing thresholds, policy errors, and the daily cap all fail closed and keep the book pending. Approval runs embedding inline — no separate worker needed.
+Pipeline states and auto-approval guardrails — see `ref/pipeline-architecture.md`.
 
 ### Classifier Providers
-`ClassifierAgent` (`agentic_pipeline/agents/classifier.py`) tries a primary then a fallback provider. Default chain: **`claude-code`** (`claude -p`, subscription billing, no API key) → **`openai`**. `CLASSIFIER_PROVIDER=claude-code|openai` forces one provider with no fallback (invalid value fails loud). Providers implement `LLMProvider` (`agents/providers/`) and share `parse_profile_json` from `providers/base.py`. The launchd worker needs `claude` on its PATH — `scripts/run-worker.sh` exports `~/.local/bin`.
+Provider chain and fallback — see `ref/module-map.md:48`. The launchd worker needs `claude` on its PATH — `scripts/run-worker.sh` exports `~/.local/bin`.
 
 ### Chunking & Re-chunking
-`src/utils/chunker.py` `chunk_chapter()` packs paragraphs to ~500 words; segments over `2*target` (1,000 words) fall through to overlapped **sentence windows** (fixes wall-of-text chapters that used to pass through as one fat chunk). Search reads `chunks.embedding` (chunk-level). Bulk re-chunk via `agentic-pipeline rechunk` (stages into `chunks_staging`, hash-keyed embedding reuse, retrieval-eval gate) then `rechunk --swap` (atomic, backs up, bumps `library_meta.data_version` so MCP-server caches self-invalidate). Gold eval sets in `eval/gold-queries*.json`.
+Chunking, re-chunking, and the eval gate — see `ref/module-map.md`, `ref/cli-commands.md` (`rechunk`), and `ref/db-schema.md` (`chunks` table).
 
 ### Autonomy Modes
-- **supervised** — All books require human approval (default)
-- **partial** — Auto-approve eligible known types at `autonomy_config.auto_approve_threshold` (default 0.95)
-- **confident** — Auto-approve eligible known types at reviewed per-type thresholds
+Autonomy modes, thresholds, and guardrails — see `ref/pipeline-architecture.md`.
 
-Auto approvals enter feedback as `pending_review`; only human-approved/rejected
-feedback and completed spot checks contribute to accuracy and calibration.
-
-### File Watcher
-```bash
-agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline
-```
-Scans run as lowest-priority step in the poll loop. Deduplication via content hash — dropping the same file twice is a no-op.
-
-### Auto-Archive
-```bash
-agentic-pipeline worker --watch-dir ~/Documents/_ebooks/agentic-book-pipeline --processed-dir ~/Documents/_ebooks/agentic-book-pipeline/processed
-```
-Files in `processed_dir` are excluded from watch scans. Name collisions handled with counter suffixes. Archive failures logged but don't affect pipeline state.
+### Watcher & Auto-Archive
+Watcher and auto-archive behavior — see `ref/pipeline-architecture.md`.
 
 ### Book ID Resolution
-Tool calls that accept a `book_id` parameter also accept partial title slugs. `resolve_book_id()` in `src/utils/validators.py` handles resolution: UUID fast path → fuzzy LIKE title match → did-you-mean error. All book_tools, chapter_tools, and server.py call this instead of the old `validate_book_id()`.
+Book ID resolution (partial-slug matching) — see `ref/mcp-tools.md`.
 
 ### Escape Hatch
 ```bash
@@ -123,16 +107,7 @@ One command reverts to fully supervised mode.
 
 ## Tuning Knobs
 
-| Knob | File | Symbol | Env override | Default |
-|------|------|--------|-------------|---------|
-| Classifier fallback threshold | `agentic_pipeline/config.py` | `confidence_threshold` | `CONFIDENCE_THRESHOLD` | 0.7 |
-| Partial auto-approve threshold | `autonomy_config` table | `auto_approve_threshold` | — | 0.95 |
-| Confident auto-approve thresholds | `autonomy_thresholds` table | `auto_approve_threshold` / `manual_override` | — | Per book type |
-| Daily automatic approval cap | `autonomy_config` table | `max_auto_approvals_per_day` | — | 50 |
-| Processing timeout | `agentic_pipeline/config.py` | `processing_timeout` | `PROCESSING_TIMEOUT_SECONDS` | 600s |
-| Embedding timeout | `agentic_pipeline/config.py` | `embedding_timeout` | `EMBEDDING_TIMEOUT_SECONDS` | 300s |
-| Worker poll interval | `agentic_pipeline/config.py` | `worker_poll_interval` | `WORKER_POLL_INTERVAL_SECONDS` | 5s |
-| Max retries | `agentic_pipeline/config.py` | `max_retry_attempts` | `MAX_RETRY_ATTEMPTS` | 3 |
+All tunable knobs (file, symbol, env override, default) — see `ref/pipeline-architecture.md`'s Configuration table.
 
 ## If Something Breaks
 
@@ -153,21 +128,11 @@ One command reverts to fully supervised mode.
 4. Add MCP tool if Claude should use it
 5. Run `python -m pytest tests/ -v`
 
-### Database Changes
-1. Add migration to `agentic_pipeline/db/migrations.py` in `MIGRATIONS` list
-2. Write test in `tests/test_*_migrations.py`
-3. Existing DBs auto-migrate on `run_migrations()`
-
-### Adding CLI Commands
-Commands in `agentic_pipeline/cli.py` using Click.
-
-### Adding MCP Tools
-Pipeline tools in `agentic_pipeline/mcp_server.py`. Library tools in `src/tools/*.py`.
+### Database Changes, CLI Commands, MCP Tools
+Adding a migration/CLI command/MCP tool — use the `new-migration`/`new-cli-command`/`new-mcp-tool` skills.
 
 ### Architecture Decisions
-Major decisions are recorded in `docs/decisions/` as numbered ADRs. When making
-a significant architectural choice, add an ADR. When in-progress design docs exist,
-they live in `docs/active/` and move to `docs/archive/` when complete.
+New architecture decision or design doc — use the `new-adr`/`design-doc` skills.
 
 ## Testing
 
@@ -176,6 +141,8 @@ python -m pytest tests/ -v                          # All tests
 python -m pytest tests/test_phase5*.py -v            # Specific phase
 python -m pytest tests/ --cov=agentic_pipeline       # With coverage
 ```
+
+Manual QA checklist — see `docs/MANUAL-TEST-PLAN.md`.
 
 **Pre-push gate.** Hosted CI (`.github/workflows/ci.yml`) is dormant:
 GitHub Actions is billing-blocked account-wide (taylor-dev-core issue
@@ -192,16 +159,9 @@ before any `git push` and blocks it on failure. Emergency bypass:
 
 **Model:** OpenAI `text-embedding-3-large` (3072 dims). Requires `OPENAI_API_KEY`.
 
-**How embeddings are generated:**
-- **Pipeline path** — `approve_book()` runs inline: `APPROVED → EMBEDDING → COMPLETE`. No separate worker.
-- **Manual refresh** — Ask Claude `"refresh embeddings"` (calls `refresh_embeddings` MCP tool), or run `python -m pytest tests/test_openai_embeddings.py` to verify.
-- **Summary embeddings** — separate from chapter embeddings; call `generate_summary_embeddings` MCP tool.
+**Manual refresh** — Ask Claude `"refresh embeddings"` (calls `refresh_embeddings` MCP tool).
 
-**Where they live:** `chunks.embedding` column (BLOB, numpy float32 array) is the primary search surface (chunk-level); `chapters.embedding` is a separate chapter-level surface. Indexed via cosine similarity at query time — no separate vector store. In-memory chunk-matrix caches (book-library MCP server) self-invalidate on a `library_meta.data_version` bump, so a bulk `rechunk --swap` takes effect without a restart.
-
-**Troubleshooting:**
-- Semantic search returns nothing → check `OPENAI_API_KEY` is set; run `refresh_embeddings`
-- New book not searchable → confirm pipeline reached `COMPLETE` state; embeddings generated at approval time
+Storage and cache-invalidation detail — see `ref/db-schema.md`'s Embedding Table section.
 
 ## Architecture Decisions
 1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row). Both this connection and the MCP-tool-side `src/database.py`'s `get_db_connection()` set `PRAGMA foreign_keys = ON` (PR #10, 2026-08-14) — `ON DELETE CASCADE` now fires consistently on either path. See `ref/db-schema.md` / the `db-schema` skill before touching delete/cascade behavior.
@@ -214,48 +174,15 @@ before any `git push` and blocks it on failure. Emergency bypass:
 
 ## Book Library Tools (Claude Desktop)
 
-| Category | Tools |
-|----------|-------|
-| **Search** | `semantic_search`, `hybrid_search`, `text_search`, `search_titles`, `search_all_books` |
-| **Discovery** | `get_topic_coverage`, `find_related_content`, `extract_code_examples` |
-| **Reading** | `list_books`, `get_book_info`, `get_table_of_contents`, `get_chapter`, `get_section`, `list_sections` |
-| **Learning** | `teach_concept`, `generate_learning_path`, `create_study_guide` |
-| **Planning** | `generate_project_learning_path`, `list_project_templates`, `generate_implementation_plan`, `list_implementation_templates`, `get_phase_prompts`, `generate_brd`, `generate_wireframe_brief`, `list_architecture_templates`, `analyze_project` |
-| **Progress** | `mark_as_reading`, `mark_as_read`, `get_reading_progress`, `add_bookmark`, `get_bookmarks`, `remove_bookmark` |
-| **Export** | `export_chapter_to_markdown` |
-| **Library** | `library_status`, `get_library_statistics`, `audit_chapter_quality`, `get_summary`, `summarize_book`, `refresh_embeddings`, `generate_summary_embeddings` |
-
-Example: "Search my books for Kubernetes content". See `docs/USER-GUIDE.md` for full usage.
+Example: "Search my books for Kubernetes content". See `ref/mcp-tools.md` for the full tool index by category, `docs/USER-GUIDE.md` for usage, and `docs/PROJECT-PLANNING-QUICKREF.md`, `docs/PROJECT-PLANNING-TOOLS.md`, `docs/PROJECT-LEARNING-TOOLS.md` for Planning/Learning tool usage guides.
 
 ## MCP Client Config
 
-Add to `.mcp.json` in any project that needs the book library:
+First-time setup and Claude Desktop / other-project `.mcp.json` configuration for the book library — see `docs/QUICKSTART.md`.
 
-```json
-{
-  "mcpServers": {
-    "book-library": {
-      "command": "/Users/taylorstephens/Dev/_Projects/book-mcp-server/.venv/bin/python",
-      "args": ["/Users/taylorstephens/Dev/_Projects/book-mcp-server/server.py"],
-      "env": {
-        "BOOK_DB_PATH": "/Users/taylorstephens/Library/Application Support/book-library/library.db",
-        "BOOKS_DIR": "/Users/taylorstephens/Library/Application Support/book-library/books",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
-      }
-    }
-  }
-}
-```
+### `agentic-pipeline` is a shared MCP provider
 
-**Critical:** Command must use the **venv python** (has mcp, fastmcp, openai deps). Env vars are `BOOK_DB_PATH` and `BOOKS_DIR` (NOT `BOOK_LIBRARY_DB`/`LIBRARY_PATH`). Do NOT use `uv`.
-
-### `agentic-pipeline` is a shared MCP provider — this is deliberate, not accidental coupling
-
-`agentic_mcp_server.py` in this repo is launched directly out of **this project's own `.venv`** by other projects' `.mcp.json` files, via a hardcoded absolute path (e.g. `/Users/taylorstephens/Dev/_Projects/book-mcp-server/.venv/bin/python .../agentic_mcp_server.py`). Current consumers: **periodical-parser**, **book-ingestion-python**. (Two other consumers named in the `[tool.uv]` pyproject.toml comment — archana-portfolio, archana-interview — are archived and no longer active.)
-
-This is why `pyproject.toml`'s `[tool.uv]` section pins exact versions via `constraint-dependencies` instead of letting `uv lock` resolve freely — an unconstrained relock drifted 67 packages in one pass, which would silently break every consumer launching out of this venv. **The pinning discipline is the safety net for the coupling, not a separate concern.** Do not "fix" this by packaging `agentic-pipeline` as an installable dependency for each consumer to `pip install -e` into their own venv — that trades one working, actively-maintained pattern for a second point of drift (now N venvs to keep in sync instead of one pinned one), with no corresponding benefit.
-
-**Upgrade procedure** (from the pyproject.toml comment, restated here since that's not where a future session would look first): bump the pin in `constraint-dependencies`, re-run `uv lock --python 3.12`, re-run this repo's test suite, then **smoke-test each consumer** (periodical-parser, book-ingestion-python) by actually invoking their `agentic-pipeline` MCP tools before considering the upgrade done.
+Before touching `pyproject.toml`'s `[tool.uv] constraint-dependencies`, or when a new project wants to consume `agentic-pipeline` as an MCP server — read `docs/shared-mcp-provider.md`.
 
 ---
 
