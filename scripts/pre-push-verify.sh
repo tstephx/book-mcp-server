@@ -37,10 +37,7 @@ cd "$repository_root"
 
 # Portability regression guard: tracked .claude/**, .mcp.json, and CLAUDE.md
 # must not gain a fresh-clone-breaking /Users/... path. The allowlist below
-# covers two reviewed exceptions: the taylor-dev-core marketplace's
-# version-pinned directory source in .claude/settings.json (fleet portability
-# audit, 2026-08-21 -- centrally managed by fleet promotion tooling, degrades
-# gracefully if absent), and .mcp.json's shared book-library DB default
+# covers one reviewed exception: .mcp.json's shared book-library DB default
 # (same external-data default documented in CLAUDE.md's Environment
 # Variables table, overridable via AGENTIC_PIPELINE_DB) -- .mcp.json is
 # currently .gitignore'd so this entry is a no-op today, kept so the guard
@@ -55,7 +52,7 @@ done < <(git -C "$repository_root" ls-files -- '.claude' '.mcp.json' 'CLAUDE.md'
 portability_hits=""
 if [[ ${#portability_targets[@]} -gt 0 ]]; then
   portability_hits="$(grep -Hn '/Users/' "${portability_targets[@]}" 2>/dev/null \
-    | grep -vE '/Users/taylorstephens/Dev/_Workspace/\.harness-releases/taylor-dev-core/|/Users/taylorstephens/Library/Application Support/book-library/library\.db' \
+    | grep -vE '/Users/taylorstephens/Library/Application Support/book-library/library\.db' \
     || true)"
 fi
 
