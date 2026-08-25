@@ -155,6 +155,15 @@ repository root, runs `uv sync --locked` then `make lint && make test`
 before any `git push` and blocks it on failure. Emergency bypass:
 `git push --no-verify`.
 
+**Pre-commit gate.** Local secret scan via `gitleaks` — a tracked
+`scripts/pre-commit-verify.sh` git hook, installed per clone the same way
+(`.git/hooks` is untracked) via
+`ln -sf ../../scripts/pre-commit-verify.sh .git/hooks/pre-commit` from the
+repository root, runs `gitleaks protect --staged --redact` before any
+`git commit` and blocks it if a live credential is staged. Requires
+`gitleaks` on `PATH` (`brew install gitleaks`); the hook fails closed if
+it's missing. Emergency bypass: `git commit --no-verify`.
+
 ## Embeddings
 
 **Model:** OpenAI `text-embedding-3-large` (3072 dims). Requires `OPENAI_API_KEY`.
