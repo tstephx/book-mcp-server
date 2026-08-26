@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-sqlite",
+        "--db-path",
+        "./data/pipeline.db"
+      ]
+    },
+    "agentic-pipeline": {
+      "command": ".venv/bin/python",
+      "args": [
+        "agentic_mcp_server.py"
+      ],
+      "env": {
+        "AGENTIC_PIPELINE_DB": "${AGENTIC_PIPELINE_DB:-/Users/taylorstephens/Library/Application Support/book-library/library.db}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}"
+      }
+    }
+  }
+}

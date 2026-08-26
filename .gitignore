@@ -21,7 +21,6 @@ build/
 *.swo
 
 # Project specific
-.mcp.json
 .worktrees/
 *.db
 *.sqlite
