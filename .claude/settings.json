@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE_PATH=$(cat | jq -r '.tool_input.file_path // empty'); if [[ \"$FILE_PATH\" == *.py ]]; then .venv/bin/ruff format --quiet \"$FILE_PATH\" 2>/dev/null; fi"
+            "command": "FILE_PATH=$(cat | jq -r '.tool_input.file_path // empty'); if [[ \"$FILE_PATH\" == *.py ]]; then \"${CLAUDE_PROJECT_DIR}/.venv/bin/ruff\" format --quiet \"$FILE_PATH\" 2>/dev/null; fi"
           }
         ]
       }
