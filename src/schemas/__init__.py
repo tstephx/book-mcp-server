@@ -10,17 +10,13 @@ This ensures:
 - Type safety
 """
 
-from .tool_schemas import SearchInput, SemanticSearchInput, BookIdInput, ChapterInput, ChapterRangeInput
+from .tool_schemas import SemanticSearchInput
 
 from .response_schemas import SearchResult, SearchResponse, BookInfo, ChapterInfo, ErrorResponse
 
 __all__ = [
     # Input schemas
-    "SearchInput",
     "SemanticSearchInput",
-    "BookIdInput",
-    "ChapterInput",
-    "ChapterRangeInput",
     # Response schemas
     "SearchResult",
     "SearchResponse",
