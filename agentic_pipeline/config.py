@@ -34,12 +34,15 @@ class OrchestratorConfig:
         """Create configuration from environment variables."""
         watch_dir_str = os.environ.get("WATCH_DIR")
         processed_dir_str = os.environ.get("PROCESSED_DIR")
+        embedding_timeout = int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300))
+        if embedding_timeout <= 0:
+            raise ValueError(f"EMBEDDING_TIMEOUT_SECONDS must be positive, got {embedding_timeout}")
         return cls(
             db_path=get_db_path(),
             watch_dir=Path(watch_dir_str) if watch_dir_str else None,
             processed_dir=Path(processed_dir_str).resolve() if processed_dir_str else None,
             processing_timeout=int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", 600)),
-            embedding_timeout=int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300)),
+            embedding_timeout=embedding_timeout,
             confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", 0.7)),
             worker_poll_interval=int(os.environ.get("WORKER_POLL_INTERVAL_SECONDS", 5)),
             max_retry_attempts=int(os.environ.get("MAX_RETRY_ATTEMPTS", 3)),

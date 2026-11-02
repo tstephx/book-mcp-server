@@ -156,7 +156,7 @@ All values overridable via env vars:
 |------|---------|---------|
 | Classifier fallback threshold | `CONFIDENCE_THRESHOLD` | `0.7` |
 | Processing timeout | `PROCESSING_TIMEOUT_SECONDS` | `600s` |
-| Embedding timeout | `EMBEDDING_TIMEOUT_SECONDS` | `300s` — enforced in `approval.actions._complete_approved` (daemon thread + join). On timeout the book goes to `NEEDS_RETRY` with `failed_in: "embedding"`; the timed-out call is not cancelled and may finish later |
+| Embedding timeout | `EMBEDDING_TIMEOUT_SECONDS` | `300s` — enforced in `approval.actions._complete_approved` (daemon thread + join). On timeout the book goes to `NEEDS_RETRY` with `failed_in: "embedding"`; the timed-out call is not cancelled and may finish later (or die with the CLI process). Retries re-embed chunks left without embeddings, and `_complete_approved` refuses COMPLETE while any chunk for the book is unembedded. Timeouts count against `max_retry_attempts` |
 | Worker poll interval | `WORKER_POLL_INTERVAL_SECONDS` | `5s` |
 | Max retries | `MAX_RETRY_ATTEMPTS` | `3` |
 | Pipeline DB | `AGENTIC_PIPELINE_DB` | — |

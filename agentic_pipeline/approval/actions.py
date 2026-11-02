@@ -220,7 +220,7 @@ def _call_with_timeout(fn, timeout: float, **kwargs):
     def runner():
         try:
             box["result"] = fn(**kwargs)
-        except BaseException as e:  # noqa: BLE001 - re-raised in the caller
+        except Exception as e:  # SystemExit/KeyboardInterrupt are left to propagate
             box["error"] = e
 
     thread = threading.Thread(target=runner, daemon=True, name="embedding-call")
@@ -231,6 +231,17 @@ def _call_with_timeout(fn, timeout: float, **kwargs):
     if "error" in box:
         raise box["error"]
     return box["result"]
+
+
+def _count_unembedded_chunks(db_path: Path, book_id: str) -> int:
+    from agentic_pipeline.db.connection import get_pipeline_db
+
+    with get_pipeline_db(str(db_path)) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM chunks WHERE book_id = ? AND embedding IS NULL",
+            (book_id,),
+        ).fetchone()
+    return row["n"]
 
 
 def _complete_approved(
@@ -250,12 +261,15 @@ def _complete_approved(
     routes back here. No sqlite transaction is held while waiting.
 
     Known limit: the timed-out call is not cancelled and may still finish
-    later. generate_embeddings only selects chapters with no chunk rows, so a
-    retry normally skips chapters the orphan already chunked (it may then
-    report success with 0 chapters while the orphan still fills in embeddings).
-    The narrow race is a retry starting while the orphan is still in its
-    chunk-insert phase: both do INSERT OR REPLACE on the same chunk ids, and a
-    replace can reset an embedding the other already wrote to NULL.
+    later (or die with the process, for the CLI). Chunk rows are committed
+    before embedding, so a timeout can leave chunks with embedding NULL;
+    generate_embeddings re-selects such chapters on retry, and this function
+    refuses COMPLETE while any chunk for the book is unembedded. The residual
+    race is a retry overlapping a still-running orphan in its chunk-insert
+    phase: both INSERT OR REPLACE the same ids and one can reset an embedding
+    the other wrote to NULL; the unembedded check then sends the book around
+    the retry loop again rather than publishing it. Timeouts count against
+    max_retry_attempts.
     """
     if embedding_timeout is None:
         from agentic_pipeline.config import OrchestratorConfig
@@ -292,6 +306,12 @@ def _complete_approved(
                 "state": PipelineState.NEEDS_RETRY.value,
                 "embedding_error": result.error,
             }
+
+        # Fail loudly rather than publish a book whose chunks lack embeddings
+        # (e.g. an earlier attempt timed out after committing chunk rows).
+        unembedded = _count_unembedded_chunks(db_path, book_id)
+        if unembedded:
+            raise RuntimeError(f"{unembedded} chunk(s) for {book_id} still have no embedding")
 
         # Make the chapters keyword-searchable (text_search). Best-effort:
         # sync_book_fts swallows its own errors, so an index problem can't fail approval.

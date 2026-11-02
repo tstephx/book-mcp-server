@@ -5,6 +5,7 @@ approve_book() (background thread or background=False) and from the
 orchestrator's retry/worker loop.
 """
 
+import json
 import sys
 import threading
 import time
@@ -45,8 +46,6 @@ def _history_error(db_path, pid):
             "WHERE pipeline_id = ? AND to_state = 'needs_retry' ORDER BY id DESC LIMIT 1",
             (pid,),
         ).fetchone()
-    import json
-
     return json.loads(row["error_details"])
 
 
@@ -147,3 +146,97 @@ def test_fast_embedding_unaffected_by_timeout(MockAdapter, db_path):
     result = _complete_approved(db_path, pid, pipeline, embedding_timeout=5)
 
     assert result["state"] == PipelineState.COMPLETE.value
+
+
+def test_unembedded_chunks_block_complete(MockAdapter, db_path):
+    """If the adapter reports success but chunks still lack embeddings, the book
+    must not reach COMPLETE (a retry after a Phase-2 timeout used to do exactly that)."""
+    import sqlite3
+
+    from agentic_pipeline.approval.actions import _complete_approved
+
+    MockAdapter.return_value.generate_embeddings.return_value = _ok_result()
+    pid, pipeline = _setup_approved_pipeline(db_path)
+    processing_result = pipeline.get("processing_result")
+    if isinstance(processing_result, str):
+        processing_result = json.loads(processing_result)
+    book_id = processing_result.get("book_id", pid) if processing_result else pid
+
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute(
+        "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count) VALUES (?,?,?,?,?,?)",
+        ("c:0", "c", book_id, 0, "x", 1),
+    )
+    conn.commit()
+    conn.close()
+
+    result = _complete_approved(db_path, pid, pipeline, embedding_timeout=5)
+
+    assert result["state"] == PipelineState.NEEDS_RETRY.value
+    assert _history_error(db_path, pid)["failed_in"] == "embedding"
+
+
+def test_retry_after_timeout_completes(MockAdapter, db_path):
+    """Timed-out book -> Orchestrator._retry_one -> COMPLETE on a successful retry."""
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.db.pipelines import PipelineRepository
+    from agentic_pipeline.orchestrator.orchestrator import Orchestrator
+
+    release = threading.Event()
+    MockAdapter.return_value.generate_embeddings.side_effect = _hang(release)
+    pid, _ = _setup_approved_pipeline(db_path)
+    orch = Orchestrator(OrchestratorConfig(db_path=db_path, embedding_timeout=1))
+    try:
+        orch._complete_approved(pid)
+    finally:
+        release.set()
+    repo = PipelineRepository(db_path)
+    assert repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value
+    assert _history_error(db_path, pid)["timeout"] is True
+
+    MockAdapter.return_value.generate_embeddings.side_effect = None
+    MockAdapter.return_value.generate_embeddings.return_value = _ok_result()
+    orch._retry_one(repo.get(pid))
+
+    assert repo.get(pid)["state"] == PipelineState.COMPLETE.value
+
+
+def test_background_entry_point_times_out(MockAdapter, db_path, monkeypatch):
+    """approve_book(background=True) reaches the same timeout on its daemon thread."""
+    from agentic_pipeline.approval.actions import approve_book
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    monkeypatch.setenv("EMBEDDING_TIMEOUT_SECONDS", "1")
+    release = threading.Event()
+    MockAdapter.return_value.generate_embeddings.side_effect = _hang(release)
+    pid = _create_pending_pipeline(db_path)
+    try:
+        approve_book(db_path, pid, actor="human:taylor", background=True)
+        deadline = time.monotonic() + 2.5
+        repo = PipelineRepository(db_path)
+        while time.monotonic() < deadline:
+            if repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value:
+                break
+            time.sleep(0.05)
+    finally:
+        release.set()
+    assert repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value
+
+
+@pytest.mark.parametrize("bad", [0, -5])
+def test_non_positive_timeout_rejected(bad, monkeypatch):
+    """EMBEDDING_TIMEOUT_SECONDS<=0 would make every embed 'time out' instantly."""
+    from agentic_pipeline.config import OrchestratorConfig
+
+    monkeypatch.setenv("EMBEDDING_TIMEOUT_SECONDS", str(bad))
+    with pytest.raises(ValueError, match="EMBEDDING_TIMEOUT_SECONDS"):
+        OrchestratorConfig.from_env()
+
+
+def test_call_with_timeout_propagates_exceptions_and_results():
+    from agentic_pipeline.approval.actions import _call_with_timeout
+
+    assert _call_with_timeout(lambda x: x * 2, 1, x=4) == 8
+    with pytest.raises(KeyError):
+        _call_with_timeout(lambda: {}["missing"], 1)
