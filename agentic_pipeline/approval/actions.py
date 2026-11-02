@@ -240,6 +240,12 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
                 "embedding_error": result.error,
             }
 
+        # Make the chapters keyword-searchable (text_search). Best-effort:
+        # sync_book_fts swallows its own errors, so an index problem can't fail approval.
+        from agentic_pipeline.library.fts_index import sync_book_fts
+
+        sync_book_fts(db_path, book_id)
+
         repo.update_state(pipeline_id, PipelineState.COMPLETE)
 
         # Archive source file if configured, and follow it in the record —

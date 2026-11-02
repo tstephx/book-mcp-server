@@ -10,7 +10,7 @@ modified: '2026-03-05'
 
 Entry point: `agentic-pipeline` → `agentic_pipeline/cli.py` (Click)
 
-31 commands organized by category.
+32 commands organized by category.
 
 ## Pipeline Operations
 
@@ -72,6 +72,7 @@ Entry point: `agentic-pipeline` → `agentic_pipeline/cli.py` (Click)
 | `strategies` | — | List available processing strategies |
 | `audit` | `[--last] [--actor] [--action] [--book-id]` | Query the audit trail |
 | `doctor` | `[--fix] [--no-backup] [--manifest]` | Detect (and with `--fix`, repair) orphaned chunks, lost books, null content hashes, null book types. Exit codes: `0` clean report or `--fix` completed with no unresolved failures; `1` violations found (bare) or a fix category failed (e.g. CAS conflict archiving a lost book). `--fix` takes an automatic WAL-safe backup first (skippable via `--no-backup`) when anything will actually mutate, writes a lost-books manifest, and prints `reingest` commands for recoverable books. |
+| `fts-rebuild` | — | Rebuild the `chapters_fts` keyword index (behind `text_search`) from every chapter on disk. New approvals index themselves; run once for an existing library. Idempotent. Exit `1` if the FTS table is missing or the rebuild fails. |
 
 ## Common Workflows
 

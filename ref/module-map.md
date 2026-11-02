@@ -149,6 +149,7 @@ Quick reference: "which file handles X?"
 | File | Responsibility |
 |------|---------------|
 | `chapter_reader.py` | `read_chapter_content(file_path, books_dir)` — shared utility for reading chapter markdown from disk, handles split chapters |
+| `fts_index.py` | `sync_book_fts(db_path, book_id)` — indexes a book's chapters into `chapters_fts` (called from `_complete_approved`; best-effort, idempotent) |
 | `migration.py` | Helpers for chunking and re-embedding the full book library (one-time migrations) |
 | `status.py` | `LibraryStatus` — unified dashboard combining books, chapters, and pipeline state |
 | `rechunk.py` | Staged re-chunking: hash-keyed staging into `chunks_staging`, embedding, gate eval, atomic swap into `chunks` |

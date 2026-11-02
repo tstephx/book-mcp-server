@@ -149,7 +149,7 @@ def ensure_library_schema() -> None:
         cursor = conn.cursor()
         created = []
 
-        # --- FTS5 virtual table (empty — rebuild_fts_index() populates it) ---
+        # --- FTS5 virtual table (created empty — filled on approve by sync_book_fts, or by `agentic-pipeline fts-rebuild`) ---
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'")
         if not cursor.fetchone():
             cursor.execute("""
