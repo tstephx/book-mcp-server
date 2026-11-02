@@ -204,6 +204,8 @@ Random audit samples of auto-approved books.
 | `notes` | TEXT |
 | `checked_at` | TIMESTAMP (default CURRENT_TIMESTAMP) |
 
+`pipeline_id` is filled by `SpotCheckManager.submit_result`: an explicit argument wins, otherwise it is copied from the book's latest `autonomy_feedback` row. It is NULL only when the book has no feedback row. (Before #24 nothing wrote it.)
+
 ---
 
 ## Health Tables

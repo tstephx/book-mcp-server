@@ -74,14 +74,19 @@ class SpotCheckManager:
         notes: str = None,
         pipeline_id: str = None,
     ) -> None:
-        """Submit a spot-check review result."""
+        """Submit a spot-check review result.
+
+        ``pipeline_id`` defaults to the one recorded on the book's latest
+        ``autonomy_feedback`` row, so callers need not thread it through. It stays
+        NULL only when the book has no feedback row at all.
+        """
         with get_pipeline_db(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Get original info
             cursor.execute(
                 """
-                SELECT id, original_book_type, original_confidence, created_at
+                SELECT id, pipeline_id, original_book_type, original_confidence, created_at
                 FROM autonomy_feedback
                 WHERE book_id = ?
                 ORDER BY created_at DESC
@@ -100,7 +105,7 @@ class SpotCheckManager:
             """,
                 (
                     book_id,
-                    pipeline_id,
+                    pipeline_id or (original["pipeline_id"] if original else None),
                     original["original_book_type"] if original else None,
                     original["original_confidence"] if original else None,
                     original["created_at"] if original else None,
