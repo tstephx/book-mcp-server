@@ -14,7 +14,11 @@ from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
 from agentic_pipeline.db.connection import get_pipeline_db
-from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+from agentic_pipeline.db.pipelines import (
+    EMBEDDING_STALE_MARGIN_SECONDS,
+    ConcurrentModificationError,
+    PipelineRepository,
+)
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
 from agentic_pipeline.orchestrator.errors import (
@@ -690,6 +694,15 @@ class Orchestrator:
         recovered = self.repo.reset_stale_processing()
         if recovered:
             self.logger.error("worker", "StartupRecovery", f"Reset {recovered} orphaned processing books to detected")
+
+        # Books a crash stranded in EMBEDDING (daemon-thread embed died with the
+        # worker) go to NEEDS_RETRY so the retry loop finishes them. The cutoff
+        # must exceed the embedding timeout or a live CLI/MCP embed is swept.
+        stranded = self.repo.reset_stale_embedding(self.config.embedding_timeout + EMBEDDING_STALE_MARGIN_SECONDS)
+        if stranded:
+            self.logger.error(
+                "worker", "StartupRecovery", f"Moved {stranded} books stranded in embedding to needs_retry"
+            )
 
         while not self.shutdown_requested:
             try:

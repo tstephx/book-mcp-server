@@ -15,6 +15,13 @@ from agentic_pipeline.pipeline.states import PipelineState, can_transition
 # actively processing. Matches OrchestratorConfig.processing_timeout.
 STALE_PROCESSING_SECONDS = 600
 
+# Slack added on top of EMBEDDING_TIMEOUT_SECONDS before an EMBEDDING book is
+# treated as stranded by a crash. updated_at is stamped when EMBEDDING begins
+# and not touched during the call, so a live embed legitimately sits for up to
+# the timeout; the margin covers the commit after it returns. Default total
+# (300 + 300) matches the stuck detector's EMBEDDING threshold.
+EMBEDDING_STALE_MARGIN_SECONDS = 300
+
 
 class ConcurrentModificationError(RuntimeError):
     """Another actor moved this pipeline between our read and our write.
@@ -473,6 +480,54 @@ class PipelineRepository:
             )
             conn.commit()
             return cursor.rowcount
+
+    def reset_stale_embedding(self, cutoff_seconds: int) -> int:
+        """Move books stranded in EMBEDDING by a crashed worker to NEEDS_RETRY.
+
+        approve_book() runs EMBEDDING on a daemon thread, so a killed worker
+        leaves the book there forever. cutoff_seconds must exceed the embedding
+        timeout, or a live CLI/MCP embed is swept mid-flight. The error_details
+        match what _complete_approved writes on a timeout, so _retry_one routes
+        the book straight back to embedding.
+
+        Each row is its own transaction (update_state), guarded by
+        expected_state: a book another actor finished or moved since our read is
+        skipped. No write transaction is held across rows.
+
+        Returns:
+            Number of books moved.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=cutoff_seconds)).isoformat()
+        with get_pipeline_db(self.db_path) as conn:
+            ids = [
+                row["id"]
+                for row in conn.execute(
+                    """
+                    SELECT id FROM processing_pipelines
+                    WHERE state = ?
+                      AND updated_at IS NOT NULL
+                      AND julianday(updated_at) < julianday(?)
+                    """,
+                    (PipelineState.EMBEDDING.value, cutoff),
+                )
+            ]
+
+        moved = 0
+        for pipeline_id in ids:
+            try:
+                self.update_state(
+                    pipeline_id,
+                    PipelineState.NEEDS_RETRY,
+                    error_details={
+                        "failed_in": "embedding",
+                        "embedding_error": "worker crashed mid-embedding (recovered at startup)",
+                    },
+                    expected_state=PipelineState.EMBEDDING,
+                )
+                moved += 1
+            except ConcurrentModificationError:
+                continue
+        return moved
 
     def get_queue_by_priority(self) -> dict[int, int]:
         """Get count of queued items by priority."""
