@@ -13,9 +13,6 @@ These schemas:
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-# UUID validation pattern
-UUID_PATTERN = r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
-
 
 class SemanticSearchInput(BaseModel):
     """Schema for semantic search operations
@@ -46,49 +43,3 @@ class SemanticSearchInput(BaseModel):
         if not 0.0 <= v <= 1.0:
             raise ValueError("min_similarity must be between 0.0 and 1.0")
         return v
-
-
-# Validation helper functions
-def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
-    """Validate and constrain limit parameter
-
-    Args:
-        limit: Limit value to validate
-        min_val: Minimum allowed value
-        max_val: Maximum allowed value
-
-    Returns:
-        Validated and constrained limit
-
-    Raises:
-        ValueError: If limit is invalid
-    """
-    if not isinstance(limit, int):
-        raise ValueError(f"Limit must be an integer, got {type(limit)}")
-
-    if limit < min_val:
-        return min_val
-    if limit > max_val:
-        return max_val
-    return limit
-
-
-def validate_chapter_number(chapter_number: int) -> int:
-    """Validate chapter number
-
-    Args:
-        chapter_number: Chapter number to validate
-
-    Returns:
-        Validated chapter number
-
-    Raises:
-        ValueError: If chapter_number is invalid
-    """
-    if not isinstance(chapter_number, int):
-        raise ValueError(f"chapter_number must be an integer, got {type(chapter_number)}")
-
-    if chapter_number < 1:
-        raise ValueError("chapter_number must be >= 1")
-
-    return chapter_number
