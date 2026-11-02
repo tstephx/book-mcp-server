@@ -172,7 +172,7 @@ def create_server() -> FastMCP:
         """Clear cached data
 
         Args:
-            cache_type: What to clear - "chapters", "embeddings", "summary_embeddings", or "all" (default)
+            cache_type: What to clear - "chapters" or "all" (default)
 
         Returns:
             Dictionary with confirmation and updated stats
@@ -186,18 +186,12 @@ def create_server() -> FastMCP:
         if cache_type == "chapters":
             cache.clear_chapters()
             message = "Chapter cache cleared"
-        elif cache_type == "embeddings":
-            cache.invalidate_embeddings()
-            message = "Embeddings cache invalidated"
-        elif cache_type == "summary_embeddings":
-            cache.invalidate_summary_embeddings()
-            message = "Summary embeddings cache invalidated"
         elif cache_type == "all":
             cache.clear_all()
             message = "All caches cleared"
         else:
             return {
-                "error": f"Invalid cache_type: {cache_type}. Use 'chapters', 'embeddings', 'summary_embeddings', or 'all'"
+                "error": f"Invalid cache_type: {cache_type}. Use 'chapters' or 'all'"
             }
 
         return {"message": message, "stats": cache.stats()}

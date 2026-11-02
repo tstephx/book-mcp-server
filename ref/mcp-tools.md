@@ -150,7 +150,7 @@ Read-only tools for Claude Desktop. Implementations in `src/tools/*.py`.
 | `get_author_insights` | `analytics_tools.py` | Stats for a specific author |
 | `audit_chapter_quality` | `audit_tools.py` | Chapter quality metrics |
 | `get_cache_stats` | `server.py` | Cache hit/miss rates, memory usage, cached counts |
-| `clear_cache` | `server.py` | Clear caches (`cache_type`: `chapters`/`embeddings`/`summary_embeddings`/`all`) |
+| `clear_cache` | `server.py` | Clear caches (`cache_type`: `chapters`/`all`) |
 | `get_summary` | `server.py` | Summary for a specific chapter (`chapter_id`, `force`) |
 | `summarize_book` | `server.py` | Generate/fetch book summary |
 | `refresh_embeddings` | `server.py` | Regenerate chapter embeddings |
@@ -165,4 +165,3 @@ All tools accepting `book_id` also accept partial title slugs via `resolve_book_
 2. Fuzzy LIKE title match
 3. Returns "did-you-mean" error if ambiguous
 
-Do not call the old `validate_book_id()` directly.

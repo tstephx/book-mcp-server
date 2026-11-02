@@ -290,6 +290,14 @@ def test_clear_cache(server):
     assert "error" not in result
 
 
+@pytest.mark.parametrize("cache_type", ["embeddings", "summary_embeddings", "bogus"])
+def test_clear_cache_rejects_removed_tiers(server, cache_type):
+    """The never-filled embedding tiers are gone; clear_cache reports valid types."""
+    result = _call_tool(server, "clear_cache", cache_type=cache_type)
+    assert "error" in result
+    assert "'chapters' or 'all'" in result["error"]
+
+
 # Embedding management tools — skipped by default (OpenAI + slow + known issues)
 
 

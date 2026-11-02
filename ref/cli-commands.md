@@ -21,7 +21,7 @@ Entry point: `agentic-pipeline` → `agentic_pipeline/cli.py` (Click)
 | `worker` | `[--watch-dir] [--processed-dir]` | Run the queue worker (processes books continuously) |
 | `status` | `PIPELINE_ID` | Show status of a pipeline. For rejected pipelines, prints the rejecting actor and reason from the audit trail. |
 | `health` | `[--json]` | Show pipeline health status |
-| `stuck` | `[--recover]` | List stuck pipelines |
+| `stuck` | — | List stuck pipelines |
 | `retry` | `[--max-attempts/-m]` | Retry books in NEEDS_RETRY state |
 | `reingest` | `BOOK_ID [--force-fallback]` | Reprocess a book through the full pipeline |
 | `reprocess` | `[--flagged] [--execute] [--json]` | Re-queue books that fail extraction quality checks |

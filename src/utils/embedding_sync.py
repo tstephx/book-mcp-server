@@ -16,7 +16,6 @@ from typing import Callable, Optional
 import numpy as np
 
 from ..database import get_db_connection
-from .cache import get_cache
 from .file_utils import resolve_chapter_path, read_chapter_content
 
 logger = logging.getLogger(__name__)
@@ -295,11 +294,6 @@ def update_embeddings_incremental(
             progress_callback(min(i + batch_size, len(chapters_to_update)), len(chapters_to_update))
 
         logger.info(f"Progress: {updated}/{len(chapters_to_update)} chapters updated")
-
-    # Invalidate embeddings cache
-    cache = get_cache()
-    cache.invalidate_embeddings()
-    logger.info("Embeddings cache invalidated")
 
     duration = round(time.time() - start_time, 2)
 

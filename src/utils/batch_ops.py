@@ -7,12 +7,11 @@ Provides memory-efficient batch processing for:
 - Aggregate operations
 """
 
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import Iterator, Optional, List
+from typing import Optional, List
 
-from ..database import execute_query, get_db_connection
+from ..database import execute_query
 
 logger = logging.getLogger(__name__)
 
@@ -145,97 +144,6 @@ def batch_semantic_search(
     logger.info(f"Batch search '{query}' found {total_results} results across {len(results_by_book)} books")
 
     return result
-
-
-def batch_export_chapters(
-    book_ids: Optional[List[str]] = None, format: str = "markdown", include_content: bool = False
-) -> Iterator[str]:
-    """Stream export of chapter metadata
-
-    Memory-efficient generator for large exports.
-
-    Args:
-        book_ids: List of book IDs (None = all)
-        format: "markdown" or "json"
-        include_content: Include full chapter content (large!)
-
-    Yields:
-        Formatted strings for each chapter
-    """
-    from .file_utils import read_chapter_content
-
-    # Build query
-    if book_ids:
-        placeholders = ",".join("?" * len(book_ids))
-        query = f"""
-            SELECT c.id, c.book_id, c.chapter_number, c.title, c.file_path, c.word_count,
-                   b.title as book_title, b.author
-            FROM chapters c
-            JOIN books b ON c.book_id = b.id
-            WHERE c.book_id IN ({placeholders})
-            ORDER BY b.title, c.chapter_number
-        """
-        params = tuple(book_ids)
-    else:
-        query = """
-            SELECT c.id, c.book_id, c.chapter_number, c.title, c.file_path, c.word_count,
-                   b.title as book_title, b.author
-            FROM chapters c
-            JOIN books b ON c.book_id = b.id
-            ORDER BY b.title, c.chapter_number
-        """
-        params = ()
-
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-
-        # Yield header
-        if format == "markdown":
-            yield "# Chapter Export\n\n"
-            current_book = None
-
-        for row in cursor:
-            if format == "markdown":
-                # Add book header when book changes
-                if row["book_title"] != current_book:
-                    current_book = row["book_title"]
-                    yield f"\n## {current_book}\n"
-                    if row["author"]:
-                        yield f"*by {row['author']}*\n\n"
-                    else:
-                        yield "\n"
-
-                yield f"### Chapter {row['chapter_number']}: {row['title']}\n"
-                yield f"- Words: {row['word_count'] or 'N/A'}\n"
-
-                if include_content:
-                    try:
-                        content = read_chapter_content(row["file_path"])
-                        yield f"\n{content}\n\n---\n"
-                    except Exception as e:
-                        yield f"- *Content unavailable: {e}*\n"
-
-                yield "\n"
-
-            else:  # json
-                data = {
-                    "chapter_id": row["id"],
-                    "book_id": row["book_id"],
-                    "book_title": row["book_title"],
-                    "author": row["author"],
-                    "chapter_number": row["chapter_number"],
-                    "chapter_title": row["title"],
-                    "word_count": row["word_count"],
-                }
-
-                if include_content:
-                    try:
-                        data["content"] = read_chapter_content(row["file_path"])
-                    except Exception as e:
-                        data["content_error"] = str(e)
-
-                yield json.dumps(data) + "\n"
 
 
 def get_library_statistics() -> dict:

@@ -13,32 +13,6 @@ class ValidationError(Exception):
     pass
 
 
-def validate_book_id(book_id: str) -> str:
-    """
-    Validate book ID format (UUID).
-
-    Deprecated: use resolve_book_id() instead, which also accepts slug-style IDs.
-
-    Args:
-        book_id: Book ID to validate
-
-    Returns:
-        Validated book ID
-
-    Raises:
-        ValidationError: If book ID is invalid
-    """
-    if not book_id:
-        raise ValidationError("Book ID cannot be empty")
-
-    # UUID format: 8-4-4-4-12 hex digits
-    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-    if not re.match(uuid_pattern, book_id, re.IGNORECASE):
-        raise ValidationError(f"Invalid book ID format: {book_id}")
-
-    return book_id
-
-
 def validate_chapter_number(chapter_number: int) -> int:
     """
     Validate chapter number

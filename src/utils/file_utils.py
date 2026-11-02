@@ -135,26 +135,3 @@ def _read_split_chapter(dir_path: Path) -> str:
             logger.warning(f"Could not read chapter part {part}: {e}")
 
     return "\n\n".join(content_parts)
-
-
-def get_chapter_excerpt(file_path: str | Path, max_chars: int = 300) -> str:
-    """Get a short excerpt from a chapter
-
-    Convenience function for search results and previews.
-
-    Args:
-        file_path: Path to chapter file
-        max_chars: Maximum characters to return (default: 300)
-
-    Returns:
-        Chapter excerpt with ellipsis if truncated, or error message
-    """
-    try:
-        content = read_chapter_content(file_path)
-        excerpt = content[:max_chars].strip()
-        if len(content) > max_chars:
-            excerpt += "..."
-        return excerpt
-    except Exception as e:
-        logger.warning(f"Could not read chapter excerpt: {e}")
-        return "[Content not available]"

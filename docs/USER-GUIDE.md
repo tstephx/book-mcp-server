@@ -247,7 +247,6 @@ agentic-pipeline health --json
 
 # Check stuck pipelines
 agentic-pipeline stuck
-agentic-pipeline stuck --recover
 ```
 
 ### Approval

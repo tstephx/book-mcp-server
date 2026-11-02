@@ -23,7 +23,6 @@ def approve_book_tool(
     db_path: Optional[str] = None,
     pipeline_id: str = "",
     actor: str = "human:unknown",
-    adjustments: Optional[dict] = None,
 ) -> dict:
     """
     Approve a book for ingestion into the library.
@@ -31,10 +30,9 @@ def approve_book_tool(
     Args:
         pipeline_id: The pipeline ID to approve
         actor: Who is approving (e.g., "human:taylor", "auto:confident")
-        adjustments: Optional adjustments to apply before ingestion
     """
     path = Path(db_path) if db_path else get_db_path()
-    return approve_book(path, pipeline_id, actor, adjustments)
+    return approve_book(path, pipeline_id, actor)
 
 
 def reject_book_tool(
