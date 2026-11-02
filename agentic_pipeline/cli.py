@@ -1515,5 +1515,32 @@ def rechunk(do_swap: bool, fresh: bool, yes: bool) -> None:
     raise SystemExit(0 if verdict["pass"] else 1)
 
 
+@main.command("fts-rebuild")
+def fts_rebuild() -> None:
+    """Rebuild the chapters_fts keyword index from every chapter on disk.
+
+    New approvals index themselves; run this once for an existing library
+    (or after bulk changes) so `text_search` finds older books. Idempotent.
+    Exit codes: 0 = rebuilt (even with some unreadable chapters, reported),
+    1 = the FTS table is missing or the rebuild failed.
+    """
+    from src.utils.fts_search import rebuild_fts_index
+
+    from .db.config import get_db_path
+    from .library.chapter_reader import read_chapter_content
+
+    db_path = get_db_path()
+    books_dir = db_path.parent / "books"
+    result = rebuild_fts_index(db_path=db_path, reader=lambda fp: read_chapter_content(fp, books_dir))
+
+    if "error" in result:
+        console.print(f"[red]FTS rebuild failed: {result['error']}[/red]")
+        raise SystemExit(1)
+    console.print(
+        f"FTS index rebuilt: {result['entries_after']} chapters indexed "
+        f"(was {result['entries_before']}), {result['errors']} errors"
+    )
+
+
 if __name__ == "__main__":
     main()

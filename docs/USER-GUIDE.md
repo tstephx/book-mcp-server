@@ -119,6 +119,8 @@ Restart Claude Desktop. Claude now has access to your entire book library.
 
 ## Search Syntax
 
+> **Existing library?** New books are keyword-indexed automatically when approved. For books ingested earlier, run `agentic-pipeline fts-rebuild` once so `text_search` finds them (safe to re-run).
+
 ### Full-Text Search (FTS5)
 
 ```

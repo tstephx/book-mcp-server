@@ -6,18 +6,41 @@ Complements semantic search with exact term matching.
 """
 
 import logging
-from typing import Optional
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Callable, Optional
 
-from ..database import get_db_connection, execute_query
+from ..database import get_db_connection
 
 logger = logging.getLogger(__name__)
 
 
-def fts_table_exists() -> bool:
+@contextmanager
+def _connection(db_path: Optional[Path] = None):
+    """Yield a connection to db_path, or the configured library DB when None.
+
+    The pipeline writes to AGENTIC_PIPELINE_DB, which can differ from the
+    BOOK_DB_PATH the MCP server reads, so the write helpers take an explicit path.
+    """
+    if db_path is None:
+        with get_db_connection() as conn:
+            yield conn
+        return
+    conn = sqlite3.connect(str(db_path), timeout=10)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def fts_table_exists(db_path: Optional[Path] = None) -> bool:
     """Check if FTS table is available"""
     try:
-        rows = execute_query("SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'")
-        return len(rows) > 0
+        with _connection(db_path) as conn:
+            row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chapters_fts'").fetchone()
+        return row is not None
     except Exception:
         return False
 
@@ -161,19 +184,28 @@ def full_text_search(query: str, limit: int = 10, book_id: Optional[str] = None,
         return {"error": str(e), "results": []}
 
 
-def rebuild_fts_index() -> dict:
+def rebuild_fts_index(
+    db_path: Optional[Path] = None,
+    reader: Optional[Callable[[str], str]] = None,
+) -> dict:
     """Rebuild FTS index by repopulating from chapters table and files on disk.
 
-    Deletes all existing FTS rows and re-indexes every chapter.
-    Useful when the FTS index is stale (e.g. after DB migration or bulk import).
+    Deletes all existing FTS rows and re-indexes every chapter, so it is
+    idempotent. Useful when the FTS index is stale (e.g. after DB migration
+    or bulk import).
+
+    Args:
+        db_path: Library DB to rebuild; defaults to the configured one.
+        reader: file_path -> content; defaults to file_utils.read_chapter_content.
     """
-    if not fts_table_exists():
+    if not fts_table_exists(db_path):
         return {"error": "FTS table does not exist"}
 
     try:
-        from .file_utils import read_chapter_content
+        if reader is None:
+            from .file_utils import read_chapter_content as reader
 
-        with get_db_connection() as conn:
+        with _connection(db_path) as conn:
             cursor = conn.cursor()
 
             # Get count before
@@ -192,7 +224,7 @@ def rebuild_fts_index() -> dict:
 
             for chapter in chapters:
                 try:
-                    content = read_chapter_content(chapter["file_path"])
+                    content = reader(chapter["file_path"])
                     cursor.execute(
                         "INSERT INTO chapters_fts (chapter_id, title, content) VALUES (?, ?, ?)",
                         (chapter["id"], chapter["title"] or "", content),
@@ -217,7 +249,7 @@ def rebuild_fts_index() -> dict:
         return {"error": str(e)}
 
 
-def sync_fts_chapter(chapter_id: str, content: str, title: str = "") -> bool:
+def sync_fts_chapter(chapter_id: str, content: str, title: str = "", db_path: Optional[Path] = None) -> bool:
     """Sync a single chapter to FTS index
 
     Call this when chapter content is updated.
@@ -226,15 +258,16 @@ def sync_fts_chapter(chapter_id: str, content: str, title: str = "") -> bool:
         chapter_id: Chapter ID
         content: Full chapter content
         title: Chapter title
+        db_path: Library DB to write; defaults to the configured one
 
     Returns:
         True if successful
     """
-    if not fts_table_exists():
+    if not fts_table_exists(db_path):
         return False
 
     try:
-        with get_db_connection() as conn:
+        with _connection(db_path) as conn:
             cursor = conn.cursor()
 
             # Delete existing entry

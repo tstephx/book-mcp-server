@@ -20,7 +20,7 @@ related: ["[[Claude-Config/mcp-servers/book-library]]", "[[Claude-Config/mcp-ser
 | [`ref/mcp-tools.md`](ref/mcp-tools.md) | All MCP tools for both servers with signatures and descriptions |
 | [`ref/db-schema.md`](ref/db-schema.md) | All pipeline DB tables and columns |
 | [`ref/module-map.md`](ref/module-map.md) | "Which file handles X?" — responsibility of every module in `agentic_pipeline/` |
-| [`ref/cli-commands.md`](ref/cli-commands.md) | All 31 CLI commands grouped by category with args and descriptions |
+| [`ref/cli-commands.md`](ref/cli-commands.md) | All 32 CLI commands grouped by category with args and descriptions |
 
 ## What This Is
 Two MCP servers + a CLI pipeline in one repo:
@@ -34,7 +34,7 @@ Two MCP servers + a CLI pipeline in one repo:
 |-----------|-------------|-------------|
 | **Book library MCP server** | `server.py` → `src/server.py` | FastMCP stdio server for Claude Desktop. Search, read, learning tools. |
 | **Agentic pipeline MCP server** | `agentic_mcp_server.py` → `agentic_pipeline/mcp_server.py` | Pipeline approval, health, autonomy tools. |
-| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 31 commands for pipeline management, approval, autonomy, library maintenance (incl. `rechunk`). See `ref/cli-commands.md`. |
+| **CLI (humans)** | `agentic-pipeline` → `agentic_pipeline/cli.py` | Click CLI: 32 commands for pipeline management, approval, autonomy, library maintenance (incl. `rechunk`). See `ref/cli-commands.md`. |
 | **MCP tool definitions** | `agentic_pipeline/mcp_server.py` (pipeline), `src/tools/*.py` (library) | Where to add/edit tools. |
 
 ## Environment Variables
