@@ -153,7 +153,17 @@ per clone (`.git/hooks` is untracked) via
 `ln -sf ../../scripts/pre-push-verify.sh .git/hooks/pre-push` from the
 repository root, runs `uv sync --locked` then `make lint && make test`
 before any `git push` and blocks it on failure. Emergency bypass:
-`git push --no-verify`.
+`git push --no-verify`. The `uv sync` runs **only from linked worktrees**;
+in the main checkout it is skipped, because that checkout's `.venv` is what
+the launchd worker (and other projects' MCP configs) run from, and `uv sync`
+removes `book_ingestion` (a local editable sibling kept out of
+`pyproject.toml` deps) from it (#19). `scripts/run-worker.sh` also refuses to
+start without `book_ingestion` (one stderr line, then exit 1) instead of
+crash-looping silently. Manual reinstall if it is ever missing:
+`uv pip install -e $HOME/Dev/_Projects/book-ingestion-python --no-deps --python .venv/bin/python3`
+(never plain `pip`), then
+`launchctl kickstart -k gui/$(id -u)/com.taylorstephens.agentic-pipeline-worker`.
+After any manual `uv sync` in the main checkout, re-run that reinstall.
 
 **Pre-commit gate.** Local secret scan via `gitleaks` — a tracked
 `scripts/pre-commit-verify.sh` git hook, installed per clone the same way
