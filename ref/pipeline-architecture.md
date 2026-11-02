@@ -70,9 +70,9 @@ approve it through the same audited action used for human and batch approval.
 
 ### Worker Loop (`run_worker`)
 
-Startup recovery (once, before the loop), for books a crashed worker orphaned:
+Startup recovery (once, before the loop), for books a crashed process orphaned:
 - `repo.reset_stale_processing()` — `PROCESSING` untouched for `STALE_PROCESSING_SECONDS` (600s) → `DETECTED`.
-- `repo.reset_stale_embedding(embedding_timeout + EMBEDDING_STALE_MARGIN_SECONDS)` — `EMBEDDING` untouched for longer than the cutoff (default 300s + 300s margin = 600s) → `NEEDS_RETRY` with `error_details {"failed_in": "embedding", "embedding_error": ...}`, so `_retry_one` re-runs only the embedding stage. Needed because `approve_book()` embeds on a daemon thread that dies with the worker. Each row moves via `update_state(expected_state=EMBEDDING)`; a book another actor moved meanwhile is skipped. The cutoff must exceed `EMBEDDING_TIMEOUT_SECONDS` (`updated_at` is not touched during the embed call) or a live CLI/MCP embed would be swept; rows with NULL `updated_at` are never swept.
+- `repo.reset_stale_embedding(embedding_timeout + EMBEDDING_STALE_MARGIN_SECONDS)` — `EMBEDDING` untouched for longer than the cutoff (default 300s + 300s margin = 600s) → `NEEDS_RETRY` with `error_details {"failed_in": "embedding", "embedding_error": ...}`, so `_retry_one` re-runs only the embedding stage. Needed because `approve_book()` embeds on a daemon thread that dies with the worker. Each row moves via `update_state(expected_state=EMBEDDING)`; a book another actor moved meanwhile is skipped. The cutoff must exceed `EMBEDDING_TIMEOUT_SECONDS` (`updated_at` is not touched during the embed call) or a live CLI/MCP embed would be swept; rows with NULL `updated_at` are never swept. The sweep repeats every `EMBEDDING_SWEEP_INTERVAL_SECONDS` (300s) inside the poll loop, because a crashed MCP-server or CLI process strands a book exactly as a crashed worker does. The cutoff uses the *worker's* `EMBEDDING_TIMEOUT_SECONDS`; the launchd worker does not inherit a shell's env, so set it consistently across worker, MCP server and CLI (a live embed whose timeout exceeds worker timeout + 300s can be swept).
 
 Poll cycle (every `WORKER_POLL_INTERVAL_SECONDS`, default 5s):
 1. Retry NEEDS_RETRY pipelines

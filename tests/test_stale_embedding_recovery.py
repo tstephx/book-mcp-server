@@ -183,3 +183,56 @@ def test_run_worker_startup_recovers_stranded_book(MockAdapter, db_path):
 
     assert repo.get(stale)["state"] == PipelineState.NEEDS_RETRY.value
     assert repo.get(live)["state"] == PipelineState.EMBEDDING.value
+
+
+# --- Periodic sweep: a crashed MCP/CLI process strands books too (#34 review) ---
+
+
+def test_sweep_is_throttled_between_calls(MockAdapter, db_path, monkeypatch):
+    """_sweep_stranded_embedding_if_due runs the sweep at most once per interval."""
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.orchestrator import orchestrator as orch_mod
+    from agentic_pipeline.orchestrator.orchestrator import Orchestrator
+
+    clock = [1000.0]
+    monkeypatch.setattr(orch_mod.time, "monotonic", lambda: clock[0])
+    orch = Orchestrator(OrchestratorConfig(db_path=db_path, embedding_timeout=100))
+    window = 100 + orch_mod.EMBEDDING_STALE_MARGIN_SECONDS
+
+    assert orch._sweep_stranded_embedding_if_due() == 0  # first call is due; nothing stranded
+    repo, pid = _embedding_book(db_path, seconds_ago=window + 30)
+
+    clock[0] += orch_mod.EMBEDDING_SWEEP_INTERVAL_SECONDS - 1
+    assert orch._sweep_stranded_embedding_if_due() == 0, "not due yet"
+    assert repo.get(pid)["state"] == PipelineState.EMBEDDING.value
+
+    clock[0] += 1
+    assert orch._sweep_stranded_embedding_if_due() == 1, "due at the interval"
+    assert repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value
+
+
+def test_run_worker_loop_recovers_book_stranded_after_startup(MockAdapter, db_path, monkeypatch):
+    """A book stranded mid-run (e.g. the MCP server crashed) is swept without a worker restart."""
+    from agentic_pipeline.config import OrchestratorConfig
+    from agentic_pipeline.orchestrator import orchestrator as orch_mod
+    from agentic_pipeline.orchestrator.orchestrator import Orchestrator
+
+    monkeypatch.setattr(orch_mod, "EMBEDDING_SWEEP_INTERVAL_SECONDS", 0)
+    orch = Orchestrator(OrchestratorConfig(db_path=db_path, embedding_timeout=100))
+    window = 100 + orch_mod.EMBEDDING_STALE_MARGIN_SECONDS
+    stranded = {}
+
+    def fake_sleep(_):
+        # Runs on the first idle poll, i.e. after startup recovery has finished.
+        repo, stranded["pid"] = _embedding_book(db_path, seconds_ago=window + 30)
+        stranded["repo"] = repo
+
+    def stop_after_retry(book):
+        orch.shutdown_requested = True
+        return {}
+
+    monkeypatch.setattr(orch_mod.time, "sleep", fake_sleep)
+    orch._retry_one = stop_after_retry
+    orch.run_worker()
+
+    assert stranded["repo"].get(stranded["pid"])["state"] == PipelineState.NEEDS_RETRY.value
