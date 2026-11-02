@@ -14,7 +14,11 @@ from typing import Optional
 
 from agentic_pipeline.config import OrchestratorConfig
 from agentic_pipeline.db.connection import get_pipeline_db
-from agentic_pipeline.db.pipelines import ConcurrentModificationError, PipelineRepository
+from agentic_pipeline.db.pipelines import (
+    EMBEDDING_STALE_MARGIN_SECONDS,
+    ConcurrentModificationError,
+    PipelineRepository,
+)
 from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
 from agentic_pipeline.orchestrator.errors import (
@@ -25,6 +29,10 @@ from agentic_pipeline.agents.classifier import ClassifierAgent
 from agentic_pipeline.pipeline.strategy import StrategySelector
 from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
 from agentic_pipeline.validation import ExtractionValidator
+
+# How often the worker re-sweeps for books stranded in EMBEDDING. Cheap (one
+# state-indexed SELECT), so well under the sweep cutoff.
+EMBEDDING_SWEEP_INTERVAL_SECONDS = 300
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +47,7 @@ class Orchestrator:
         self.classifier = ClassifierAgent(config.db_path)
         self.strategy_selector = StrategySelector()
         self.shutdown_requested = False
+        self._last_embedding_sweep: Optional[float] = None
 
         # Initialize processing adapter for direct library calls
         self.processing_adapter = ProcessingAdapter(
@@ -691,8 +700,16 @@ class Orchestrator:
         if recovered:
             self.logger.error("worker", "StartupRecovery", f"Reset {recovered} orphaned processing books to detected")
 
+        # Books a crash stranded in EMBEDDING go to NEEDS_RETRY (see
+        # _sweep_stranded_embedding_if_due); first call is always due.
+        self._sweep_stranded_embedding_if_due()
+
         while not self.shutdown_requested:
             try:
+                # An MCP/CLI process crashing mid-embed strands a book too, so
+                # the sweep repeats rather than waiting for a worker restart.
+                self._sweep_stranded_embedding_if_due()
+
                 # Priority 1: Complete approved books
                 approved = self.repo.find_by_state(PipelineState.APPROVED, limit=1)
                 if approved:
@@ -761,6 +778,32 @@ class Orchestrator:
                 time.sleep(self.config.worker_poll_interval)
 
         self.logger.worker_stopped()
+
+    def _sweep_stranded_embedding_if_due(self) -> int:
+        """Move books stranded in EMBEDDING to NEEDS_RETRY, at most once per interval.
+
+        approve_book() embeds on a daemon thread, so whichever process owned it
+        (worker, MCP server, CLI) dying leaves the book in EMBEDDING forever.
+        The cutoff is this process's embedding_timeout plus a margin: a live
+        embed in another process using a longer EMBEDDING_TIMEOUT_SECONDS than
+        ours can be swept once its timeout exceeds that sum, so keep the env
+        consistent across the worker, MCP server and CLI.
+
+        Returns:
+            Number of books moved (0 when not yet due).
+        """
+        now = time.monotonic()
+        last = self._last_embedding_sweep
+        if last is not None and now - last < EMBEDDING_SWEEP_INTERVAL_SECONDS:
+            return 0
+        self._last_embedding_sweep = now
+
+        stranded = self.repo.reset_stale_embedding(self.config.embedding_timeout + EMBEDDING_STALE_MARGIN_SECONDS)
+        if stranded:
+            self.logger.error(
+                "worker", "StartupRecovery", f"Moved {stranded} books stranded in embedding to needs_retry"
+            )
+        return stranded
 
     def _handle_shutdown(self, signum, frame):
         """Handle shutdown signal gracefully."""

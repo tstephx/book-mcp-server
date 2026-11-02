@@ -121,7 +121,7 @@ Quick reference: "which file handles X?"
 | `connection.py` | `get_pipeline_db(path)` — canonical connection factory (WAL mode, timeout=10, row_factory=Row). **Always use this, never open sqlite3 directly.** |
 | `config.py` | `get_db_path()` — resolves DB path from env var or default |
 | `migrations.py` | `MIGRATIONS` list + `run_migrations(path)` — auto-applied on startup; append-only |
-| `pipelines.py` | `PipelineRepository` — CRUD for `processing_pipelines`. `create()`, `get()`, `update_state()`, `update_book_profile()`, `prepare_reingest()`, `list_pending()` |
+| `pipelines.py` | `PipelineRepository` — CRUD for `processing_pipelines`. `create()`, `get()`, `update_state()`, `update_book_profile()`, `prepare_reingest()`, `list_pending()`, `reset_stale_processing()`, `reset_stale_embedding()` (startup crash recovery) |
 
 ---
 
