@@ -184,7 +184,7 @@ Storage and cache-invalidation detail — see `ref/db-schema.md`'s Embedding Tab
 
 ## Architecture Decisions
 1. **SQLite + WAL mode** — all `agentic_pipeline/` connections via `get_pipeline_db()` (timeout=10, row_factory=sqlite3.Row). Both this connection and the MCP-tool-side `src/database.py`'s `get_db_connection()` set `PRAGMA foreign_keys = ON` (PR #10, 2026-08-14) — `ON DELETE CASCADE` now fires consistently on either path. See `ref/db-schema.md` / the `db-schema` skill before touching delete/cascade behavior.
-2. **Inline embedding** — `approve_book()` runs full APPROVED → EMBEDDING → COMPLETE flow
+2. **Background embedding** — `approve_book()` returns once APPROVED; `approval.actions._complete_approved` runs EMBEDDING → COMPLETE on a daemon thread (synchronously with `background=False`, as the CLI does)
 3. **ProcessingAdapter** — wraps `book-ingestion` as library (lazy-imported)
 4. **Hybrid Search** — RRF combines FTS5 keyword + semantic vector; optional MMR for diversity
 5. **Provider abstraction** — classifier default is `claude-code` (subscription billing) with OpenAI fallback; `CLASSIFIER_PROVIDER` forces single-provider mode
