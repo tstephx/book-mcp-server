@@ -203,12 +203,65 @@ def _archive_source_file(
         return None
 
 
-def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
+class EmbeddingTimeout(Exception):
+    """generate_embeddings did not return within the embedding timeout."""
+
+
+def _call_with_timeout(fn, timeout: float, **kwargs):
+    """Run fn(**kwargs) on a daemon thread; raise EmbeddingTimeout after `timeout` seconds.
+
+    A Python thread cannot be killed, so a timed-out call keeps running in the
+    background (see the _complete_approved docstring for what that implies). It
+    is a daemon thread, not a ThreadPoolExecutor worker, so a hung call cannot
+    keep the process alive at interpreter exit (executor threads are joined).
+    """
+    box: dict = {}
+
+    def runner():
+        try:
+            box["result"] = fn(**kwargs)
+        except BaseException as e:  # noqa: BLE001 - re-raised in the caller
+            box["error"] = e
+
+    thread = threading.Thread(target=runner, daemon=True, name="embedding-call")
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        raise EmbeddingTimeout(f"Embedding exceeded {timeout}s timeout")
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
+
+
+def _complete_approved(
+    db_path: Path,
+    pipeline_id: str,
+    pipeline: dict,
+    embedding_timeout: Optional[float] = None,
+) -> dict:
     """Run embedding for an approved book and transition to COMPLETE.
 
     Returns a dict with state and embedding details. On failure, transitions
     to NEEDS_RETRY instead.
+
+    The embedding call is bounded by `embedding_timeout` seconds (default:
+    EMBEDDING_TIMEOUT_SECONDS via OrchestratorConfig.from_env). On timeout the
+    book goes to NEEDS_RETRY with failed_in="embedding", which the retry loop
+    routes back here. No sqlite transaction is held while waiting.
+
+    Known limit: the timed-out call is not cancelled and may still finish
+    later. generate_embeddings only selects chapters with no chunk rows, so a
+    retry normally skips chapters the orphan already chunked (it may then
+    report success with 0 chapters while the orphan still fills in embeddings).
+    The narrow race is a retry starting while the orphan is still in its
+    chunk-insert phase: both do INSERT OR REPLACE on the same chunk ids, and a
+    replace can reset an embedding the other already wrote to NULL.
     """
+    if embedding_timeout is None:
+        from agentic_pipeline.config import OrchestratorConfig
+
+        embedding_timeout = OrchestratorConfig.from_env().embedding_timeout
+
     repo = PipelineRepository(db_path)
 
     # Extract book_id from processing_result (same logic as orchestrator)
@@ -226,7 +279,7 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
         from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
 
         adapter = ProcessingAdapter(db_path=db_path)
-        result = adapter.generate_embeddings(book_id=book_id)
+        result = _call_with_timeout(adapter.generate_embeddings, embedding_timeout, book_id=book_id)
 
         if not result.success:
             logger.warning("Embedding failed for %s: %s", pipeline_id, result.error)
@@ -262,6 +315,18 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
         return {
             "state": PipelineState.COMPLETE.value,
             "chapters_embedded": result.chapters_processed,
+        }
+
+    except EmbeddingTimeout as e:
+        logger.error("Embedding timed out for %s: %s", pipeline_id, e)
+        repo.update_state(
+            pipeline_id,
+            PipelineState.NEEDS_RETRY,
+            error_details={"embedding_error": str(e), "failed_in": "embedding", "timeout": True},
+        )
+        return {
+            "state": PipelineState.NEEDS_RETRY.value,
+            "embedding_error": str(e),
         }
 
     except Exception as e:

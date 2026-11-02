@@ -65,9 +65,8 @@ approve it through the same audited action used for human and batch approval.
 | `_check_idempotency` | Detects DUPLICATE |
 | `_run_classifier` | CLASSIFYING → SELECTING_STRATEGY |
 | `_run_processing` | PROCESSING → VALIDATING |
-| `_run_embedding` | **Unused** — no production caller; only tests reference it. Not the EMBEDDING step (see `_complete_approved`) |
 | `_process_book` | Drives full CLASSIFYING→PENDING_APPROVAL flow |
-| `_complete_approved` | APPROVED → EMBEDDING → COMPLETE. Thin wrapper over `approval.actions._complete_approved`, the real EMBEDDING path; called by `_retry_one` (embedding-stage retries) and `run_worker` (APPROVED books). `approve_book()` calls the `approval.actions` function directly (background thread, or synchronously when `background=False`) |
+| `_complete_approved` | APPROVED → EMBEDDING → COMPLETE. Thin wrapper over `approval.actions._complete_approved`, the real EMBEDDING path (passes `config.embedding_timeout`); called by `_retry_one` (embedding-stage retries) and `run_worker` (APPROVED books). `approve_book()` calls the `approval.actions` function directly (background thread, or synchronously when `background=False`) |
 
 ### Worker Loop (`run_worker`)
 
@@ -157,7 +156,7 @@ All values overridable via env vars:
 |------|---------|---------|
 | Classifier fallback threshold | `CONFIDENCE_THRESHOLD` | `0.7` |
 | Processing timeout | `PROCESSING_TIMEOUT_SECONDS` | `600s` |
-| Embedding timeout | `EMBEDDING_TIMEOUT_SECONDS` | `300s` — currently read only by the unused `_run_embedding`; the live path (`approval.actions._complete_approved`) enforces no timeout |
+| Embedding timeout | `EMBEDDING_TIMEOUT_SECONDS` | `300s` — enforced in `approval.actions._complete_approved` (daemon thread + join). On timeout the book goes to `NEEDS_RETRY` with `failed_in: "embedding"`; the timed-out call is not cancelled and may finish later |
 | Worker poll interval | `WORKER_POLL_INTERVAL_SECONDS` | `5s` |
 | Max retries | `MAX_RETRY_ATTEMPTS` | `3` |
 | Pipeline DB | `AGENTIC_PIPELINE_DB` | — |

@@ -81,7 +81,7 @@ Quick reference: "which file handles X?"
 
 | File | Responsibility |
 |------|---------------|
-| `actions.py` | `approve_book()`, `reject_book()`, `rollback_book()`. `approve_book()` is non-blocking — spawns daemon thread for embedding. `_run_embedding_background()` and `_complete_approved()` also here. |
+| `actions.py` | `approve_book()`, `reject_book()`, `rollback_book()`. `approve_book()` is non-blocking — spawns daemon thread for embedding. `_run_embedding_background()` and `_complete_approved()` also here; `_complete_approved()` enforces `EMBEDDING_TIMEOUT_SECONDS` via `_call_with_timeout()`. |
 | `queue.py` | `ApprovalQueue` — `get_pending(sort_by)` query; formats books for human review |
 
 ---
