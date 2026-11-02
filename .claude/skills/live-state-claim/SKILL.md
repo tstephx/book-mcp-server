@@ -15,6 +15,9 @@ second session had to rediscover it was already done from file mtimes and `launc
 (book-mcp-server#28). A claim stops a peer starting the same write; a release with an
 outcome note leaves the trace.
 
+Requires the user-global session-claims hook at `~/.claude/hooks/session_claims.py` (it lives
+outside this repo). If that file is missing, stop and say so; do not improvise a substitute.
+
 ## Arguments
 
 `$ARGUMENTS` is one of:
@@ -23,8 +26,9 @@ outcome note leaves the trace.
 - `release <slug> "<outcome>"` — when done, stood down, or aborted
 - `status` — list active claims for this repo
 
-`<slug>` is a short kebab name for the runbook, e.g. `fts-rebuild`. The ledger branch label
-is `live-state-<slug>`, so the same slug must be passed to `claim` and `release`.
+`<slug>` is a short lowercase kebab-case name for the runbook (letters, digits, hyphens only),
+e.g. `fts-rebuild`; reject anything else. The ledger branch label is `live-state-<slug>`, so
+the same slug must be passed to `claim` and `release`.
 Repo is always `tstephx/book-mcp-server`.
 
 ## claim
@@ -43,7 +47,7 @@ Repo is always `tstephx/book-mcp-server`.
    `doctor --fix` contend for the same write lock even under different slugs:
 
    ```bash
-   python3 ~/.claude/hooks/session_claims.py list
+   python3 ~/.claude/hooks/session_claims.py list --repo tstephx/book-mcp-server --status active
    ```
 
    Runbook claims are the ones this skill makes: an active `tstephx/book-mcp-server` claim with
@@ -74,16 +78,19 @@ python3 ~/.claude/hooks/session_claims.py release --repo tstephx/book-mcp-server
 
 Example outcome: `fts-rebuild done: backup library.db.backup-fts-20261102-124502, entries_before=8083 entries_after=8294 errors=0, worker pid 51854`.
 
-If release exits 1 ("no matching active claim"), the claim was never made or already
-released. Say so; do not claim retroactively.
+If release exits 1 ("no matching active claim"), the claim was never made, was already
+released, or belongs to a different session. Release matches on `session_id`, so only the
+session that claimed can release; a successor session cannot release a predecessor's claim. A
+crashed session's claim reads as stale (check exit 2, non-blocking), so the successor can
+proceed and claim afresh. Say which case applies; do not claim retroactively.
 
 ## status
 
 ```bash
-python3 ~/.claude/hooks/session_claims.py list
+python3 ~/.claude/hooks/session_claims.py list --repo tstephx/book-mcp-server --status active
 ```
 
-Report only the `tstephx/book-mcp-server` rows: label, status, claimed_at, outcome.
+Report label, status, claimed_at, and outcome for each row.
 
 ## Adding this to a kickoff prompt
 
