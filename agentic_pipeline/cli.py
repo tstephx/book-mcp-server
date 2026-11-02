@@ -476,8 +476,7 @@ def health(as_json: bool):
 
 
 @main.command()
-@click.option("--recover", is_flag=True, help="Auto-recover stuck pipelines")
-def stuck(recover: bool):
+def stuck():
     """List stuck pipelines."""
     from .db.config import get_db_path
     from .health import StuckDetector

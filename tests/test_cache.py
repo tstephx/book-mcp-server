@@ -42,3 +42,39 @@ class TestChunkCacheVersioning:
         # unversioned entry + versioned probe -> treated as stale
         cache.set_chunk_embeddings(m, meta)
         assert cache.get_chunk_embeddings(current_version=5) is None
+
+
+class TestCacheTiers:
+    """Only the tiers that are actually filled exist: chapters + chunk embeddings."""
+
+    def test_unfilled_tiers_removed(self):
+        cache = LibraryCache(enabled=True)
+        for name in (
+            "get_embeddings",
+            "set_embeddings",
+            "invalidate_embeddings",
+            "get_summary_embeddings",
+            "set_summary_embeddings",
+            "invalidate_summary_embeddings",
+            "invalidate_chunk_embeddings",
+        ):
+            assert not hasattr(cache, name), name
+
+    def test_stats_cover_chunk_tier_only(self):
+        cache = LibraryCache(enabled=True)
+        m, meta = _matrix()
+        cache.set_chunk_embeddings(m, meta, data_version=1)
+        stats = cache.stats()
+        assert stats["chunk_embeddings_loaded"] is True
+        assert isinstance(stats["chunk_embeddings_count"], int)
+        assert stats["chunk_embeddings_count"] == 2
+        assert isinstance(stats["chunk_embeddings_memory_mb"], float)
+        assert not any(k.startswith(("embeddings_", "summary_")) for k in stats)
+
+    def test_clear_all_clears_chunk_tier(self):
+        cache = LibraryCache(enabled=True)
+        m, meta = _matrix()
+        cache.set_chunk_embeddings(m, meta)
+        cache.clear_all()
+        assert cache.get_chunk_embeddings() is None
+

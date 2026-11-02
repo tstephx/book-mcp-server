@@ -77,7 +77,6 @@ Report:
 - **Retry status**: retry_count / max_retries
 - **Recommended action**: one of:
   - `agentic-pipeline retry` — if NEEDS_RETRY with retries remaining
-  - `agentic-pipeline stuck --recover` — if stuck in a processing state
   - `agentic-pipeline reingest <book_id>` — if corrupted/need full redo
   - `agentic-pipeline reject <pipeline_id> --retry` — if needs manual review first
   - Check `OPENAI_API_KEY` — if stuck in EMBEDDING state

@@ -168,27 +168,6 @@ def validate_limit(limit: int, min_val: int = 1, max_val: int = 20) -> int:
     return limit
 
 
-def validate_book_id(book_id: str) -> str:
-    """Validate book ID — accepts UUID or slug-style identifier.
-
-    Args:
-        book_id: Book ID to validate (UUID or slug)
-
-    Returns:
-        Validated book ID as-is (resolution happens at query time)
-
-    Raises:
-        ValueError: If book_id is empty or not a string
-    """
-    if not isinstance(book_id, str):
-        raise ValueError(f"book_id must be a string, got {type(book_id)}")
-
-    if not book_id.strip():
-        raise ValueError("book_id cannot be empty")
-
-    return book_id
-
-
 def validate_chapter_number(chapter_number: int) -> int:
     """Validate chapter number
 

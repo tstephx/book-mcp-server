@@ -368,33 +368,3 @@ class ProcessingAdapter:
                 chapters_processed=0,
                 error=str(e),
             )
-
-    def get_processing_status(self, book_id: str) -> Optional[dict]:
-        """
-        Get the processing status for a book.
-
-        Args:
-            book_id: The book ID to check
-
-        Returns:
-            Dictionary with book status, or None if not found
-        """
-        from book_ingestion import BookDatabase
-
-        db = BookDatabase(str(self.db_path))
-        book = db.get_book(book_id)
-
-        if not book:
-            return None
-
-        chapters = db.get_chapters_by_book(book_id)
-
-        return {
-            "book_id": book_id,
-            "title": book.get("title"),
-            "author": book.get("author"),
-            "status": book.get("processing_status"),
-            "chapter_count": len(chapters),
-            "word_count": book.get("word_count", 0),
-            "has_embeddings": any(ch.get("has_embedding", False) for ch in chapters),
-        }
