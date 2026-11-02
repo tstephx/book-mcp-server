@@ -9,6 +9,22 @@ from typing import Optional
 from agentic_pipeline.db.config import get_db_path
 
 
+def embedding_timeout_from_env() -> int:
+    """EMBEDDING_TIMEOUT_SECONDS as a positive int (default 300).
+
+    Read on its own so callers that need only this value (the approval path)
+    do not depend on every other env var parsing cleanly.
+    """
+    raw = os.environ.get("EMBEDDING_TIMEOUT_SECONDS", "300")
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(f"EMBEDDING_TIMEOUT_SECONDS must be an integer, got {raw!r}") from None
+    if value <= 0:
+        raise ValueError(f"EMBEDDING_TIMEOUT_SECONDS must be positive, got {value}")
+    return value
+
+
 @dataclass
 class OrchestratorConfig:
     """Configuration for the orchestrator."""
@@ -34,12 +50,13 @@ class OrchestratorConfig:
         """Create configuration from environment variables."""
         watch_dir_str = os.environ.get("WATCH_DIR")
         processed_dir_str = os.environ.get("PROCESSED_DIR")
+        embedding_timeout = embedding_timeout_from_env()
         return cls(
             db_path=get_db_path(),
             watch_dir=Path(watch_dir_str) if watch_dir_str else None,
             processed_dir=Path(processed_dir_str).resolve() if processed_dir_str else None,
             processing_timeout=int(os.environ.get("PROCESSING_TIMEOUT_SECONDS", 600)),
-            embedding_timeout=int(os.environ.get("EMBEDDING_TIMEOUT_SECONDS", 300)),
+            embedding_timeout=embedding_timeout,
             confidence_threshold=float(os.environ.get("CONFIDENCE_THRESHOLD", 0.7)),
             worker_poll_interval=int(os.environ.get("WORKER_POLL_INTERVAL_SECONDS", 5)),
             max_retry_attempts=int(os.environ.get("MAX_RETRY_ATTEMPTS", 3)),

@@ -1,4 +1,4 @@
-"""Tests for processing and embedding timeout enforcement in the orchestrator."""
+"""Tests for processing timeout enforcement in the orchestrator. Embedding timeout: see test_embedding_timeout_live_path.py."""
 
 import tempfile
 import time
@@ -37,18 +37,6 @@ def test_processing_timeout_raises_pipeline_timeout_error(orchestrator):
     with patch.object(orchestrator.processing_adapter, "process_book", side_effect=slow_process):
         with pytest.raises(PipelineTimeoutError):
             orchestrator._run_processing("/fake/book.epub", book_id="test-id")
-
-
-def test_embedding_timeout_raises_pipeline_timeout_error(orchestrator):
-    """_run_embedding must raise PipelineTimeoutError when adapter hangs past embedding_timeout."""
-    from agentic_pipeline.orchestrator.errors import PipelineTimeoutError
-
-    def slow_embed(*args, **kwargs):
-        time.sleep(5)
-
-    with patch.object(orchestrator.processing_adapter, "generate_embeddings", side_effect=slow_embed):
-        with pytest.raises(PipelineTimeoutError):
-            orchestrator._run_embedding(book_id="test-id")
 
 
 def test_processing_completes_within_timeout(orchestrator):

@@ -167,8 +167,9 @@ class TestGenerateEmbeddings:
         # Pre-insert a chunk so chapter is already processed
         conn = sqlite3.connect(db_path)
         conn.execute(
-            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count) VALUES (?, ?, ?, ?, ?, ?)",
-            ("c1:0", "c1", "b1", 0, "existing chunk", 20),
+            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count, embedding, embedding_model)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("c1:0", "c1", "b1", 0, "existing chunk", 20, b"x", "text-embedding-3-large"),
         )
         conn.commit()
         conn.close()
@@ -181,6 +182,42 @@ class TestGenerateEmbeddings:
         assert result.success is True
         assert result.chapters_processed == 0
         mock_chunk.assert_not_called()
+
+    @patch("agentic_pipeline.adapters.processing_adapter.chunk_chapter")
+    @patch("agentic_pipeline.adapters.processing_adapter.OpenAIEmbeddingGenerator")
+    def test_reembeds_chapters_with_unembedded_chunks(self, mock_emb_cls, mock_chunk, tmp_path):
+        """A chapter whose chunks were committed but never embedded (timeout/crash
+        mid-embedding) is picked up again — the retry must not report success
+        while leaving embedding NULL (#32 review)."""
+        db_path = _create_test_db(tmp_path)
+        books_dir = db_path.parent / "books"
+        books_dir.mkdir()
+        ch_file = books_dir / "ch1.md"
+        ch_file.write_text("Some content.")
+        _insert_book_and_chapter(db_path, "b1", "c1", str(ch_file))
+
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "INSERT INTO chunks (id, chapter_id, book_id, chunk_index, content, word_count) VALUES (?, ?, ?, ?, ?, ?)",
+            ("c1:0", "c1", "b1", 0, "chunk zero", 20),
+        )
+        conn.commit()
+        conn.close()
+
+        mock_chunk.return_value = [{"chunk_index": 0, "content": "chunk zero", "word_count": 20}]
+        mock_gen = MagicMock()
+        mock_gen.generate_batch.return_value = np.zeros((1, 1536))
+        mock_emb_cls.return_value = mock_gen
+
+        result = ProcessingAdapter(db_path=db_path).generate_embeddings(book_id="b1")
+
+        assert result.success is True
+        assert result.chapters_processed == 1
+        assert result.chunks_embedded == 1
+        conn = sqlite3.connect(db_path)
+        nulls = conn.execute("SELECT COUNT(*) FROM chunks WHERE book_id='b1' AND embedding IS NULL").fetchone()[0]
+        conn.close()
+        assert nulls == 0
 
     @patch("agentic_pipeline.adapters.processing_adapter.OpenAIEmbeddingGenerator")
     def test_no_chapters_returns_success(self, mock_emb_cls, tmp_path):

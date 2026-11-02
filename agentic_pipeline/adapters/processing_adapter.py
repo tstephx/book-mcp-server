@@ -238,7 +238,9 @@ class ProcessingAdapter:
         Chunk chapters and generate OpenAI embeddings for each chunk.
 
         If book_id is provided, processes only that book's chapters.
-        Otherwise, processes all chapters that don't yet have chunks.
+        Otherwise, processes all chapters in the library. Either way a chapter is
+        selected when it has no chunks yet, or has chunks without an embedding
+        (left by an earlier run that timed out or crashed mid-embedding).
 
         Args:
             book_id: Optional book ID to limit processing
@@ -260,21 +262,29 @@ class ProcessingAdapter:
             with get_pipeline_db(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                # Find chapters that need chunking (no chunks exist yet)
+                # Find chapters that need work: no chunks yet, or chunks committed but
+                # never embedded (a timed-out/crashed earlier run). Re-chunking is
+                # deterministic and INSERT OR REPLACE keeps ids stable.
                 if book_id:
                     cursor.execute(
                         """SELECT c.id, c.book_id, c.file_path FROM chapters c
                         WHERE c.book_id = ?
-                        AND NOT EXISTS (
-                            SELECT 1 FROM chunks k WHERE k.chapter_id = c.id
+                        AND (
+                            NOT EXISTS (SELECT 1 FROM chunks k WHERE k.chapter_id = c.id)
+                            OR EXISTS (
+                                SELECT 1 FROM chunks k
+                                WHERE k.chapter_id = c.id AND k.embedding IS NULL
+                            )
                         )""",
                         (book_id,),
                     )
                 else:
                     cursor.execute(
                         """SELECT c.id, c.book_id, c.file_path FROM chapters c
-                        WHERE NOT EXISTS (
-                            SELECT 1 FROM chunks k WHERE k.chapter_id = c.id
+                        WHERE NOT EXISTS (SELECT 1 FROM chunks k WHERE k.chapter_id = c.id)
+                        OR EXISTS (
+                            SELECT 1 FROM chunks k
+                            WHERE k.chapter_id = c.id AND k.embedding IS NULL
                         )"""
                     )
 

@@ -19,7 +19,6 @@ from agentic_pipeline.pipeline.states import PipelineState, TERMINAL_STATES
 from agentic_pipeline.orchestrator.logging import PipelineLogger
 from agentic_pipeline.orchestrator.errors import (
     ProcessingError,
-    EmbeddingError,
     PipelineTimeoutError,
 )
 from agentic_pipeline.agents.classifier import ClassifierAgent
@@ -290,40 +289,6 @@ class Orchestrator:
                 conn.commit()
         except sqlite3.OperationalError:
             pass  # Tables may not exist in test environments
-
-    def _run_embedding(self, book_id: Optional[str] = None) -> dict:
-        """Run embedding generation via direct library call.
-
-        Args:
-            book_id: Optional book ID to limit embedding to specific book
-
-        Returns:
-            Dict with embedding results
-        """
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(
-            self.processing_adapter.generate_embeddings,
-            book_id=book_id,
-        )
-        try:
-            result = future.result(timeout=self.config.embedding_timeout)
-        except concurrent.futures.TimeoutError:
-            raise PipelineTimeoutError(
-                f"Embedding exceeded {self.config.embedding_timeout}s timeout",
-                timeout=self.config.embedding_timeout,
-            )
-        finally:
-            executor.shutdown(wait=False)
-
-        if not result.success:
-            raise EmbeddingError(
-                f"Embedding failed: {result.error}",
-                exit_code=1,
-            )
-
-        return {
-            "chapters_processed": result.chapters_processed,
-        }
 
     def process_one(self, book_path: str) -> dict:
         """Process a single book through the pipeline."""
@@ -611,7 +576,9 @@ class Orchestrator:
         if not record:
             raise ProcessingError(f"Pipeline not found: {pipeline_id}")
 
-        result = _complete_approved(self.config.db_path, pipeline_id, record)
+        result = _complete_approved(
+            self.config.db_path, pipeline_id, record, embedding_timeout=self.config.embedding_timeout
+        )
         result["pipeline_id"] = pipeline_id
         return result
 

@@ -203,11 +203,79 @@ def _archive_source_file(
         return None
 
 
-def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
+class EmbeddingTimeout(Exception):
+    """generate_embeddings did not return within the embedding timeout."""
+
+
+def _call_with_timeout(fn, timeout: float, **kwargs):
+    """Run fn(**kwargs) on a daemon thread; raise EmbeddingTimeout after `timeout` seconds.
+
+    A Python thread cannot be killed, so a timed-out call keeps running in the
+    background (see the _complete_approved docstring for what that implies). It
+    is a daemon thread, not a ThreadPoolExecutor worker, so a hung call cannot
+    keep the process alive at interpreter exit (executor threads are joined).
+    """
+    box: dict = {}
+
+    def runner():
+        try:
+            box["result"] = fn(**kwargs)
+        except BaseException as e:  # noqa: BLE001 - surfaced in the caller, never lost in the thread
+            box["error"] = e
+
+    thread = threading.Thread(target=runner, daemon=True, name="embedding-call")
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        raise EmbeddingTimeout(f"Embedding exceeded {timeout}s timeout")
+    if "error" in box:
+        err = box["error"]
+        if isinstance(err, Exception):
+            raise err
+        # SystemExit/KeyboardInterrupt inside the worker thread must not escape
+        # as-is: it would skip the NEEDS_RETRY handling and strand the book.
+        raise RuntimeError(f"embedding call aborted with {type(err).__name__}") from err
+    return box["result"]
+
+
+def _unembedded_chapters(db_path: Path, book_id: str) -> list[str]:
+    """Chapter ids of this book that still have chunks without an embedding."""
+    from agentic_pipeline.db.connection import get_pipeline_db
+
+    with get_pipeline_db(str(db_path)) as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT chapter_id FROM chunks WHERE book_id = ? AND embedding IS NULL ORDER BY chapter_id",
+            (book_id,),
+        ).fetchall()
+    return [r["chapter_id"] for r in rows]
+
+
+def _complete_approved(
+    db_path: Path,
+    pipeline_id: str,
+    pipeline: dict,
+    embedding_timeout: Optional[float] = None,
+) -> dict:
     """Run embedding for an approved book and transition to COMPLETE.
 
     Returns a dict with state and embedding details. On failure, transitions
     to NEEDS_RETRY instead.
+
+    The embedding call is bounded by `embedding_timeout` seconds (default:
+    EMBEDDING_TIMEOUT_SECONDS via OrchestratorConfig.from_env). On timeout the
+    book goes to NEEDS_RETRY with failed_in="embedding", which the retry loop
+    routes back here. No sqlite transaction is held while waiting.
+
+    Known limit: the timed-out call is not cancelled and may still finish
+    later (or die with the process, for the CLI). Chunk rows are committed
+    before embedding, so a timeout can leave chunks with embedding NULL;
+    generate_embeddings re-selects such chapters on retry, and this function
+    refuses COMPLETE while any chunk for the book is unembedded. The residual
+    race is a retry overlapping a still-running orphan in its chunk-insert
+    phase: both INSERT OR REPLACE the same ids and one can reset an embedding
+    the other wrote to NULL; the unembedded check then sends the book around
+    the retry loop again rather than publishing it. Timeouts count against
+    max_retry_attempts.
     """
     repo = PipelineRepository(db_path)
 
@@ -222,11 +290,18 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
     repo.update_state(pipeline_id, PipelineState.EMBEDDING)
 
     try:
+        # Resolved inside the try: a bad env value must land the book in
+        # NEEDS_RETRY with a visible error, not strand it in EMBEDDING.
+        if embedding_timeout is None:
+            from agentic_pipeline.config import embedding_timeout_from_env
+
+            embedding_timeout = embedding_timeout_from_env()
+
         # Lazy import — book_ingestion may not be installed in test envs
         from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
 
         adapter = ProcessingAdapter(db_path=db_path)
-        result = adapter.generate_embeddings(book_id=book_id)
+        result = _call_with_timeout(adapter.generate_embeddings, embedding_timeout, book_id=book_id)
 
         if not result.success:
             logger.warning("Embedding failed for %s: %s", pipeline_id, result.error)
@@ -239,6 +314,16 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
                 "state": PipelineState.NEEDS_RETRY.value,
                 "embedding_error": result.error,
             }
+
+        # Fail loudly rather than publish a book whose chunks lack embeddings
+        # (e.g. an earlier attempt timed out after committing chunk rows).
+        stuck = _unembedded_chapters(db_path, book_id)
+        if stuck:
+            shown = ", ".join(stuck[:5]) + (f" (+{len(stuck) - 5} more)" if len(stuck) > 5 else "")
+            raise RuntimeError(
+                f"chunks without embeddings remain in chapter {shown} for {book_id} "
+                "(source file missing/empty or unreadable?)"
+            )
 
         # Make the chapters keyword-searchable (text_search). Best-effort:
         # sync_book_fts swallows its own errors, so an index problem can't fail approval.
@@ -262,6 +347,18 @@ def _complete_approved(db_path: Path, pipeline_id: str, pipeline: dict) -> dict:
         return {
             "state": PipelineState.COMPLETE.value,
             "chapters_embedded": result.chapters_processed,
+        }
+
+    except EmbeddingTimeout as e:
+        logger.error("Embedding timed out for %s: %s", pipeline_id, e)
+        repo.update_state(
+            pipeline_id,
+            PipelineState.NEEDS_RETRY,
+            error_details={"embedding_error": str(e), "failed_in": "embedding", "timeout": True},
+        )
+        return {
+            "state": PipelineState.NEEDS_RETRY.value,
+            "embedding_error": str(e),
         }
 
     except Exception as e:
