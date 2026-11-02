@@ -193,7 +193,7 @@ cli.py / mcp_server.py
           ├── PipelineRepository (db/)
           └── approval/actions.py
                 ├── AuditTrail (audit/)
-                └── _complete_approved() → runs embedding inline
+                └── _complete_approved() → EMBEDDING → COMPLETE (background thread by default; synchronous when background=False)
 ```
 
 **Key rule:** `db/connection.py:get_pipeline_db()` is the only correct way to open the pipeline DB. All other modules call it — never open `sqlite3.connect()` directly.
