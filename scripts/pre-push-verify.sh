@@ -63,8 +63,20 @@ if [[ -n "$portability_hits" ]]; then
 fi
 printf 'pre-push: portability check passed.\n'
 
-printf 'pre-push: syncing locked dependencies (uv sync --locked --python 3.12 --extra dev)...\n'
-uv sync --locked --python 3.12 --extra dev
+# The main checkout's .venv is shared live infrastructure: the launchd worker
+# and other projects' MCP configs run out of it, and `book_ingestion` (a local
+# editable sibling, deliberately outside pyproject.toml deps) lives in it. A
+# `uv sync` here removes that package and crash-loops the worker (#19). So only
+# linked worktrees (own private venv) sync; the main checkout runs lint + test
+# against its existing venv without mutating it.
+git_dir="$(git rev-parse --absolute-git-dir)"
+git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+if [[ "$git_dir" == "$git_common_dir" ]]; then
+  printf 'pre-push: main checkout -- skipping uv sync so the shared .venv keeps book_ingestion (run it by hand after changing deps/lock; see CLAUDE.md).\n'
+else
+  printf 'pre-push: syncing locked dependencies (uv sync --locked --python 3.12 --extra dev)...\n'
+  uv sync --locked --python 3.12 --extra dev
+fi
 
 printf 'pre-push: running make lint && make test (bypass: git push --no-verify)\n'
 if ! { make lint && make test; }; then
