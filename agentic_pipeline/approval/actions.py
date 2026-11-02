@@ -220,7 +220,7 @@ def _call_with_timeout(fn, timeout: float, **kwargs):
     def runner():
         try:
             box["result"] = fn(**kwargs)
-        except Exception as e:  # SystemExit/KeyboardInterrupt are left to propagate
+        except BaseException as e:  # noqa: BLE001 - surfaced in the caller, never lost in the thread
             box["error"] = e
 
     thread = threading.Thread(target=runner, daemon=True, name="embedding-call")
@@ -229,19 +229,25 @@ def _call_with_timeout(fn, timeout: float, **kwargs):
     if thread.is_alive():
         raise EmbeddingTimeout(f"Embedding exceeded {timeout}s timeout")
     if "error" in box:
-        raise box["error"]
+        err = box["error"]
+        if isinstance(err, Exception):
+            raise err
+        # SystemExit/KeyboardInterrupt inside the worker thread must not escape
+        # as-is: it would skip the NEEDS_RETRY handling and strand the book.
+        raise RuntimeError(f"embedding call aborted with {type(err).__name__}") from err
     return box["result"]
 
 
-def _count_unembedded_chunks(db_path: Path, book_id: str) -> int:
+def _unembedded_chapters(db_path: Path, book_id: str) -> list[str]:
+    """Chapter ids of this book that still have chunks without an embedding."""
     from agentic_pipeline.db.connection import get_pipeline_db
 
     with get_pipeline_db(str(db_path)) as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) AS n FROM chunks WHERE book_id = ? AND embedding IS NULL",
+        rows = conn.execute(
+            "SELECT DISTINCT chapter_id FROM chunks WHERE book_id = ? AND embedding IS NULL ORDER BY chapter_id",
             (book_id,),
-        ).fetchone()
-    return row["n"]
+        ).fetchall()
+    return [r["chapter_id"] for r in rows]
 
 
 def _complete_approved(
@@ -271,11 +277,6 @@ def _complete_approved(
     the retry loop again rather than publishing it. Timeouts count against
     max_retry_attempts.
     """
-    if embedding_timeout is None:
-        from agentic_pipeline.config import OrchestratorConfig
-
-        embedding_timeout = OrchestratorConfig.from_env().embedding_timeout
-
     repo = PipelineRepository(db_path)
 
     # Extract book_id from processing_result (same logic as orchestrator)
@@ -289,6 +290,13 @@ def _complete_approved(
     repo.update_state(pipeline_id, PipelineState.EMBEDDING)
 
     try:
+        # Resolved inside the try: a bad env value must land the book in
+        # NEEDS_RETRY with a visible error, not strand it in EMBEDDING.
+        if embedding_timeout is None:
+            from agentic_pipeline.config import embedding_timeout_from_env
+
+            embedding_timeout = embedding_timeout_from_env()
+
         # Lazy import — book_ingestion may not be installed in test envs
         from agentic_pipeline.adapters.processing_adapter import ProcessingAdapter
 
@@ -309,9 +317,13 @@ def _complete_approved(
 
         # Fail loudly rather than publish a book whose chunks lack embeddings
         # (e.g. an earlier attempt timed out after committing chunk rows).
-        unembedded = _count_unembedded_chunks(db_path, book_id)
-        if unembedded:
-            raise RuntimeError(f"{unembedded} chunk(s) for {book_id} still have no embedding")
+        stuck = _unembedded_chapters(db_path, book_id)
+        if stuck:
+            shown = ", ".join(stuck[:5]) + (f" (+{len(stuck) - 5} more)" if len(stuck) > 5 else "")
+            raise RuntimeError(
+                f"chunks without embeddings remain in chapter {shown} for {book_id} "
+                "(source file missing/empty or unreadable?)"
+            )
 
         # Make the chapters keyword-searchable (text_search). Best-effort:
         # sync_book_fts swallows its own errors, so an index problem can't fail approval.

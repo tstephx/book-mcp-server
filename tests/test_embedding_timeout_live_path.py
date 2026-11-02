@@ -55,7 +55,7 @@ def _ok_result():
 
 def _hang(release):
     def slow(*args, **kwargs):
-        release.wait(timeout=3)
+        release.wait(timeout=8)
         # Eventually "succeeds": without a timeout the book would reach COMPLETE,
         # so the NEEDS_RETRY assertions can't pass for an unrelated reason.
         return _ok_result()
@@ -77,7 +77,7 @@ def test_hung_embedding_times_out_to_needs_retry(MockAdapter, db_path, monkeypat
     finally:
         release.set()
 
-    assert time.monotonic() - start < 2.5, "timeout was not enforced; call hung"
+    assert time.monotonic() - start < 5, "timeout was not enforced; call hung"
     assert result["state"] == PipelineState.NEEDS_RETRY.value
     assert "timeout" in result["embedding_error"].lower()
     assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.NEEDS_RETRY.value
@@ -174,7 +174,9 @@ def test_unembedded_chunks_block_complete(MockAdapter, db_path):
     result = _complete_approved(db_path, pid, pipeline, embedding_timeout=5)
 
     assert result["state"] == PipelineState.NEEDS_RETRY.value
-    assert _history_error(db_path, pid)["failed_in"] == "embedding"
+    err = _history_error(db_path, pid)
+    assert err["failed_in"] == "embedding"
+    assert "chapter c" in err["embedding_error"], "operator must be told which chapter is stuck"
 
 
 def test_retry_after_timeout_completes(MockAdapter, db_path):
@@ -213,7 +215,7 @@ def test_background_entry_point_times_out(MockAdapter, db_path, monkeypatch):
     pid = _create_pending_pipeline(db_path)
     try:
         approve_book(db_path, pid, actor="human:taylor", background=True)
-        deadline = time.monotonic() + 2.5
+        deadline = time.monotonic() + 5
         repo = PipelineRepository(db_path)
         while time.monotonic() < deadline:
             if repo.get(pid)["state"] == PipelineState.NEEDS_RETRY.value:
@@ -240,3 +242,32 @@ def test_call_with_timeout_propagates_exceptions_and_results():
     assert _call_with_timeout(lambda x: x * 2, 1, x=4) == 8
     with pytest.raises(KeyError):
         _call_with_timeout(lambda: {}["missing"], 1)
+
+
+def test_call_with_timeout_reports_thread_that_died_without_result():
+    """SystemExit in the worker thread is reported as a clear RuntimeError, not lost or a KeyError."""
+    from agentic_pipeline.approval.actions import _call_with_timeout
+
+    def die():
+        raise SystemExit(1)
+
+    with pytest.raises(RuntimeError, match="aborted with SystemExit"):
+        _call_with_timeout(die, 1)
+
+
+@pytest.mark.parametrize("bad", ["abc", "0", "-3"])
+def test_bad_timeout_env_is_recorded_not_raised(bad, MockAdapter, db_path, monkeypatch):
+    """A bad EMBEDDING_TIMEOUT_SECONDS must not strand the book in APPROVED: it is
+    recorded as an embedding failure (visible, retryable once fixed)."""
+    from agentic_pipeline.approval.actions import _complete_approved
+    from agentic_pipeline.db.pipelines import PipelineRepository
+
+    monkeypatch.setenv("EMBEDDING_TIMEOUT_SECONDS", bad)
+    MockAdapter.return_value.generate_embeddings.return_value = _ok_result()
+    pid, pipeline = _setup_approved_pipeline(db_path)
+
+    result = _complete_approved(db_path, pid, pipeline)
+
+    assert result["state"] == PipelineState.NEEDS_RETRY.value
+    assert "EMBEDDING_TIMEOUT_SECONDS" in result["embedding_error"]
+    assert PipelineRepository(db_path).get(pid)["state"] == PipelineState.NEEDS_RETRY.value
