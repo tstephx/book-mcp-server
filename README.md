@@ -45,19 +45,20 @@ Add to your Claude Desktop MCP config:
 {
   "mcpServers": {
     "book-library": {
-      "command": "/path/to/book-mcp-server/.venv/bin/python",
-      "args": ["/path/to/book-mcp-server/server.py"],
-      "env": {
-        "BOOK_DB_PATH": "/path/to/library.db",
-        "BOOKS_DIR": "/path/to/books",
-        "OPENAI_API_KEY": "sk-..."
-      }
+      "command": "op",
+      "args": [
+        "run", "--env-file=/path/to/book-mcp-server/.env", "--",
+        "/path/to/book-mcp-server/.venv/bin/python",
+        "/path/to/book-mcp-server/server.py"
+      ]
     }
   }
 }
 ```
 
-**Critical:** Use the `.venv/bin/python` path — it has all required dependencies. `OPENAI_API_KEY` is required for semantic search.
+Copy `.env.example` to `.env` first; it holds `op://` references (including `OPENAI_API_KEY`, required for semantic search), never literal keys.
+
+**Critical:** Use the `.venv/bin/python` path — it has all required dependencies.
 
 ### Agentic Pipeline (CLI)
 
